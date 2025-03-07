@@ -7,6 +7,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { EmailModule } from './email/email.module';
 import { TypedEventEmitterModule } from './event-emitter/typed-event-emitter.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { SeedsModule } from './modules/seeds/seeds.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     PrismaModule,
     AdminModule,
     EmailModule,
+    SeedsModule,
     EventEmitterModule.forRoot(),
     TypedEventEmitterModule,
   ],
