@@ -7,12 +7,54 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id                 String      @id @unique @default(uuid())
+  name               String
+  userRol            UserRolType
+  email              String
+  password           String
+  phone              String?
+  isSuperAdmin       Boolean     @default(false)
+  lastLogin          DateTime    @default(now()) @db.Timestamptz(6)
+  isActive           Boolean     @default(true)
+  mustChangePassword Boolean     @default(true)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+
+  // Relación con auditorías (acciones realizadas por este usuario)
+  auditsPerformed Audit[] @relation("AuditPerformedBy")
+
+  @@unique([email, isActive])
+}
+
+enum UserRolType {
+  ADMIN
+  RECEPCIONIST
+}
+
+model Audit {
+  id            String          @id @unique @default(uuid())
+  entityId      String
+  entityType    String // Representa el nombre del modelo (ej: User, Rol, etc.)
+  action        AuditActionType // Representa la acción (CREATE, UPDATE, DELETE)
+  performedBy   User            @relation("AuditPerformedBy", fields: [performedById], references: [id])
+  performedById String
+  createdAt     DateTime        @default(now()) @db.Timestamptz(6)
+}
+
+enum AuditActionType {
+  CREATE
+  UPDATE
+  DELETE
+}
+
 model Customer {
   id             String   @id @default(uuid())
   name           String
   address        String
   birthPlace     String
-  country         String
+  country        String
   department     String
   province       String
   phone          String
