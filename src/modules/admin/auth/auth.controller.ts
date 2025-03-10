@@ -11,7 +11,7 @@ import {
 import { Response, Request } from 'express';
 import { RefreshAuth } from './decorators';
 
-@ApiTags('Auth')
+@ApiTags('Admin Auth')
 @ApiInternalServerErrorResponse({
   description: 'Internal server error',
 })

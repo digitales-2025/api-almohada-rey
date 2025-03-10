@@ -9,7 +9,7 @@ import {
 import { Auth } from '../auth/decorators';
 
 @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-@ApiTags('Audit')
+@ApiTags('Admin Audit')
 @Auth()
 @Controller({
   path: 'audit',

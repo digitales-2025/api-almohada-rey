@@ -25,7 +25,7 @@ import {
 import { DeleteUsersDto } from './dto/delete-users.dto';
 import { HttpResponse, UserData, UserPayload } from 'src/interfaces';
 
-@ApiTags('Users')
+@ApiTags('Admin Users')
 @ApiUnauthorizedResponse({ description: 'Unauthorized' })
 @ApiInternalServerErrorResponse({ description: 'Internal server error' })
 @ApiBadRequestResponse({ description: 'Bad request' })

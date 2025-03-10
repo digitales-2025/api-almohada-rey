@@ -10,7 +10,7 @@ import {
 } from '@nestjs/swagger';
 import { HttpResponse, UserData } from 'src/interfaces';
 
-@ApiTags('Admin')
+@ApiTags('Admin Account')
 @ApiUnauthorizedResponse({
   description: 'Unauthorized',
 })
