@@ -5,8 +5,8 @@ import { EventPayloads } from 'src/interfaces/event-types.interface';
 import { getFirstWord } from 'src/utils';
 
 const infoBusiness = {
-  business: 'Trazo',
-  url: 'https://trazo.com',
+  business: 'La Almohada del Rey',
+  url: 'https://almohada-rey.com',
   phone: '+51 999 999 998',
   address: '1234 Street',
   contact: 'contacto@gmail.com',
