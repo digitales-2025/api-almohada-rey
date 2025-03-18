@@ -4,7 +4,7 @@ import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { ConfigModule } from '@nestjs/config';
 import { AdminModule } from './modules/admin/admin.module';
-import { EmailModule } from './email/email.module';
+import { EmailModule } from './modules/email/email.module';
 import { TypedEventEmitterModule } from './event-emitter/typed-event-emitter.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { SeedsModule } from './modules/seeds/seeds.module';

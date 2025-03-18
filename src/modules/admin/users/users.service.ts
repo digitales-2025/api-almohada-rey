@@ -90,19 +90,19 @@ export class UsersService {
         });
 
         // Enviamos el usuario al correo con la contraseña temporal
-        //const emailResponse = await this.eventEmitter.emitAsync(
-        //  'user.welcome-admin-first',
-        //  {
-        //    name: newUser.name.toUpperCase(),
-        //    email,
-        //    password,
-        //    webAdmin: process.env.WEB_URL,
-        //  },
-        //);
-        //
-        //if (emailResponse.every((response) => response !== true)) {
-        //  throw new BadRequestException('Failed to send email');
-        //}
+        const emailResponse = await this.eventEmitter.emitAsync(
+          'user.welcome-admin-first',
+          {
+            name: newUser.name.toUpperCase(),
+            email,
+            password,
+            webAdmin: process.env.WEB_URL,
+          },
+        );
+
+        if (emailResponse.every((response) => response !== true)) {
+          throw new BadRequestException('Failed to send email');
+        }
 
         await this.audit.create({
           entityId: newUser.id,
