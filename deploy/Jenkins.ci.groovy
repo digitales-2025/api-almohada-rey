@@ -3,6 +3,7 @@ pipeline {
 		docker {
 			image 'node:22'
 			reuseNode true
+      args '-u 0:0'
 		}
 	}
 	stages {
