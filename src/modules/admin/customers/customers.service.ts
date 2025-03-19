@@ -330,8 +330,60 @@ export class CustomersService {
     }
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} customer`;
+  /**
+   * Buscar un cliente por su id
+   * @param id Id del cliente
+   * @returns Datos del cliente
+   */
+  async findOne(id: string): Promise<CustomerData> {
+    try {
+      return await this.findById(id);
+    } catch (error) {
+      this.logger.error('Error get customer');
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      handleException(error, 'Error get customer');
+    }
+  }
+
+  /**
+   * Buscar un cliente por su id y validar si existe
+   * @param id Id del cliente
+   * @returns Datos del cliente
+   */
+  async findById(id: string): Promise<CustomerData> {
+    const customerDb = await this.prisma.customer.findFirst({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        address: true,
+        birthPlace: true,
+        country: true,
+        documentNumber: true,
+        documentType: true,
+        email: true,
+        maritalStatus: true,
+        occupation: true,
+        phone: true,
+        ruc: true,
+        companyAddress: true,
+        companyName: true,
+        department: true,
+        province: true,
+        isActive: true,
+      },
+    });
+    if (!customerDb) {
+      throw new BadRequestException('This customer doesnt exist');
+    }
+
+    if (!!customerDb && !customerDb.isActive) {
+      throw new BadRequestException('This customer exist, but is inactive');
+    }
+
+    return customerDb;
   }
 
   update(id: number, updateCustomerDto: UpdateCustomerDto) {

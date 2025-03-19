@@ -53,9 +53,10 @@ export class CustomersController {
     return this.customersService.findAll(user);
   }
 
+  @ApiOkResponse({ description: 'Customer found successfully' })
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.customersService.findOne(+id);
+    return this.customersService.findOne(id);
   }
 
   @Patch(':id')
