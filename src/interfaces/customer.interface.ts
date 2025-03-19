@@ -4,6 +4,7 @@ export type CustomerData = Pick<
   Customer,
   | 'id'
   | 'name'
+  | 'address'
   | 'birthPlace'
   | 'country'
   | 'phone'
