@@ -47,6 +47,8 @@ enum AuditActionType {
   CREATE
   UPDATE
   DELETE
+  REACTIVATE
+  UPDATE_STATUS
 }
 
 model Customer {
