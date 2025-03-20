@@ -21,6 +21,7 @@ import {
   createDynamicUpdateObject,
   hasNoChanges,
 } from 'src/utils/update-validations.util';
+import { DeleteCustomerDto } from './dto/delete-customer.dto';
 
 @Injectable()
 export class CustomersService {
@@ -276,6 +277,11 @@ export class CustomersService {
     }
   }
 
+  /**
+   * Listar todos los clientes
+   * @param user Usuario que realiza la acción
+   * @returns Lista de clientes
+   */
   async findAll(user: UserPayload): Promise<CustomerData[]> {
     try {
       const customers = await this.prisma.customer.findMany({
@@ -461,13 +467,12 @@ export class CustomersService {
           },
         });
         // Crear un registro de auditoría
-        await prisma.audit.create({
-          data: {
-            entityId: customer.id,
-            action: AuditActionType.UPDATE,
-            performedById: user.id,
-            entityType: 'customer',
-          },
+        await this.audit.create({
+          entityId: customer.id,
+          entityType: 'customer',
+          action: AuditActionType.UPDATE,
+          performedById: user.id,
+          createdAt: new Date(),
         });
 
         return customer;
@@ -508,7 +513,161 @@ export class CustomersService {
     }
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} customer`;
+  /**
+   * Reactivar todos los clientes inactivos
+   * @param user Usuario que realiza la acción
+   * @param customers Lista de clientes a reactivar
+   * @returns Respuesta de la acción
+   */
+  async reactivateAll(
+    user: UserData,
+    customers: DeleteCustomerDto,
+  ): Promise<Omit<HttpResponse, 'data'>> {
+    try {
+      await this.prisma.$transaction(async (prisma) => {
+        // Buscar los clientes en la base de datos
+        const customersDB = await prisma.customer.findMany({
+          where: {
+            id: { in: customers.ids },
+          },
+          select: {
+            id: true,
+            isActive: true,
+          },
+        });
+
+        // Validar que se encontraron los clientes
+        if (customersDB.length === 0) {
+          throw new NotFoundException('Customers not found');
+        }
+
+        // Filtrar solo los clientes inactivos
+        const inactiveCustomers = customersDB.filter(
+          (customer) => !customer.isActive,
+        );
+
+        // Si no hay clientes inactivos, simplemente retornamos sin hacer cambios
+        if (inactiveCustomers.length === 0) {
+          return [];
+        }
+
+        // Reactivar solo los clientes inactivos
+        const reactivatePromises = inactiveCustomers.map(async (customer) => {
+          // Activar el cliente
+          await prisma.customer.update({
+            where: { id: customer.id },
+            data: { isActive: true },
+          });
+
+          await this.audit.create({
+            entityId: customer.id,
+            entityType: 'customer',
+            action: AuditActionType.REACTIVATE,
+            performedById: user.id,
+            createdAt: new Date(),
+          });
+
+          return {
+            id: customer.id,
+            isActive: true,
+          };
+        });
+
+        return Promise.all(reactivatePromises);
+      });
+
+      return {
+        statusCode: HttpStatus.OK,
+        message: 'Customers reactivated successfully',
+      };
+    } catch (error) {
+      this.logger.error('Error reactivating customers', error.stack);
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      handleException(error, 'Error reactivating customers');
+    }
+  }
+
+  /**
+   * Desactivar clientes
+   * @param customers Lista de clientes a desactivar
+   * @param user Usuario que realiza la acción
+   * @returns Respuesta de la acción
+   */
+  async removeAll(
+    customers: DeleteCustomerDto,
+    user: UserData,
+  ): Promise<Omit<HttpResponse, 'data'>> {
+    try {
+      await this.prisma.$transaction(async (prisma) => {
+        // Buscar los clientes en la base de datos
+        const customersDB = await prisma.customer.findMany({
+          where: {
+            id: { in: customers.ids },
+          },
+          select: {
+            id: true,
+            isActive: true,
+          },
+        });
+
+        // Validar que se encontraron los clientes
+        if (customersDB.length === 0) {
+          throw new NotFoundException('Customers not found');
+        }
+
+        // Filtrar solo los clientes activos
+        const activeCustomers = customersDB.filter(
+          (customer) => customer.isActive,
+        );
+
+        // Si no hay clientes activos, simplemente retornamos sin hacer cambios
+        if (activeCustomers.length === 0) {
+          return [];
+        }
+
+        // Desactivar solo los clientes activos
+        const deactivatePromises = activeCustomers.map(async (customer) => {
+          // Desactivar cliente
+          await prisma.customer.update({
+            where: { id: customer.id },
+            data: { isActive: false },
+          });
+
+          await this.audit.create({
+            entityId: customer.id,
+            entityType: 'customer',
+            action: AuditActionType.DELETE,
+            performedById: user.id,
+            createdAt: new Date(),
+          });
+
+          return {
+            id: customer.id,
+            isActive: false,
+          };
+        });
+
+        return Promise.all(deactivatePromises);
+      });
+
+      return {
+        statusCode: HttpStatus.OK,
+        message: 'Customers deactivated successfully',
+      };
+    } catch (error) {
+      this.logger.error('Error deactivating customers', error.stack);
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      handleException(error, 'Error deactivating customers');
+    }
   }
 }

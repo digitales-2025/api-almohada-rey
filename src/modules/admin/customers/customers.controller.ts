@@ -25,6 +25,7 @@ import {
   UserData,
   UserPayload,
 } from 'src/interfaces';
+import { DeleteCustomerDto } from './dto/delete-customer.dto';
 
 @ApiTags('Admin Customers')
 @ApiUnauthorizedResponse({ description: 'Unauthorized' })
@@ -69,8 +70,21 @@ export class CustomersController {
     return this.customersService.update(id, updateCustomerDto, user);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.customersService.remove(+id);
+  @ApiOkResponse({ description: 'Customers deactivated successfully' })
+  @Delete('remove/all')
+  deactivate(
+    @Body() customers: DeleteCustomerDto,
+    @GetUser() user: UserData,
+  ): Promise<Omit<HttpResponse, 'data'>> {
+    return this.customersService.removeAll(customers, user);
+  }
+
+  @ApiOkResponse({ description: 'Customers reactivated successfully' })
+  @Patch('reactivate/all')
+  reactivateAll(
+    @GetUser() user: UserData,
+    @Body() customers: DeleteCustomerDto,
+  ): Promise<Omit<HttpResponse, 'data'>> {
+    return this.customersService.reactivateAll(user, customers);
   }
 }
