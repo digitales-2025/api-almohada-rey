@@ -7,7 +7,6 @@ import {
   IsInt,
   IsNumber,
   IsEnum,
-  Min,
   IsPositive,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
