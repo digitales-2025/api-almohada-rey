@@ -42,7 +42,9 @@
     "passport-jwt": "^4.0.1",
     "prisma": "^6.4.1",
     "reflect-metadata": "^0.2.0",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "@aws-sdk/client-s3": "^3.738.0",
+    "@types/multer": "^1.4.12"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.7.1",
