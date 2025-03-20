@@ -9,6 +9,7 @@ import { TypedEventEmitterModule } from './event-emitter/typed-event-emitter.mod
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { SeedsModule } from './modules/seeds/seeds.module';
 import { CustomersModule } from './modules/admin/customers/customers.module';
+import { ReservationModule } from './modules/reservation/reservation.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { CustomersModule } from './modules/admin/customers/customers.module';
     EventEmitterModule.forRoot(),
     TypedEventEmitterModule,
     CustomersModule,
+    ReservationModule,
   ],
   controllers: [AppController],
   providers: [AppService],
