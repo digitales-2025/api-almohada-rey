@@ -8,6 +8,7 @@ import { EmailModule } from './modules/email/email.module';
 import { TypedEventEmitterModule } from './event-emitter/typed-event-emitter.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { SeedsModule } from './modules/seeds/seeds.module';
+import { CustomersModule } from './modules/admin/customers/customers.module';
 import { CloudflareModule } from './cloudflare/cloudflare.module';
 
 @Module({
@@ -21,6 +22,7 @@ import { CloudflareModule } from './cloudflare/cloudflare.module';
     SeedsModule,
     EventEmitterModule.forRoot(),
     TypedEventEmitterModule,
+    CustomersModule,
     CloudflareModule,
   ],
   controllers: [AppController],

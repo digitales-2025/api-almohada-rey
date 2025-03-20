@@ -47,26 +47,41 @@ enum AuditActionType {
   CREATE
   UPDATE
   DELETE
+  REACTIVATE
+  UPDATE_STATUS
 }
 
 model Customer {
-  id             String   @id @default(uuid())
+  id             String               @id @default(uuid())
   name           String
   address        String
   birthPlace     String
   country        String
-  department     String
-  province       String
+  department     String?
+  province       String?
   phone          String
   occupation     String
-  documentType   String
-  documentNumber String   @unique
-  email          String   @unique
-  maritalStatus  String
+  documentType   CustomerDocumentType
+  documentNumber String               @unique
+  email          String               @unique
+  maritalStatus  CustomerMaritalStatus
   companyName    String?
-  ruc            String?  @unique
+  ruc            String?              @unique
   companyAddress String?
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime @updatedAt
+  isActive       Boolean              @default(true)
+  createdAt      DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime             @updatedAt
+}
+
+enum CustomerDocumentType {
+  DNI
+  PASSPORT
+  FOREIGNER_CARD
+}
+
+enum CustomerMaritalStatus {
+  SINGLE
+  MARRIED
+  DIVORCED
+  WIDOWED
 }

@@ -41,6 +41,7 @@ async function bootstrap() {
     },
     { name: 'Admin Users', description: 'Gestión de usuarios administradores' },
     { name: 'Admin Audit', description: 'Gestión de auditoría' },
+    { name: 'Admin Customers', description: 'Gestión de clientes' },
   ];
 
   SwaggerModule.setup('api', app, document);
