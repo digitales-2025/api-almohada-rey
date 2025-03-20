@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Room } from '../entities/rooms.entity';
 import { BaseRepository, PrismaService } from 'src/prisma/src';
-import { RoomTypes, RoomStatus, FloorTypes } from '@prisma/client'; // Importar desde Prisma
 
 export interface CreateImageRoomData {
   room: string;
@@ -19,7 +18,7 @@ export class RoomsRepository extends BaseRepository<Room> {
    * Obtiene todas las habitaciones
    * @returns Promise<Room[]>
    */
-/*   async findMany(): Promise<Room[]> {
+  /*   async findMany(): Promise<Room[]> {
     return this.prisma.room.findMany({
       where: {},
       orderBy: { number: 'asc' },
@@ -35,7 +34,7 @@ export class RoomsRepository extends BaseRepository<Room> {
     const room = await this.prisma.room.findUnique({
       where: { id },
     });
-    
+
     // Si necesitas devolver el resultado como Room, puedes usar type assertion
     return room as unknown as Room;
   }
@@ -49,7 +48,7 @@ export class RoomsRepository extends BaseRepository<Room> {
     const room = await this.prisma.room.findUnique({
       where: { number },
     });
-    
+
     // Si necesitas devolver el resultado como Room, puedes usar type assertion
     return room as unknown as Room;
   }
@@ -130,7 +129,7 @@ export class RoomsRepository extends BaseRepository<Room> {
    * @param roomId ID de la habitación
    * @returns Promise con array de objetos de imágenes
    */
-   async findImagesByRoomId(
+  async findImagesByRoomId(
     roomId: string,
   ): Promise<Array<{ id: string; url: string; isMain: boolean }>> {
     try {
@@ -148,7 +147,7 @@ export class RoomsRepository extends BaseRepository<Room> {
           isMain: 'desc', // Las imágenes principales primero
         },
       });
-  
+
       // Transformar a formato de respuesta incluyendo isMain
       return images.map((img) => ({
         id: img.id,

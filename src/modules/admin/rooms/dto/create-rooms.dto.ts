@@ -64,7 +64,7 @@ export class CreateRoomDto {
 
   @ApiProperty({
     description: 'Precio por noche',
-    example: 150.50,
+    example: 150.5,
     required: true,
   })
   @IsNumber()

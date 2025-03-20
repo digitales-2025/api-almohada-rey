@@ -19,21 +19,21 @@ export class FormatDataInterceptor implements NestInterceptor {
         throw new BadRequestException('number must be a valid integer');
       }
     }
-    
+
     if (request.body.guests) {
       request.body.guests = Number(request.body.guests);
       if (isNaN(request.body.guests)) {
         throw new BadRequestException('guests must be a valid integer');
       }
     }
-    
+
     if (request.body.price) {
       request.body.price = Number(request.body.price);
       if (isNaN(request.body.price)) {
         throw new BadRequestException('price must be a valid number');
       }
     }
-    
+
     if (request.body.area) {
       request.body.area = Number(request.body.area);
       if (isNaN(request.body.area)) {
