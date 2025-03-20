@@ -76,10 +76,10 @@ importers:
         version: 7.8.2
     devDependencies:
       '@commitlint/cli':
-        specifier: ^19.7.1
+        specifier: ^19.8.0
         version: 19.8.0(@types/node@20.17.24)(typescript@5.8.2)
       '@commitlint/config-conventional':
-        specifier: ^19.7.1
+        specifier: ^19.8.0
         version: 19.8.0
       '@nestjs/cli':
         specifier: ^10.0.0
