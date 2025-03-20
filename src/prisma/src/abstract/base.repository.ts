@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { PrismaTransaction, QueryParams, CreateDto, UpdateDto } from '../types';
+import { BaseEntity } from './base.entity';
 
 /**
  * Clase base abstracta que implementa operaciones CRUD genéricas.
@@ -11,7 +12,7 @@ import { PrismaTransaction, QueryParams, CreateDto, UpdateDto } from '../types';
  * @template T - Tipo de entidad que maneja el repositorio
  */
 @Injectable()
-export abstract class BaseRepository<T extends { id: string }> {
+export abstract class BaseRepository<T extends BaseEntity> {
   constructor(
     protected readonly prisma: PrismaService,
     protected readonly modelName: keyof PrismaService,
@@ -19,35 +20,44 @@ export abstract class BaseRepository<T extends { id: string }> {
 
   /**
    * Crea una nueva entidad en la base de datos
+   * @template V - Tipo opcional para el retorno, por defecto es T
    * @param createDto - DTO con los datos para crear la entidad
+   * @returns - La entidad creada con el tipo especificado
    * @throws {ValidationError} Si los datos no son válidos
    */
-  async create(createDto: CreateDto<T>): Promise<T> {
-    return this.prisma.measureQuery(`create${String(this.modelName)}`, () =>
-      (this.prisma[this.modelName] as any).create({
-        data: this.mapDtoToEntity(createDto),
-      }),
+  async create<V = T>(createDto: CreateDto<T>): Promise<V> {
+    const result = await this.prisma.measureQuery(
+      `create${String(this.modelName)}`,
+      () =>
+        (this.prisma[this.modelName] as any).create({
+          data: this.mapDtoToEntity(createDto),
+        }),
     );
+
+    return result as unknown as V;
   }
 
   /**
    * Busca múltiples registros con filtros opcionales
+   * @template V - Tipo opcional para el retorno, por defecto es T
    * @param params - Parámetros de búsqueda, ordenamiento y paginación
    */
-  async findMany(params?: QueryParams): Promise<T[]> {
-    return this.prisma.measureQuery(`findMany${String(this.modelName)}`, () =>
-      (this.prisma[this.modelName] as any).findMany(params),
+  async findMany<V = T>(params?: QueryParams): Promise<V[]> {
+    const result = await this.prisma.measureQuery(
+      `findMany${String(this.modelName)}`,
+      () => (this.prisma[this.modelName] as any).findMany(params),
     );
+    return result as unknown as V[];
   }
 
   /**
    * Busca múltiples registros activos en la base de datos.
-   *
+   * @template V - Tipo opcional para el retorno, por defecto es T
    * @param {QueryParams} [params] - Parámetros opcionales para la consulta.
-   * @returns {Promise<T[]>} - Una promesa que resuelve con una lista de registros activos.
+   * @returns {Promise<V[]>} - Una promesa que resuelve con una lista de registros activos.
    */
-  async findManyActive(params?: QueryParams): Promise<T[]> {
-    return this.prisma.measureQuery(
+  async findManyActive<V = T>(params?: QueryParams): Promise<V[]> {
+    const result = await this.prisma.measureQuery(
       `findManyActive${String(this.modelName)}`,
       () =>
         (this.prisma[this.modelName] as any).findMany({
@@ -58,45 +68,54 @@ export abstract class BaseRepository<T extends { id: string }> {
           },
         }),
     );
+    return result as unknown as V[];
   }
 
   /**
    * Busca un registro por parámetros.
+   * @template V - Tipo opcional para el retorno, por defecto es T
    * @param params - Parámetros de búsqueda.
    * @returns El registro encontrado o null si no se encuentra.
    */
-  async findOne(params: QueryParams): Promise<T | null> {
-    return this.prisma.measureQuery(`findOne${String(this.modelName)}`, () =>
-      (this.prisma[this.modelName] as any).findFirst(params),
+  async findOne<V = T>(params: QueryParams): Promise<V | null> {
+    const result = await this.prisma.measureQuery(
+      `findOne${String(this.modelName)}`,
+      () => (this.prisma[this.modelName] as any).findFirst(params),
     );
+    return result as unknown as V | null;
   }
 
   /**
    * Busca un registro por su id.
+   * @template V - Tipo opcional para el retorno, por defecto es T
    * @param id - ID del registro a buscar.
    * @param include - Relaciones a incluir.
    * @returns El registro encontrado o null si no se encuentra.
    */
-  async findById(
+  async findById<V = T>(
     id: string,
     include?: Record<string, boolean>,
-  ): Promise<T | null> {
-    return this.prisma.measureQuery(`findById${String(this.modelName)}`, () =>
-      (this.prisma[this.modelName] as any).findUnique({
-        where: { id },
-        include,
-      }),
+  ): Promise<V | null> {
+    const result = await this.prisma.measureQuery(
+      `findById${String(this.modelName)}`,
+      () =>
+        (this.prisma[this.modelName] as any).findUnique({
+          where: { id },
+          include,
+        }),
     );
+    return result as unknown as V | null;
   }
 
   /**
    * Actualiza un registro existente.
+   * @template V - Tipo opcional para el retorno, por defecto es T
    * @param id - ID del registro a actualizar.
    * @param updateDto - DTO con los datos para actualizar.
    * @returns El registro actualizado.
    * @throws {NotFoundException} Si el registro no se encuentra.
    */
-  async update(id: string, updateDto: UpdateDto<T>): Promise<T> {
+  async update<V = T>(id: string, updateDto: UpdateDto<T>): Promise<V> {
     const exists = await this.findById(id);
     if (!exists) {
       throw new NotFoundException(
@@ -104,20 +123,24 @@ export abstract class BaseRepository<T extends { id: string }> {
       );
     }
 
-    return this.prisma.measureQuery(`update${String(this.modelName)}`, () =>
-      (this.prisma[this.modelName] as any).update({
-        where: { id },
-        data: this.mapDtoToEntity(updateDto),
-      }),
+    const result = await this.prisma.measureQuery(
+      `update${String(this.modelName)}`,
+      () =>
+        (this.prisma[this.modelName] as any).update({
+          where: { id },
+          data: this.mapDtoToEntity(updateDto),
+        }),
     );
+    return result as unknown as V;
   }
 
   /**
    * Elimina un registro por su id.
+   * @template V - Tipo opcional para el retorno, por defecto es T
    * @param id - ID del registro a eliminar.
    * @throws {NotFoundException} Si el registro no se encuentra.
    */
-  async delete(id: string): Promise<T> {
+  async delete<V = T>(id: string): Promise<V> {
     const exists = await this.findById(id);
     if (!exists) {
       throw new NotFoundException(
@@ -125,22 +148,24 @@ export abstract class BaseRepository<T extends { id: string }> {
       );
     }
 
-    return await this.prisma.measureQuery(
+    const result = await this.prisma.measureQuery(
       `delete${String(this.modelName)}`,
       () =>
         (this.prisma[this.modelName] as any).delete({
           where: { id },
         }),
     );
+    return result as unknown as V;
   }
 
   /**
    * Elimina múltiples registros por sus IDs.
+   * @template V - Tipo opcional para el retorno, por defecto es T
    * @param ids - Array de IDs de los registros a eliminar
    * @returns Array con los registros eliminados
    * @throws {NotFoundException} Si alguno de los registros no se encuentra
    */
-  async deleteMany(ids: string[]): Promise<T[]> {
+  async deleteMany<V = T>(ids: string[]): Promise<V[]> {
     // Find existing records
     const existingRecords = await this.findMany({
       where: { id: { in: ids } },
@@ -148,7 +173,7 @@ export abstract class BaseRepository<T extends { id: string }> {
 
     // If no records found, end early
     if (existingRecords.length === 0) {
-      return [];
+      return [] as unknown as V[];
     }
 
     // Get IDs of existing records
@@ -162,16 +187,17 @@ export abstract class BaseRepository<T extends { id: string }> {
     );
 
     // Return deleted records
-    return existingRecords;
+    return existingRecords as unknown as V[];
   }
 
   /**
    * Elimina lógicamente un registro por su id.
+   * @template V - Tipo opcional para el retorno, por defecto es T
    * @param id - ID del registro a eliminar lógicamente.
    * @returns El registro eliminado lógicamente.
    * @throws {NotFoundException} Si el registro no se encuentra.
    */
-  async softDelete(id: string): Promise<T> {
+  async softDelete<V = T>(id: string): Promise<V> {
     const exists = await this.findById(id);
     if (!exists) {
       throw new NotFoundException(
@@ -179,20 +205,24 @@ export abstract class BaseRepository<T extends { id: string }> {
       );
     }
 
-    return this.prisma.measureQuery(`softDelete${String(this.modelName)}`, () =>
-      (this.prisma[this.modelName] as any).update({
-        where: { id },
-        data: { isActive: false },
-      }),
+    const result = await this.prisma.measureQuery(
+      `softDelete${String(this.modelName)}`,
+      () =>
+        (this.prisma[this.modelName] as any).update({
+          where: { id },
+          data: { isActive: false },
+        }),
     );
+    return result as unknown as V;
   }
 
   /**
    * Elimina múltiples registros lógicamente
+   * @template V - Tipo opcional para el retorno, por defecto es T
    * @param ids - Array de IDs de los registros a desactivar
    * @returns Array con los registros desactivados exitosamente
    */
-  async softDeleteMany(ids: string[]): Promise<T[]> {
+  async softDeleteMany<V = T>(ids: string[]): Promise<V[]> {
     // Buscar registros que existen y están activos
     const existingRecords = await this.findMany({
       where: {
@@ -203,7 +233,7 @@ export abstract class BaseRepository<T extends { id: string }> {
 
     // Si no hay registros activos para procesar, termina
     if (existingRecords.length === 0) {
-      return [];
+      return [] as unknown as V[];
     }
 
     // Obtiene solo los IDs de los registros activos
@@ -220,16 +250,17 @@ export abstract class BaseRepository<T extends { id: string }> {
     );
 
     // Retorna los registros que fueron desactivados
-    return existingRecords;
+    return existingRecords as unknown as V[];
   }
 
   /**
    * Reactiva un registro previamente desactivado.
+   * @template V - Tipo opcional para el retorno, por defecto es T
    * @param id - ID del registro a reactivar
    * @returns El registro reactivado
    * @throws {NotFoundException} Si el registro no se encuentra
    */
-  async reactivate(id: string): Promise<T> {
+  async reactivate<V = T>(id: string): Promise<V> {
     const exists = await this.findOne({
       where: { id, isActive: false },
     });
@@ -240,20 +271,24 @@ export abstract class BaseRepository<T extends { id: string }> {
       );
     }
 
-    return this.prisma.measureQuery(`reactivate${String(this.modelName)}`, () =>
-      (this.prisma[this.modelName] as any).update({
-        where: { id },
-        data: { isActive: true },
-      }),
+    const result = await this.prisma.measureQuery(
+      `reactivate${String(this.modelName)}`,
+      () =>
+        (this.prisma[this.modelName] as any).update({
+          where: { id },
+          data: { isActive: true },
+        }),
     );
+    return result as unknown as V;
   }
 
   /**
    * Reactiva múltiples registros previamente desactivados.
+   * @template V - Tipo opcional para el retorno, por defecto es T
    * @param ids - Array de IDs de los registros a reactivar
    * @returns Array con los registros reactivados exitosamente
    */
-  async reactivateMany(ids: string[]): Promise<T[]> {
+  async reactivateMany<V = T>(ids: string[]): Promise<V[]> {
     // Buscar registros que existen y están inactivos
     const existingRecords = await this.findMany({
       where: {
@@ -264,7 +299,7 @@ export abstract class BaseRepository<T extends { id: string }> {
 
     // Si no hay registros inactivos para procesar, termina
     if (existingRecords.length === 0) {
-      return [];
+      return [] as unknown as V[];
     }
 
     // Obtiene solo los IDs de los registros inactivos
@@ -281,10 +316,12 @@ export abstract class BaseRepository<T extends { id: string }> {
     );
 
     // Obtiene y retorna los registros reactivados
-    return this.findMany({
+    const result = await this.findMany({
       where: { id: { in: inactiveIds } },
     });
+    return result as unknown as V[];
   }
+
   /**
    * Ejecuta una transacción con la base de datos.
    * @param operation - Función que contiene las operaciones a ejecutar dentro de la transacción.
@@ -317,46 +354,51 @@ export abstract class BaseRepository<T extends { id: string }> {
     return baseEntities as unknown as F[];
   }
 
-  // Añadir este método dentro de la clase BaseRepository
-
   /**
    * Busca registros por un campo específico y su valor
+   * @template V - Tipo opcional para el retorno, por defecto es T
    * @param field - Nombre del campo por el cual buscar
    * @param value - Valor a buscar
    * @returns Array con los registros que coinciden con la búsqueda
    */
-  async findByField(field: keyof T, value: any): Promise<T[]> {
-    return this.prisma.measureQuery(`findBy${String(field)}`, () =>
-      (this.prisma[this.modelName] as any).findMany({
-        where: {
-          [field]: value,
-          // No incluimos isActive aquí para permitir búsquedas flexibles
-        },
-      }),
+  async findByField<V = T>(field: keyof T, value: any): Promise<V[]> {
+    const result = await this.prisma.measureQuery(
+      `findBy${String(field)}`,
+      () =>
+        (this.prisma[this.modelName] as any).findMany({
+          where: {
+            [field]: value,
+            // No incluimos isActive aquí para permitir búsquedas flexibles
+          },
+        }),
     );
+    return result as unknown as V[];
   }
 
   /**
    * Busca registros con relaciones específicas
+   * @template V - Tipo opcional para el retorno, por defecto es T
    * @param params - Parámetros de búsqueda incluyendo relaciones
    */
-  async findManyWithRelations(params?: QueryParams): Promise<T[]> {
-    return this.prisma.measureQuery(
+  async findManyWithRelations<V = T>(params?: QueryParams): Promise<V[]> {
+    const result = await this.prisma.measureQuery(
       `findManyWithRelations${String(this.modelName)}`,
       () => (this.prisma[this.modelName] as any).findMany(params),
     );
+    return result as unknown as V[];
   }
 
   /**
    * Busca un registro con sus relaciones
+   * @template V - Tipo opcional para el retorno, por defecto es T
    * @param id - ID del registro a buscar
    * @param include - Relaciones a incluir
    */
-  async findOneWithRelations(
+  async findOneWithRelations<V = T>(
     id: string,
     params: QueryParams,
-  ): Promise<T | null> {
-    return this.prisma.measureQuery(
+  ): Promise<V | null> {
+    const result = await this.prisma.measureQuery(
       `findOneWithRelations${String(this.modelName)}`,
       () =>
         (this.prisma[this.modelName] as any).findUnique({
@@ -364,41 +406,48 @@ export abstract class BaseRepository<T extends { id: string }> {
           where: { id },
         }),
     );
+    return result as unknown as V | null;
   }
 
   /**
    * Busca registros en una tabla específica por un campo y su valor
+   * @template V - Tipo opcional para el retorno, por defecto es any
    * @param field - Nombre del campo por el cual buscar
    * @param value - Valor a buscar
    * @param table - Nombre de la tabla donde buscar
    * @returns Array con los registros que coinciden con la búsqueda
    */
-  async findOneDataTable(
+  async findOneDataTable<V = any>(
     field: string,
     value: any,
     table: string,
-  ): Promise<any[]> {
-    return this.prisma.measureQuery(`findBy${String(field)}In${table}`, () =>
-      this.prisma[table].findMany({
-        where: {
-          [field]: value,
-        },
-      }),
+  ): Promise<V[]> {
+    const result = await this.prisma.measureQuery(
+      `findBy${String(field)}In${table}`,
+      () =>
+        this.prisma[table].findMany({
+          where: {
+            [field]: value,
+          },
+        }),
     );
+    return result as unknown as V[];
   }
 
   /**
    * Busca registros por el campo 'name' y su valor
+   * @template V - Tipo opcional para el retorno, por defecto es T
    * @param name - Valor del nombre a buscar
    * @returns Array con los registros que coinciden con el nombre
    */
-  async findByName<T>(name: string): Promise<T[]> {
-    return this.prisma.measureQuery(`findByName`, () =>
+  async findByName<V = T>(name: string): Promise<V[]> {
+    const result = await this.prisma.measureQuery(`findByName`, () =>
       (this.prisma[this.modelName] as any).findMany({
         where: {
           name: name,
         },
       }),
     );
+    return result as unknown as V[];
   }
 }

@@ -25,6 +25,8 @@ model User {
   // Relación con auditorías (acciones realizadas por este usuario)
   auditsPerformed Audit[] @relation("AuditPerformedBy")
 
+  reservations    Reservation[]
+
   @@unique([email, isActive])
 }
 
@@ -71,6 +73,8 @@ model Customer {
   isActive       Boolean               @default(true)
   createdAt      DateTime              @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime              @updatedAt
+  
+  reservations   Reservation[]
 }
 
 enum CustomerDocumentType {
@@ -123,6 +127,8 @@ model Room {
   updatedAt         DateTime            @updatedAt
   ImageRoom         ImageRoom[]
   CleaningChecklist CleaningChecklist[] //aun no considerar
+
+  reservations      Reservation[]
 }
 
 model ImageRoom {
@@ -153,4 +159,30 @@ model CleaningChecklist {
 
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt
+}
+
+enum ReservationStatus {
+  PENDING
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELED
+}
+
+model Reservation {
+  id              String            @id @default(uuid())
+  customer        Customer          @relation(fields: [customerId], references: [id])
+  customerId      String
+  room            Room              @relation(fields: [roomId], references: [id])
+  roomId          String
+  user            User              @relation(fields: [userId], references: [id])
+  userId          String
+  reservationDate DateTime          @default(now()) @db.Timestamptz(6)
+  checkInDate     DateTime          @db.Date
+  checkOutDate    DateTime          @db.Date
+  status          ReservationStatus
+  guests          Json?             // List of companions
+  observations    String?           // Additional notes
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime          @updatedAt
 }
