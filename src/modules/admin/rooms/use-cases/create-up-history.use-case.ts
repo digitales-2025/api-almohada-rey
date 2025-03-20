@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { CreateUpdateHistoryDto } from '../dto/create-up-history.dto';
-import { UpdateHistory } from '../entities/up-history.entity';
-import { UpdateHistoryRepository } from '../repositories/up-history.repository';
-import { UserData } from '@login/login/interfaces';
-import { AuditService } from '@login/login/admin/audit/audit.service';
+import { UpdateHistory } from '../entities/rooms.entity';
+import { UpdateHistoryRepository } from '../repositories/rooms.repository';
 import { AuditActionType } from '@prisma/client';
-import { BaseApiResponse } from 'src/dto/BaseApiResponse.dto';
+import { UserData } from 'src/interfaces';
+import { AuditService } from '../../audit/audit.service';
+import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 
 @Injectable()
 export class CreateUpdateHistoryUseCase {
