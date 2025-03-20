@@ -218,7 +218,7 @@ export class CustomersService {
 
         // Registrar la auditoría de la creación del cliente
         await this.audit.create({
-          entityId: newCustomer.id,
+          entityId: customer.id,
           entityType: 'customer',
           action: AuditActionType.CREATE,
           performedById: user.id,
