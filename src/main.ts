@@ -1,13 +1,14 @@
 import { NestFactory } from '@nestjs/core';
 import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { generalEnvs } from './config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors({
-    origin: [process.env.WEB_URL],
+    origin: [generalEnvs.WEB_URL],
     credentials: true,
   });
   app.use(cookieParser());
@@ -45,7 +46,11 @@ async function bootstrap() {
   ];
 
   SwaggerModule.setup('api', app, document);
+  Logger.log(`System's environment: ${generalEnvs.NODE_ENV}`);
+  Logger.log(
+    `System local uri: http://localhost:${generalEnvs.PORT ?? 4000}/api`,
+  );
 
-  await app.listen(parseInt(process.env.PORT));
+  await app.listen(parseInt(generalEnvs.PORT));
 }
 bootstrap();

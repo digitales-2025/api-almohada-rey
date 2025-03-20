@@ -1,0 +1,30 @@
+services:
+  db-almohada-rey:
+    image: postgres:latest
+    container_name: db-almohada-rey
+    restart: unless-stopped
+    shm_size: 256mb
+    volumes:
+      - ../db-almohada-rey/:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-root}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-root}
+      - POSTGRES_DB=${POSTGRES_DB:-almohada_rey}
+    ports:
+      - 5432:5432
+  pgadmin4:
+    image: elestio/pgadmin:latest
+    container_name: pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_LISTEN_PORT: 8080
+    ports:
+      - '8080:8080'
+    volumes:
+      - ./servers.json:/pgadmin4/servers.json
+
+networks:
+  default:
+    driver: bridge
