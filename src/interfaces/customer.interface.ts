@@ -16,7 +16,7 @@ export type CustomerData = Pick<
   | 'isActive'
 > & {
   department?: string;
-  city?: string;
+  province?: string;
   companyName?: string;
   ruc?: string;
   companyAddress?: string;

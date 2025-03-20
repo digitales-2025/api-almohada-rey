@@ -17,6 +17,10 @@ import {
 } from 'src/interfaces';
 import { handleException } from 'src/utils';
 import { AuditActionType } from '@prisma/client';
+import {
+  createDynamicUpdateObject,
+  hasNoChanges,
+} from 'src/utils/update-validations.util';
 
 @Injectable()
 export class CustomersService {
@@ -386,8 +390,122 @@ export class CustomersService {
     return customerDb;
   }
 
-  update(id: number, updateCustomerDto: UpdateCustomerDto) {
-    return `This action updates a #${id} ${updateCustomerDto} customer`;
+  /**
+   * Actualizar un cliente
+   * @param id Id del cliente
+   * @param updateCustomerDto Datos del cliente a actualizar
+   * @param user Usuario que realiza la acción
+   * @returns Cliente actualizado
+   */
+  async update(
+    id: string,
+    updateCustomerDto: UpdateCustomerDto,
+    user: UserData,
+  ): Promise<HttpResponse<CustomerData>> {
+    const { documentNumber, email, ruc } = updateCustomerDto;
+
+    try {
+      const customerDB = await this.findById(id);
+
+      if (ruc) await this.findByRuc(ruc, id);
+      if (email) await this.findByEmail(email, id);
+      if (documentNumber) await this.findBYDocumentNumber(documentNumber, id);
+
+      // Validar si hay cambios
+      if (hasNoChanges(updateCustomerDto, customerDB)) {
+        return {
+          statusCode: HttpStatus.OK,
+          message: 'Customer updated successfully',
+          data: {
+            ...customerDB,
+            ...(customerDB.ruc && {
+              ruc: customerDB.ruc,
+              companyAddress: customerDB.companyAddress,
+              companyName: customerDB.companyName,
+            }),
+            ...(customerDB.department && { department: customerDB.department }),
+            ...(customerDB.province && { province: customerDB.province }),
+          },
+        };
+      }
+
+      // Construir el objeto de actualización dinámicamente solo con los campos presentes
+      const updateData = createDynamicUpdateObject(
+        updateCustomerDto,
+        customerDB,
+      );
+
+      // Transacción para realizar la actualización
+      const updatedCustomer = await this.prisma.$transaction(async (prisma) => {
+        const customer = await prisma.customer.update({
+          where: { id },
+          data: updateData,
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            birthPlace: true,
+            country: true,
+            documentNumber: true,
+            documentType: true,
+            email: true,
+            maritalStatus: true,
+            occupation: true,
+            phone: true,
+            ruc: true,
+            companyAddress: true,
+            companyName: true,
+            department: true,
+            province: true,
+            isActive: true,
+          },
+        });
+        // Crear un registro de auditoría
+        await prisma.audit.create({
+          data: {
+            entityId: customer.id,
+            action: AuditActionType.UPDATE,
+            performedById: user.id,
+            entityType: 'customer',
+          },
+        });
+
+        return customer;
+      });
+
+      return {
+        statusCode: HttpStatus.OK,
+        message: 'Customer updated successfully',
+        data: {
+          ...updatedCustomer,
+          ...(updatedCustomer.ruc && {
+            ruc: updatedCustomer.ruc,
+            companyAddress: updatedCustomer.companyAddress,
+            companyName: updatedCustomer.companyName,
+          }),
+          ...(updatedCustomer.department && {
+            department: updatedCustomer.department,
+          }),
+          ...(updatedCustomer.province && {
+            province: updatedCustomer.province,
+          }),
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error updating customer: ${error.message}`,
+        error.stack,
+      );
+
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+
+      handleException(error, 'Error updating a customer');
+    }
   }
 
   remove(id: number) {

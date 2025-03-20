@@ -59,12 +59,14 @@ export class CustomersController {
     return this.customersService.findOne(id);
   }
 
+  @ApiOkResponse({ description: 'Customer updated successfully' })
   @Patch(':id')
   update(
     @Param('id') id: string,
     @Body() updateCustomerDto: UpdateCustomerDto,
+    @GetUser() user: UserData,
   ) {
-    return this.customersService.update(+id, updateCustomerDto);
+    return this.customersService.update(id, updateCustomerDto, user);
   }
 
   @Delete(':id')
