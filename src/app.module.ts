@@ -9,6 +9,8 @@ import { TypedEventEmitterModule } from './event-emitter/typed-event-emitter.mod
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { SeedsModule } from './modules/seeds/seeds.module';
 import { CustomersModule } from './modules/admin/customers/customers.module';
+import { CloudflareModule } from './cloudflare/cloudflare.module';
+import { RoomsModule } from './modules/admin/rooms/rooms.module';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { CustomersModule } from './modules/admin/customers/customers.module';
     EventEmitterModule.forRoot(),
     TypedEventEmitterModule,
     CustomersModule,
+    CloudflareModule,
+    RoomsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

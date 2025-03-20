@@ -52,7 +52,7 @@ enum AuditActionType {
 }
 
 model Customer {
-  id             String               @id @default(uuid())
+  id             String                @id @default(uuid())
   name           String
   address        String
   birthPlace     String
@@ -62,15 +62,15 @@ model Customer {
   phone          String
   occupation     String
   documentType   CustomerDocumentType
-  documentNumber String               @unique
-  email          String               @unique
+  documentNumber String                @unique
+  email          String                @unique
   maritalStatus  CustomerMaritalStatus
   companyName    String?
-  ruc            String?              @unique
+  ruc            String?               @unique
   companyAddress String?
-  isActive       Boolean              @default(true)
-  createdAt      DateTime             @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime             @updatedAt
+  isActive       Boolean               @default(true)
+  createdAt      DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime              @updatedAt
 }
 
 enum CustomerDocumentType {
@@ -84,4 +84,73 @@ enum CustomerMaritalStatus {
   MARRIED
   DIVORCED
   WIDOWED
+}
+
+enum FloorTypes {
+  LIMINATING
+  CARPETING
+}
+
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  CLEANING
+}
+
+enum RoomTypes {
+  SINGLE
+  DOUBLE_SINGLE
+  DOUBLE_FAMILY
+  SUITE
+  MATRIMONIAL
+}
+
+model Room {
+  id          String     @id @default(uuid())
+  number      Int        @unique
+  guests      Int
+  type        RoomTypes
+  price       Float
+  status      RoomStatus
+  tv          String
+  floorType   FloorTypes
+  description String
+  area        Float
+  isActive    Boolean    @default(true)
+
+  createdAt         DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime            @updatedAt
+  ImageRoom         ImageRoom[]
+  CleaningChecklist CleaningChecklist[] //aun no considerar
+}
+
+model ImageRoom {
+  id       String  @id @default(uuid())
+  imageUrl String
+  isMain   Boolean @default(false)
+  room     String
+  rooms    Room    @relation(fields: [room], references: [id])
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+}
+
+model CleaningChecklist {
+  id           Int     @id @default(autoincrement())
+  roomId       String // ID of room (Habitación)
+  Room         Room    @relation(fields: [roomId], references: [id])
+  trashBin     Boolean // Trash bin (Tacho)
+  towel        Boolean // Towel (Toalla)
+  toiletPaper  Boolean // Toilet paper (Papel higiénico)
+  showerSoap   Boolean // Shower soap (Jabón de ducha)
+  handSoap     Boolean // Hand soap (Jabón de lavado)
+  lamp         Boolean // Lamp (Lámpara)
+  staffName    String // ID of cleaning staff (Personal)
+  userCheckId  String // ID of user who verifies (UserCheck)
+  observations String? // Observations or comments (Observaciones)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
 }
