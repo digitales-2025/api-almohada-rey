@@ -9,7 +9,7 @@ import {
   UseInterceptors,
   UploadedFiles,
 } from '@nestjs/common';
-import { UpdateHistoryService } from '../services/rooms.service';
+import { RoomsService } from '../services/rooms.service';
 
 import {
   ApiTags,
@@ -17,19 +17,14 @@ import {
   ApiResponse,
   ApiBadRequestResponse,
   ApiUnauthorizedResponse,
-  ApiParam,
   ApiOkResponse,
   ApiNotFoundResponse,
   ApiConsumes,
   ApiBody,
 } from '@nestjs/swagger';
 
-import {
-  CreateUpdateHistoryDto,
-  UpdateUpdateHistoryDto,
-  DeleteUpdateHistoryDto,
-} from '../dto';
-import { UpdateHistory } from '../entities/rooms.entity';
+import { CreateRoomDto, UpdateRoomDto, DeleteRoomDto } from '../dto';
+import { Room } from '../entities/rooms.entity';
 
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { FormatDataInterceptor } from './format-data.interceptor';
@@ -39,10 +34,10 @@ import { UserData } from 'src/interfaces';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 
 /**
- * Controlador REST para gestionar actualizaciones de historias médicas.
- * Expone endpoints para operaciones CRUD sobre actualizaciones.
+ * Controlador REST para gestionar habitaciones del hotel.
+ * Expone endpoints para operaciones CRUD sobre habitaciones.
  */
-@ApiTags('Update Medical history')
+@ApiTags('Rooms')
 @ApiBadRequestResponse({
   description:
     'Bad Request - Error en la validación de datos o solicitud incorrecta',
@@ -50,205 +45,102 @@ import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 @ApiUnauthorizedResponse({
   description: 'Unauthorized - No autorizado para realizar esta operación',
 })
-@Controller({ path: 'update-history', version: '1' })
+@Controller({ path: 'rooms', version: '1' })
 @Auth()
-export class UpdateHistoryController {
-  constructor(private readonly updateHistoryService: UpdateHistoryService) {}
+export class RoomsController {
+  constructor(private readonly roomsService: RoomsService) {}
 
   /**
-   * Crea una nueva actualización de historia médica
-   */
-  @Post()
-  @ApiOperation({ summary: 'Crear nueva actualización de historia médica' })
-  @ApiResponse({
-    status: 201,
-    description: 'Actualización de historia médica creada exitosamente',
-    type: BaseApiResponse<UpdateHistory>,
-  })
-  @ApiBadRequestResponse({
-    description: 'Datos de entrada inválidos o actualización ya existe',
-  })
-  create(
-    @Body() createUpdateHistoryDto: CreateUpdateHistoryDto,
-    @GetUser() user: UserData,
-  ): Promise<BaseApiResponse<UpdateHistory>> {
-    return this.updateHistoryService.create(createUpdateHistoryDto, user);
-  }
-
-  /**
-   * Obtiene todas las actualizaciones de historias médicas
+   * Obtiene todas las habitaciones
    */
   @Get()
   @ApiOperation({
-    summary: 'Obtener todas las actualizaciones de historias médicas',
+    summary: 'Obtener todas las habitaciones',
   })
   @ApiResponse({
     status: 200,
-    description: 'Lista de todas las actualizaciones de historias médicas',
-    type: [UpdateHistory],
+    description: 'Lista de todas las habitaciones',
+    type: [Room],
   })
-  findAll(): Promise<UpdateHistory[]> {
-    return this.updateHistoryService.findAll();
+  findAll(): Promise<Room[]> {
+    return this.roomsService.findAll();
   }
 
   /**
-   * Obtiene una actualización de historia médica por su ID
+   * Obtiene una habitación por ID
    */
   @Get(':id')
-  @ApiOperation({ summary: 'Obtener actualización de historia médica por ID' })
-  @ApiParam({ name: 'id', description: 'ID de la actualización' })
-  @ApiOkResponse({
-    description: 'Actualización de historia médica encontrada',
-    type: UpdateHistory,
+  @ApiOperation({
+    summary: 'Obtener una habitación por ID',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Habitación encontrada',
+    type: Room,
   })
   @ApiNotFoundResponse({
-    description: 'Actualización de historia médica no encontrada',
+    description: 'Habitación no encontrada',
   })
-  findOne(@Param('id') id: string): Promise<UpdateHistory> {
-    return this.updateHistoryService.findOne(id);
+  findOne(@Param('id') id: string): Promise<Room> {
+    return this.roomsService.findOne(id);
   }
 
   /**
-   * Actualiza una actualización de historia médica existente
-   */
-  @Patch(':id')
-  @ApiOperation({
-    summary: 'Actualizar actualización de historia médica existente',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Actualización de historia médica actualizada exitosamente',
-    type: BaseApiResponse<UpdateHistory>,
-  })
-  update(
-    @Param('id') id: string,
-    @Body() updateUpdateHistoryDto: UpdateUpdateHistoryDto,
-    @GetUser() user: UserData,
-  ): Promise<BaseApiResponse<UpdateHistory>> {
-    return this.updateHistoryService.update(id, updateUpdateHistoryDto, user);
-  }
-
-  /**
-   * Desactiva múltiples actualizaciones de historias médicas
-   */
-  @Delete('remove/all')
-  @ApiOperation({
-    summary: 'Desactivar múltiples actualizaciones de historias médicas',
-  })
-  @ApiResponse({
-    status: 200,
-    description:
-      'Actualizaciones de historias médicas desactivadas exitosamente',
-    type: BaseApiResponse<UpdateHistory[]>,
-  })
-  @ApiBadRequestResponse({
-    description: 'IDs inválidos o actualizaciones no existen',
-  })
-  deleteMany(
-    @Body() deleteUpdateHistoryDto: DeleteUpdateHistoryDto,
-    @GetUser() user: UserData,
-  ): Promise<BaseApiResponse<UpdateHistory[]>> {
-    return this.updateHistoryService.deleteMany(deleteUpdateHistoryDto, user);
-  }
-
-  /**
-   * Reactiva múltiples actualizaciones de historias médicas
-   */
-  @Patch('reactivate/all')
-  @ApiOperation({
-    summary: 'Reactivar múltiples actualizaciones de historias médicas',
-  })
-  @ApiOkResponse({
-    description:
-      'Actualizaciones de historias médicas reactivadas exitosamente',
-    type: BaseApiResponse<UpdateHistory[]>,
-  })
-  @ApiBadRequestResponse({
-    description: 'IDs inválidos o actualizaciones no existen',
-  })
-  reactivateAll(
-    @Body() deleteUpdateHistoryDto: DeleteUpdateHistoryDto,
-    @GetUser() user: UserData,
-  ): Promise<BaseApiResponse<UpdateHistory[]>> {
-    return this.updateHistoryService.reactivateMany(
-      deleteUpdateHistoryDto.ids,
-      user,
-    );
-  }
-
-  /**
-   * Crea una nueva actualización de historia médica con imágenes
+   * Crea una nueva habitación con imágenes
    */
   @Post('create-with-images')
   @ApiOperation({
-    summary: 'Crear actualización de historia médica con imágenes',
+    summary: 'Crear nueva habitación con imágenes',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        patientId: {
+        number: {
+          type: 'integer',
+          example: 101,
+        },
+        guests: {
+          type: 'integer',
+          example: 2,
+        },
+        type: {
           type: 'string',
-          example: '123e4567-e89b-12d3-a456-426614174000',
+          enum: [
+            'SINGLE',
+            'DOUBLE_SINGLE',
+            'DOUBLE_FAMILY',
+            'SUITE',
+            'MATRIMONIAL',
+          ],
+          example: 'DOUBLE_SINGLE',
         },
-        serviceId: {
+        price: {
+          type: 'number',
+          example: 150.5,
+        },
+        status: {
           type: 'string',
-          example: '123e4567-e89b-12d3-a456-426614174000',
+          enum: ['AVAILABLE', 'OCCUPIED', 'RESERVED', 'CLEANING'],
+          example: 'AVAILABLE',
         },
-        staffId: {
+        tv: {
           type: 'string',
-          example: '123e4567-e89b-12d3-a456-426614174000',
+          example: 'Smart TV 42 pulgadas',
         },
-        branchId: {
+        floorType: {
           type: 'string',
-          example: '123e4567-e89b-12d3-a456-426614174000',
-        },
-        medicalHistoryId: {
-          type: 'string',
-          example: '123e4567-e89b-12d3-a456-426614174000',
-        },
-        prescription: {
-          type: 'boolean',
-          example: false,
-        },
-        prescriptionId: {
-          type: 'string',
-          example: '123e4567-e89b-12d3-a456-426614174000',
-        },
-        updateHistory: {
-          type: 'object',
-          example: {
-            diagnostico: 'Gripe común',
-            tratamiento: 'Reposo y medicamentos',
-            observaciones: 'Seguimiento en 7 días',
-          },
+          enum: ['LIMINATING', 'CARPETING'],
+          example: 'LIMINATING',
         },
         description: {
           type: 'string',
-          example: 'Paciente presenta mejoría',
+          example: 'Habitación con vista al mar',
         },
-        medicalLeave: {
-          type: 'boolean',
-          example: false,
-        },
-        medicalLeaveStartDate: {
-          type: 'string',
-          format: 'date-time',
-          example: '2024-03-16T10:00:00Z',
-        },
-        medicalLeaveEndDate: {
-          type: 'string',
-          format: 'date-time',
-          example: '2024-03-19T10:00:00Z',
-        },
-        medicalLeaveDays: {
+        area: {
           type: 'number',
-          example: 3,
-        },
-        leaveDescription: {
-          type: 'string',
-          example: 'Reposo por 3 días',
+          example: 25.5,
         },
         images: {
           type: 'array',
@@ -256,112 +148,82 @@ export class UpdateHistoryController {
             type: 'string',
             format: 'binary',
           },
-          description: 'Imágenes de la actualización (opcional)',
+          description: 'Imágenes de la habitación (opcional)',
         },
       },
       required: [
-        'patientId',
-        'serviceId',
-        'staffId',
-        'branchId',
-        'medicalHistoryId',
+        'number',
+        'guests',
+        'type',
+        'price',
+        'status',
+        'tv',
+        'floorType',
+        'description',
+        'area',
       ],
     },
   })
   @UseInterceptors(FilesInterceptor('images'), FormatDataInterceptor)
   async createWithImages(
-    @Body() createUpdateHistoryDto: CreateUpdateHistoryDto,
+    @Body() createRoomDto: CreateRoomDto,
     @UploadedFiles() images: Express.Multer.File[],
     @GetUser() user: UserData,
-  ): Promise<BaseApiResponse<UpdateHistory>> {
-    // Log para verificar los datos recibidos
-    /*     console.log('Datos recibidos:', createUpdateHistoryDto);
-    console.log('Imágenes recibidas:', images);
-    console.log('Usuario:', user); */
-
-    return this.updateHistoryService.createWithImages(
-      createUpdateHistoryDto,
-      images,
-      user,
-    );
+  ): Promise<BaseApiResponse<Room>> {
+    return this.roomsService.createWithImages(createRoomDto, images, user);
   }
 
   /**
-   * Actualiza una historia médica con sus imágenes
-   * @param id ID de la historia médica a actualizar
-   * @param updateUpdateHistoryDto Datos de la historia médica a actualizar
-   * @param images Imágenes de la historia médica a actualizar
-   * @param user Usuario que realiza la actualización
-   * @returns Historia médica actualizada con sus imágenes
+   * Actualiza una habitación con sus imágenes
    */
   @Patch(':id/update-with-images')
-  @ApiOperation({ summary: 'Actualizar historia médica con imágenes' })
+  @ApiOperation({ summary: 'Actualizar habitación con imágenes' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        patientId: {
+        number: {
+          type: 'integer',
+          example: 101,
+        },
+        guests: {
+          type: 'integer',
+          example: 2,
+        },
+        type: {
           type: 'string',
-          example: '123e4567-e89b-12d3-a456-426614174000',
+          enum: [
+            'SINGLE',
+            'DOUBLE_SINGLE',
+            'DOUBLE_FAMILY',
+            'SUITE',
+            'MATRIMONIAL',
+          ],
         },
-        serviceId: {
+        price: {
+          type: 'number',
+          example: 150.5,
+        },
+        status: {
           type: 'string',
-          example: '123e4567-e89b-12d3-a456-426614174000',
+          enum: ['AVAILABLE', 'OCCUPIED', 'RESERVED', 'CLEANING'],
         },
-        staffId: {
+        tv: {
           type: 'string',
-          example: '123e4567-e89b-12d3-a456-426614174000',
+          example: 'Smart TV 42 pulgadas',
         },
-        branchId: {
+        floorType: {
           type: 'string',
-          example: '123e4567-e89b-12d3-a456-426614174000',
-        },
-        medicalHistoryId: {
-          type: 'string',
-          example: '123e4567-e89b-12d3-a456-426614174000',
-        },
-        prescription: {
-          type: 'boolean',
-          example: false,
-        },
-        prescriptionId: {
-          type: 'string',
-          example: '123e4567-e89b-12d3-a456-426614174000',
-        },
-        updateHistory: {
-          type: 'object',
-          example: {
-            diagnostico: 'Gripe común actualizado',
-            tratamiento: 'Reposo y medicamentos actualizados',
-            observaciones: 'Seguimiento en 7 días actualizado',
-          },
+          enum: ['LIMINATING', 'CARPETING'],
         },
         description: {
           type: 'string',
-          example: 'Paciente presenta mejoría actualizada',
+          example: 'Habitación con vista al mar',
         },
-        medicalLeave: {
-          type: 'boolean',
-          example: false,
-        },
-        medicalLeaveStartDate: {
-          type: 'string',
-          format: 'date-time',
-          example: '2024-03-16T10:00:00Z',
-        },
-        medicalLeaveEndDate: {
-          type: 'string',
-          format: 'date-time',
-          example: '2024-03-19T10:00:00Z',
-        },
-        medicalLeaveDays: {
+        area: {
           type: 'number',
-          example: 3,
-        },
-        leaveDescription: {
-          type: 'string',
-          example: 'Reposo por 3 días actualizado',
+          example: 25.5,
         },
         newImages: {
           type: 'array',
@@ -400,7 +262,7 @@ export class UpdateHistoryController {
   )
   async updateWithImages(
     @Param('id') id: string,
-    @Body() updateUpdateHistoryDto: UpdateUpdateHistoryDto,
+    @Body() updateRoomDto: UpdateRoomDto,
     @UploadedFiles()
     files: {
       newImages?: Express.Multer.File[];
@@ -409,16 +271,9 @@ export class UpdateHistoryController {
     @Body('imageUpdates') imageUpdateData: string,
     @GetUser() user: UserData,
   ): Promise<
-    BaseApiResponse<
-      UpdateHistory & { images: Array<{ id: string; url: string }> }
-    >
+    BaseApiResponse<Room & { images: Array<{ id: string; url: string }> }>
   > {
     try {
-      // Log para verificar los datos recibidos
-      /*      console.log('ID a actualizar:', id);
-      console.log('Datos recibidos:', updateUpdateHistoryDto);
-      console.log('Archivos recibidos:', files); */
-
       // Procesamos los datos de actualización de imágenes solo si existen
       let imageUpdates = [];
       if (imageUpdateData && files?.imageUpdates?.length) {
@@ -438,11 +293,10 @@ export class UpdateHistoryController {
       // Validamos si hay nuevas imágenes
       const newImages = files?.newImages?.length ? files.newImages : undefined;
 
-      // Solo llamamos al servicio si hay datos para actualizar
-      return this.updateHistoryService.updateWithImages(
+      return this.roomsService.updateWithImages(
         id,
         user,
-        updateUpdateHistoryDto,
+        updateRoomDto,
         newImages,
         imageUpdates.length > 0 ? imageUpdates : undefined,
       );
@@ -453,20 +307,66 @@ export class UpdateHistoryController {
   }
 
   /**
-   * Obtiene una actualización de historia médica por ID con sus imágenes
+   * Desactiva múltiples habitaciones
    */
-  @Get(':id/with-images')
-  @ApiOperation({ summary: 'Obtener historia médica con imágenes por ID' })
+  @Delete('remove/all')
+  @ApiOperation({
+    summary: 'Desactivar múltiples habitaciones',
+  })
   @ApiResponse({
     status: 200,
-    description: 'Historia médica encontrada con sus imágenes',
-    type: UpdateHistory,
+    description: 'Habitaciones desactivadas exitosamente',
+    type: BaseApiResponse<Room[]>,
+  })
+  @ApiBadRequestResponse({
+    description: 'IDs inválidos o habitaciones no existen',
+  })
+  deleteMany(
+    @Body() deleteRoomDto: DeleteRoomDto,
+    @GetUser() user: UserData,
+  ): Promise<BaseApiResponse<Room[]>> {
+    return this.roomsService.deleteMany(deleteRoomDto, user);
+  }
+
+  /**
+   * Reactiva múltiples habitaciones
+   */
+  @Patch('reactivate/all')
+  @ApiOperation({
+    summary: 'Reactivar múltiples habitaciones',
+  })
+  @ApiOkResponse({
+    description: 'Habitaciones reactivadas exitosamente',
+    type: BaseApiResponse<Room[]>,
+  })
+  @ApiBadRequestResponse({
+    description: 'IDs inválidos o habitaciones no existen',
+  })
+  reactivateAll(
+    @Body() deleteRoomDto: DeleteRoomDto,
+    @GetUser() user: UserData,
+  ): Promise<BaseApiResponse<Room[]>> {
+    return this.roomsService.reactivateMany(deleteRoomDto.ids, user);
+  }
+
+  /**
+   * Obtiene una habitación por ID con sus imágenes
+   */
+  @Get(':id/with-images')
+  @ApiOperation({ summary: 'Obtener habitación con imágenes por ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Habitación encontrada con sus imágenes',
+    type: Room,
+  })
+  @ApiNotFoundResponse({
+    description: 'Habitación no encontrada',
   })
   async findOneWithImages(@Param('id') id: string): Promise<
-    UpdateHistory & {
+    Room & {
       images: Array<{ id: string; url: string }>;
     }
   > {
-    return this.updateHistoryService.findOneWithImages(id);
+    return this.roomsService.findOneWithImages(id);
   }
 }
