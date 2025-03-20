@@ -37,7 +37,7 @@ import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
  * Controlador REST para gestionar habitaciones del hotel.
  * Expone endpoints para operaciones CRUD sobre habitaciones.
  */
-@ApiTags('Rooms')
+@ApiTags('Admin Rooms')
 @ApiBadRequestResponse({
   description:
     'Bad Request - Error en la validación de datos o solicitud incorrecta',
