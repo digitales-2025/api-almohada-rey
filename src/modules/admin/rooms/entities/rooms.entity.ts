@@ -1,50 +1,36 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { RoomTypes, FloorTypes, RoomStatus } from '../dto';
 
-export class UpdateHistory {
+export class Room {
   @ApiProperty()
   id: string;
 
   @ApiProperty()
-  patientId: string;
+  number: number;
 
   @ApiProperty()
-  serviceId: string;
+  guests: number;
+
+  @ApiProperty({ enum: RoomTypes })
+  type: RoomTypes;
 
   @ApiProperty()
-  staffId: string;
+  price: number;
+
+  @ApiProperty({ enum: RoomStatus })
+  status: RoomStatus;
 
   @ApiProperty()
-  branchId: string;
+  tv: string;
+
+  @ApiProperty({ enum: FloorTypes })
+  floorType: FloorTypes;
 
   @ApiProperty()
-  medicalHistoryId: string;
+  description: string;
 
   @ApiProperty()
-  prescription: boolean;
-
-  @ApiProperty()
-  prescriptionId?: string;
-
-  @ApiProperty()
-  updateHistory: any;
-
-  @ApiProperty()
-  description?: string;
-
-  @ApiProperty()
-  medicalLeave: boolean;
-
-  @ApiProperty()
-  medicalLeaveStartDate?: string;
-
-  @ApiProperty()
-  medicalLeaveEndDate?: string;
-
-  @ApiProperty()
-  medicalLeaveDays?: number;
-
-  @ApiProperty()
-  leaveDescription?: string;
+  area: number;
 
   @ApiProperty()
   isActive: boolean;
