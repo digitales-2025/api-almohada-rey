@@ -23,7 +23,13 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 
-import { CreateRoomDto, UpdateRoomDto, DeleteRoomDto } from '../dto';
+import {
+  CreateRoomDto,
+  UpdateRoomDto,
+  DeleteRoomDto,
+  UpdateRoomWithImagesDto,
+  CreateRoomWithImagesDto,
+} from '../dto';
 import { Room } from '../entities/rooms.entity';
 
 import { FilesInterceptor } from '@nestjs/platform-express';
@@ -93,77 +99,7 @@ export class RoomsController {
     summary: 'Crear nueva habitación con imágenes',
   })
   @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        number: {
-          type: 'integer',
-          example: 101,
-        },
-        guests: {
-          type: 'integer',
-          example: 2,
-        },
-        type: {
-          type: 'string',
-          enum: [
-            'SINGLE',
-            'DOUBLE_SINGLE',
-            'DOUBLE_FAMILY',
-            'SUITE',
-            'MATRIMONIAL',
-          ],
-          example: 'DOUBLE_SINGLE',
-        },
-        price: {
-          type: 'number',
-          example: 150.5,
-        },
-        status: {
-          type: 'string',
-          enum: ['AVAILABLE', 'OCCUPIED', 'RESERVED', 'CLEANING'],
-          example: 'AVAILABLE',
-        },
-        tv: {
-          type: 'string',
-          example: 'Smart TV 42 pulgadas',
-        },
-        floorType: {
-          type: 'string',
-          enum: ['LIMINATING', 'CARPETING'],
-          example: 'LIMINATING',
-        },
-        description: {
-          type: 'string',
-          example: 'Habitación con vista al mar',
-        },
-        area: {
-          type: 'number',
-          example: 25.5,
-        },
-        images: {
-          type: 'array',
-          items: {
-            type: 'string',
-            format: 'binary',
-          },
-          description: 'Imágenes de la habitación (opcional)',
-        },
-      },
-      required: [
-        'number',
-        'guests',
-        'type',
-        'price',
-        'status',
-        'tv',
-        'floorType',
-        'description',
-        'area',
-      ],
-    },
-  })
+  @ApiBody({ type: CreateRoomWithImagesDto }) // Cambio aquí: usa el DTO en lugar del schema
   @UseInterceptors(FilesInterceptor('images'), FormatDataInterceptor)
   async createWithImages(
     @Body() createRoomDto: CreateRoomDto,
@@ -172,87 +108,10 @@ export class RoomsController {
   ): Promise<BaseApiResponse<Room>> {
     return this.roomsService.createWithImages(createRoomDto, images, user);
   }
-
-  /**
-   * Actualiza una habitación con sus imágenes
-   */
   @Patch(':id/update-with-images')
   @ApiOperation({ summary: 'Actualizar habitación con imágenes' })
   @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        number: {
-          type: 'integer',
-          example: 101,
-        },
-        guests: {
-          type: 'integer',
-          example: 2,
-        },
-        type: {
-          type: 'string',
-          enum: [
-            'SINGLE',
-            'DOUBLE_SINGLE',
-            'DOUBLE_FAMILY',
-            'SUITE',
-            'MATRIMONIAL',
-          ],
-        },
-        price: {
-          type: 'number',
-          example: 150.5,
-        },
-        status: {
-          type: 'string',
-          enum: ['AVAILABLE', 'OCCUPIED', 'RESERVED', 'CLEANING'],
-        },
-        tv: {
-          type: 'string',
-          example: 'Smart TV 42 pulgadas',
-        },
-        floorType: {
-          type: 'string',
-          enum: ['LIMINATING', 'CARPETING'],
-        },
-        description: {
-          type: 'string',
-          example: 'Habitación con vista al mar',
-        },
-        area: {
-          type: 'number',
-          example: 25.5,
-        },
-        newImages: {
-          type: 'array',
-          items: {
-            type: 'string',
-            format: 'binary',
-          },
-          description: 'Nuevas imágenes para agregar (opcional)',
-        },
-        imageUpdates: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              imageId: {
-                type: 'string',
-                example: '123e4567-e89b-12d3-a456-426614174000',
-              },
-              file: {
-                type: 'string',
-                format: 'binary',
-              },
-            },
-          },
-          description: 'Imágenes existentes a actualizar (opcional)',
-        },
-      },
-    },
-  })
+  @ApiBody({ type: UpdateRoomWithImagesDto })
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'newImages', maxCount: 10 },
@@ -274,6 +133,17 @@ export class RoomsController {
     BaseApiResponse<Room & { images: Array<{ id: string; url: string }> }>
   > {
     try {
+      // Limpiamos los campos vacíos o nulos
+      Object.keys(updateRoomDto).forEach((key) => {
+        if (
+          updateRoomDto[key] === '' ||
+          updateRoomDto[key] === null ||
+          updateRoomDto[key] === undefined
+        ) {
+          delete updateRoomDto[key];
+        }
+      });
+
       // Procesamos los datos de actualización de imágenes solo si existen
       let imageUpdates = [];
       if (imageUpdateData && files?.imageUpdates?.length) {
@@ -296,7 +166,7 @@ export class RoomsController {
       return this.roomsService.updateWithImages(
         id,
         user,
-        updateRoomDto,
+        updateRoomDto, // DTO limpiado
         newImages,
         imageUpdates.length > 0 ? imageUpdates : undefined,
       );
