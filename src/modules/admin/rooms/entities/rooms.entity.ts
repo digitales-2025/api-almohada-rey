@@ -33,11 +33,5 @@ export class Room {
   area: number;
 
   @ApiProperty()
-  isActive: boolean;
-
-  @ApiProperty()
-  createdAt: string;
-
-  @ApiProperty()
-  updatedAt: string;
+  bed: string;
 }
