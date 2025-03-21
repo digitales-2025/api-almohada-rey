@@ -3,14 +3,14 @@ import {
   Get,
   Post,
   Body,
-  Patch,
+  // Patch,
   Param,
   Delete,
   Query,
 } from '@nestjs/common';
 import { ReservationService } from './reservation.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
-import { UpdateReservationDto } from './dto/update-reservation.dto';
+// import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { Auth, GetUser } from '../admin/auth/decorators';
 import { UserData } from 'src/interfaces';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
@@ -105,16 +105,16 @@ export class ReservationController {
     return this.reservationService.findOne(+id);
   }
 
-  @Patch(':id')
-  @ApiOperation({ summary: 'Update a reservation' })
-  @ApiParam({ name: 'id', description: 'Reservation ID' })
-  @ApiOkResponse({ type: Reservation, description: 'The updated reservation' })
-  update(
-    @Param('id') id: string,
-    @Body() updateReservationDto: UpdateReservationDto,
-  ) {
-    return this.reservationService.update(+id, updateReservationDto);
-  }
+  // @Patch(':id')
+  // @ApiOperation({ summary: 'Update a reservation' })
+  // @ApiParam({ name: 'id', description: 'Reservation ID' })
+  // @ApiOkResponse({ type: Reservation, description: 'The updated reservation' })
+  // update(
+  //   @Param('id') id: string,
+  //   @Body() updateReservationDto: UpdateReservationDto,
+  // ) {
+  //   return this.reservationService.update(id, updateReservationDto);
+  // }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a reservation' })
