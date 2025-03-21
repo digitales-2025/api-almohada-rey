@@ -11,44 +11,50 @@ import { Observable } from 'rxjs';
 export class FormatDataInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
+    const body = request.body;
 
-    // Formatear campos numéricos
-    if (request.body.number) {
-      request.body.number = Number(request.body.number);
-      if (isNaN(request.body.number)) {
+    // Eliminar propiedades extra que no están en el DTO
+    if (request.route.path.includes('update-with-images')) {
+      // Para actualizaciones, solo procesar campos que realmente existen
+      Object.keys(body).forEach((key) => {
+        if (body[key] === '' || body[key] === null) {
+          delete body[key]; // Eliminar campos vacíos
+        }
+      });
+    }
+
+    // Formatear campos numéricos solo si están presentes
+    if (body.number !== undefined && body.number !== '') {
+      body.number = Number(body.number);
+      if (isNaN(body.number)) {
         throw new BadRequestException('number must be a valid integer');
       }
     }
 
-    if (request.body.guests) {
-      request.body.guests = Number(request.body.guests);
-      if (isNaN(request.body.guests)) {
+    if (body.guests !== undefined && body.guests !== '') {
+      body.guests = Number(body.guests);
+      if (isNaN(body.guests)) {
         throw new BadRequestException('guests must be a valid integer');
       }
     }
 
-    if (request.body.price) {
-      request.body.price = Number(request.body.price);
-      if (isNaN(request.body.price)) {
+    if (body.price !== undefined && body.price !== '') {
+      body.price = Number(body.price);
+      if (isNaN(body.price)) {
         throw new BadRequestException('price must be a valid number');
       }
     }
 
-    if (request.body.area) {
-      request.body.area = Number(request.body.area);
-      if (isNaN(request.body.area)) {
+    if (body.area !== undefined && body.area !== '') {
+      body.area = Number(body.area);
+      if (isNaN(body.area)) {
         throw new BadRequestException('area must be a valid number');
       }
     }
 
     // Formatear el campo isActive si existe
-    if (request.body.isActive !== undefined) {
-      request.body.isActive = request.body.isActive === 'true';
-    }
-
-    // Eliminar la propiedad imageUpdates si no se proporciona ningún dato
-    if (!request.body.imageUpdates) {
-      delete request.body.imageUpdates;
+    if (body.isActive !== undefined) {
+      body.isActive = body.isActive === 'true';
     }
 
     return next.handle();
