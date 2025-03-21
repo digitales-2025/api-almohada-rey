@@ -300,6 +300,13 @@ export class RoomsService {
     BaseApiResponse<Room & { images: Array<{ id: string; url: string }> }>
   > {
     try {
+      // Validación: máximo 5 imágenes
+      if (images?.length > 5) {
+        throw new BadRequestException(
+          'Solo se puede agregar un máximo de 5 imágenes por habitación',
+        );
+      }
+
       const roomResponse = await this.create(createRoomDto, user);
 
       if (!images?.length) {
