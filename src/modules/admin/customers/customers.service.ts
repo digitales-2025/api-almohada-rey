@@ -47,7 +47,7 @@ export class CustomersService {
    * @param id Id del cliente
    * @returns Cliente encontrado
    */
-  async findBYDocumentNumber(
+  async findByDocumentNumber(
     documentNumber: string,
     id?: string,
   ): Promise<CustomerData> {
@@ -173,7 +173,7 @@ export class CustomersService {
 
     try {
       // Crear el cliente y registrar la auditoría
-      await this.findBYDocumentNumber(documentNumber);
+      await this.findByDocumentNumber(documentNumber);
       await this.findByEmail(email);
       if (ruc) await this.findByRuc(ruc);
 
@@ -358,6 +358,55 @@ export class CustomersService {
   }
 
   /**
+   * Buscar un cliente por su número de documento
+   * @param documentNumber Número de documento del cliente
+   * @returns Datos del cliente
+   */
+  async findDocumentNumber(documentNumber: string): Promise<CustomerData> {
+    try {
+      const customerDb = await this.prisma.customer.findUnique({
+        where: { documentNumber },
+        select: {
+          id: true,
+          name: true,
+          address: true,
+          birthPlace: true,
+          country: true,
+          documentNumber: true,
+          documentType: true,
+          email: true,
+          maritalStatus: true,
+          occupation: true,
+          phone: true,
+          ruc: true,
+          companyAddress: true,
+          companyName: true,
+          department: true,
+          province: true,
+          isActive: true,
+        },
+      });
+      if (!customerDb) {
+        throw new BadRequestException('This document number is not assigned');
+      }
+
+      if (!!customerDb && !customerDb.isActive) {
+        throw new BadRequestException(
+          'This document number is assigned but the customer is inactive',
+        );
+      }
+
+      return customerDb;
+    } catch (error) {
+      this.logger.error('Error get customer by document number');
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      handleException(error, 'Error get customer by document number');
+    }
+  }
+
+  /**
    * Buscar un cliente por su id y validar si existe
    * @param id Id del cliente
    * @returns Datos del cliente
@@ -416,7 +465,7 @@ export class CustomersService {
 
       if (ruc) await this.findByRuc(ruc, id);
       if (email) await this.findByEmail(email, id);
-      if (documentNumber) await this.findBYDocumentNumber(documentNumber, id);
+      if (documentNumber) await this.findByDocumentNumber(documentNumber, id);
 
       // Modificar updateCustomerDto si country es diferente de "Perú"
       if (country && country !== 'Perú') {

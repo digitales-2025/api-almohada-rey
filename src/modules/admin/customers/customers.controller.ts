@@ -60,6 +60,12 @@ export class CustomersController {
     return this.customersService.findOne(id);
   }
 
+  @ApiOkResponse({ description: 'Customer found successfully' })
+  @Get('document/number/:documentNumber')
+  findDocumentNumber(@Param('documentNumber') documentNumber: string) {
+    return this.customersService.findDocumentNumber(documentNumber);
+  }
+
   @ApiOkResponse({ description: 'Customer updated successfully' })
   @Patch(':id')
   update(
