@@ -408,7 +408,8 @@ export class CustomersService {
     updateCustomerDto: UpdateCustomerDto,
     user: UserData,
   ): Promise<HttpResponse<CustomerData>> {
-    const { documentNumber, email, ruc } = updateCustomerDto;
+    const { documentNumber, email, ruc, country } = updateCustomerDto;
+    console.log(JSON.stringify(updateCustomerDto, null, 2));
 
     try {
       const customerDB = await this.findById(id);
@@ -416,6 +417,12 @@ export class CustomersService {
       if (ruc) await this.findByRuc(ruc, id);
       if (email) await this.findByEmail(email, id);
       if (documentNumber) await this.findBYDocumentNumber(documentNumber, id);
+
+      // Modificar updateCustomerDto si country es diferente de "Perú"
+      if (country && country !== 'Perú') {
+        updateCustomerDto.department = null;
+        updateCustomerDto.province = null;
+      }
 
       // Validar si hay cambios
       if (hasNoChanges(updateCustomerDto, customerDB)) {
