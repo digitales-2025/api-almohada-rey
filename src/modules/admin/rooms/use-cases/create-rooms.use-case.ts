@@ -30,7 +30,7 @@ export class CreateRoomUseCase {
         floorType: createRoomDto.floorType,
         description: createRoomDto.description,
         area: createRoomDto.area,
-        isActive: true,
+        bed: createRoomDto.bed,
       });
 
       // Registrar auditoría
