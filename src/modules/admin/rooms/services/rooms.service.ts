@@ -128,11 +128,27 @@ export class RoomsService {
   }
 
   /**
-   * Obtiene todas las habitaciones
+   * Obtiene todas las habitaciones con sus imágenes
    */
-  async findAll(): Promise<Room[]> {
+  async findAll(): Promise<
+    Array<Room & { images: Array<{ id: string; url: string }> }>
+  > {
     try {
-      return this.roomsRepository.findMany();
+      // 1. Obtener todas las habitaciones
+      const rooms = await this.roomsRepository.findMany();
+
+      // 2. Para cada habitación, obtener sus imágenes
+      const roomsWithImages = await Promise.all(
+        rooms.map(async (room) => {
+          const images = await this.roomsRepository.findImagesByRoomId(room.id);
+          return {
+            ...room,
+            images,
+          };
+        }),
+      );
+
+      return roomsWithImages;
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
       throw error;

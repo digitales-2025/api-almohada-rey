@@ -61,14 +61,16 @@ export class RoomsController {
    */
   @Get()
   @ApiOperation({
-    summary: 'Obtener todas las habitaciones',
+    summary: 'Obtener todas las habitaciones con sus imágenes',
   })
   @ApiResponse({
     status: 200,
-    description: 'Lista de todas las habitaciones',
-    type: [Room],
+    description: 'Lista de todas las habitaciones con sus imágenes',
+    type: [Room], // Idealmente, deberías crear un DTO específico que incluya imágenes
   })
-  findAll(): Promise<Room[]> {
+  findAll(): Promise<
+    Array<Room & { images: Array<{ id: string; url: string }> }>
+  > {
     return this.roomsService.findAll();
   }
 
@@ -77,7 +79,7 @@ export class RoomsController {
    */
   @Get(':id')
   @ApiOperation({
-    summary: 'Obtener una habitación por ID',
+    summary: 'Obtener una habitación por ID sin imagenes',
   })
   @ApiResponse({
     status: 200,
