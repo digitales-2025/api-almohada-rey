@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 // import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
@@ -43,7 +43,7 @@ export class ReservationService {
         id: createReservationDto.roomId,
       });
       if (room.length == 0) {
-        throw new Error('Habitación no disponible');
+        throw new BadRequestException('Habitación no disponible');
       }
       const reservation = this.createReservationUseCase.execute(
         createReservationDto,
