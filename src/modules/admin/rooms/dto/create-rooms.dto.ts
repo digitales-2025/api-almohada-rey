@@ -1,9 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsString,
-  IsOptional,
   IsNotEmpty,
-  IsBoolean,
   IsInt,
   IsNumber,
   IsEnum,
@@ -123,12 +121,12 @@ export class CreateRoomDto {
   area: number;
 
   @ApiProperty({
-    description: 'Estado activo',
-    example: true,
-    default: true,
-    required: false,
+    description: 'Descripción de la cama',
+    example: 'cama 2 plasas',
+    required: true,
   })
-  @IsBoolean()
-  @IsOptional()
-  isActive?: boolean;
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => value?.trim())
+  bed: string;
 }
