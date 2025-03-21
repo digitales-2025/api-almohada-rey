@@ -7,7 +7,10 @@ import {
   IsDate,
   IsObject,
 } from 'class-validator';
-import { DocumentType } from '../entities/document-type.enum';
+import {
+  DocumentType,
+  DocumentTypeAccepetedValues,
+} from '../entities/document-type.enum';
 
 export class GuestDto {
   @ApiProperty({ description: 'Guest full name' })
@@ -30,7 +33,7 @@ export class GuestDto {
     enum: DocumentType,
   })
   @IsOptional()
-  documentType?: DocumentType;
+  documentType?: DocumentTypeAccepetedValues;
 
   @ApiPropertyOptional({ description: 'Guest phone number' })
   @IsOptional()
@@ -51,5 +54,5 @@ export class GuestDto {
   @ApiPropertyOptional({ description: 'Additional guest information' })
   @IsOptional()
   @IsObject()
-  additionalInfo?: Record<string, any>;
+  additionalInfo?: string;
 }

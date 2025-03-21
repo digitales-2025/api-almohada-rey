@@ -2,7 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { PrismaTransaction, QueryParams, CreateDto, UpdateDto } from '../types';
 import { BaseEntity } from './base.entity';
-
+import { PaginationParams } from 'src/utils/paginated-response/pagination.types';
+import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 /**
  * Clase base abstracta que implementa operaciones CRUD genéricas.
  * Proporciona una capa de abstracción sobre Prisma.
@@ -17,6 +18,15 @@ export abstract class BaseRepository<T extends BaseEntity> {
     protected readonly prisma: PrismaService,
     protected readonly modelName: keyof PrismaService,
   ) {}
+
+  /**
+   * Método interno para obtener el cliente correcto (transacción o prisma)
+   * @param tx - Contexto de transacción opcional
+   * @returns Cliente Prisma o contexto de transacción
+   */
+  protected getClient(tx?: PrismaTransaction): any {
+    return tx ?? this.prisma;
+  }
 
   /**
    * Crea una nueva entidad en la base de datos
@@ -38,6 +48,26 @@ export abstract class BaseRepository<T extends BaseEntity> {
   }
 
   /**
+   * Crea una nueva entidad dentro de una transacción
+   * @template V - Tipo opcional para el retorno, por defecto es T
+   * @param createDto - DTO con los datos para crear la entidad
+   * @param tx - Contexto de transacción opcional
+   * @returns - La entidad creada con el tipo especificado
+   */
+  async createWithTx<V = T>(
+    createDto: CreateDto<T>,
+    tx?: PrismaTransaction,
+  ): Promise<V> {
+    const client = this.getClient(tx);
+    // Nota: no usamos measureQuery dentro de una transacción
+    const result = await (client[this.modelName] as any).create({
+      data: this.mapDtoToEntity ? this.mapDtoToEntity(createDto) : createDto,
+    });
+
+    return result as unknown as V;
+  }
+
+  /**
    * Busca múltiples registros con filtros opcionales
    * @template V - Tipo opcional para el retorno, por defecto es T
    * @param params - Parámetros de búsqueda, ordenamiento y paginación
@@ -48,6 +78,66 @@ export abstract class BaseRepository<T extends BaseEntity> {
       () => (this.prisma[this.modelName] as any).findMany(params),
     );
     return result as unknown as V[];
+  }
+
+  /**
+   * Busca múltiples registros con filtros opcionales y paginación, ordenados por fecha de creación descendente
+   * @template V - Tipo opcional para el retorno, por defecto es T
+   * @param pagination - Parámetros de paginación
+   * @param params - Parámetros de búsqueda adicionales
+   */
+  async findManyPaginated<V = T>(
+    pagination?: PaginationParams,
+    params?: QueryParams,
+  ): Promise<PaginatedResponse<V>> {
+    // Valores por defecto para paginación
+    const DEFAULT_PAGE_SIZE = 10;
+    const DEFAULT_PAGE = 1;
+    const page = pagination?.page ?? DEFAULT_PAGE;
+    const pageSize = pagination?.pageSize ?? DEFAULT_PAGE_SIZE;
+
+    // Calcula skip basado en page y pageSize
+    const skip = (page - 1) * pageSize;
+
+    // Asegura que params tenga una estructura adecuada
+    const queryParams = params || {};
+
+    // Configura ordenamiento por createdAt descendente por defecto
+    // pero permite que sea sobrescrito si ya está definido
+    const orderBy = queryParams?.orderBy ?? { createdAt: 'desc' };
+
+    // Realiza dos consultas: una para obtener los datos paginados y otra para el conteo total
+    const [data, total] = await Promise.all([
+      this.prisma.measureQuery(
+        `findMany${String(this.modelName)}Paginated`,
+        () =>
+          (this.prisma[this.modelName] as any).findMany({
+            ...queryParams,
+            orderBy,
+            skip,
+            take: pageSize,
+          }),
+      ),
+      this.prisma.measureQuery(`count${String(this.modelName)}`, () =>
+        (this.prisma[this.modelName] as any).count({
+          where: queryParams.where,
+        }),
+      ),
+    ]);
+
+    // Calcula el número total de páginas
+    const totalPages = Math.ceil((total as number) / pageSize);
+    return {
+      data: data as unknown as V[],
+      meta: {
+        total: total as number,
+        page,
+        pageSize,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrevious: page > 1,
+      },
+    };
   }
 
   /**
@@ -135,6 +225,28 @@ export abstract class BaseRepository<T extends BaseEntity> {
   }
 
   /**
+   * Actualiza un registro existente dentro de una transacción.
+   * @template V - Tipo opcional para el retorno, por defecto es T
+   * @param id - ID del registro a actualizar.
+   * @param updateDto - DTO con los datos para actualizar.
+   * @param tx - Contexto de transacción opcional
+   * @returns El registro actualizado.
+   */
+  async updateWithTx<V = T>(
+    id: string,
+    updateDto: UpdateDto<T>,
+    tx?: PrismaTransaction,
+  ): Promise<V> {
+    const client = this.getClient(tx);
+    const result = await (client[this.modelName] as any).update({
+      where: { id },
+      data: this.mapDtoToEntity ? this.mapDtoToEntity(updateDto) : updateDto,
+    });
+
+    return result as unknown as V;
+  }
+
+  /**
    * Elimina un registro por su id.
    * @template V - Tipo opcional para el retorno, por defecto es T
    * @param id - ID del registro a eliminar.
@@ -155,6 +267,22 @@ export abstract class BaseRepository<T extends BaseEntity> {
           where: { id },
         }),
     );
+    return result as unknown as V;
+  }
+
+  /**
+   * Elimina un registro por su id dentro de una transacción.
+   * @template V - Tipo opcional para el retorno, por defecto es T
+   * @param id - ID del registro a eliminar.
+   * @param tx - Contexto de transacción opcional
+   * @returns El registro eliminado
+   */
+  async deleteWithTx<V = T>(id: string, tx?: PrismaTransaction): Promise<V> {
+    const client = this.getClient(tx);
+    const result = await (client[this.modelName] as any).delete({
+      where: { id },
+    });
+
     return result as unknown as V;
   }
 
@@ -191,6 +319,40 @@ export abstract class BaseRepository<T extends BaseEntity> {
   }
 
   /**
+   * Elimina múltiples registros por sus IDs dentro de una transacción.
+   * @template V - Tipo opcional para el retorno, por defecto es T
+   * @param ids - Array de IDs de los registros a eliminar
+   * @param tx - Contexto de transacción opcional
+   * @returns Array con los registros eliminados
+   */
+  async deleteManyWithTx<V = T>(
+    ids: string[],
+    tx?: PrismaTransaction,
+  ): Promise<V[]> {
+    const client = this.getClient(tx);
+
+    // Buscar primero para devolver los registros eliminados
+    const existingRecords = await (client[this.modelName] as any).findMany({
+      where: { id: { in: ids } },
+    });
+
+    // Si no hay registros, terminar
+    if (existingRecords.length === 0) {
+      return [] as unknown as V[];
+    }
+
+    // Obtener solo los IDs existentes
+    const existingIds = existingRecords.map((record) => record.id);
+
+    // Eliminar los registros existentes
+    await (client[this.modelName] as any).deleteMany({
+      where: { id: { in: existingIds } },
+    });
+
+    return existingRecords as unknown as V[];
+  }
+
+  /**
    * Elimina lógicamente un registro por su id.
    * @template V - Tipo opcional para el retorno, por defecto es T
    * @param id - ID del registro a eliminar lógicamente.
@@ -213,6 +375,26 @@ export abstract class BaseRepository<T extends BaseEntity> {
           data: { isActive: false },
         }),
     );
+    return result as unknown as V;
+  }
+
+  /**
+   * Elimina lógicamente un registro por su id dentro de una transacción.
+   * @template V - Tipo opcional para el retorno, por defecto es T
+   * @param id - ID del registro a eliminar lógicamente.
+   * @param tx - Contexto de transacción opcional
+   * @returns El registro eliminado lógicamente.
+   */
+  async softDeleteWithTx<V = T>(
+    id: string,
+    tx?: PrismaTransaction,
+  ): Promise<V> {
+    const client = this.getClient(tx);
+    const result = await (client[this.modelName] as any).update({
+      where: { id },
+      data: { isActive: false },
+    });
+
     return result as unknown as V;
   }
 
@@ -254,6 +436,44 @@ export abstract class BaseRepository<T extends BaseEntity> {
   }
 
   /**
+   * Elimina múltiples registros lógicamente dentro de una transacción.
+   * @template V - Tipo opcional para el retorno, por defecto es T
+   * @param ids - Array de IDs de los registros a desactivar
+   * @param tx - Contexto de transacción opcional
+   * @returns Array con los registros desactivados exitosamente
+   */
+  async softDeleteManyWithTx<V = T>(
+    ids: string[],
+    tx?: PrismaTransaction,
+  ): Promise<V[]> {
+    const client = this.getClient(tx);
+
+    // Buscar registros que existen y están activos
+    const existingRecords = await (client[this.modelName] as any).findMany({
+      where: {
+        id: { in: ids },
+        isActive: true,
+      },
+    });
+
+    // Si no hay registros activos para procesar, termina
+    if (existingRecords.length === 0) {
+      return [] as unknown as V[];
+    }
+
+    // Obtiene solo los IDs de los registros activos
+    const activeIds = existingRecords.map((record) => record.id);
+
+    // Actualiza todos los registros activos encontrados
+    await (client[this.modelName] as any).updateMany({
+      where: { id: { in: activeIds } },
+      data: { isActive: false },
+    });
+
+    return existingRecords as unknown as V[];
+  }
+
+  /**
    * Reactiva un registro previamente desactivado.
    * @template V - Tipo opcional para el retorno, por defecto es T
    * @param id - ID del registro a reactivar
@@ -279,6 +499,26 @@ export abstract class BaseRepository<T extends BaseEntity> {
           data: { isActive: true },
         }),
     );
+    return result as unknown as V;
+  }
+
+  /**
+   * Reactiva un registro previamente desactivado dentro de una transacción.
+   * @template V - Tipo opcional para el retorno, por defecto es T
+   * @param id - ID del registro a reactivar
+   * @param tx - Contexto de transacción opcional
+   * @returns El registro reactivado
+   */
+  async reactivateWithTx<V = T>(
+    id: string,
+    tx?: PrismaTransaction,
+  ): Promise<V> {
+    const client = this.getClient(tx);
+    const result = await (client[this.modelName] as any).update({
+      where: { id },
+      data: { isActive: true },
+    });
+
     return result as unknown as V;
   }
 
@@ -323,6 +563,49 @@ export abstract class BaseRepository<T extends BaseEntity> {
   }
 
   /**
+   * Reactiva múltiples registros previamente desactivados dentro de una transacción.
+   * @template V - Tipo opcional para el retorno, por defecto es T
+   * @param ids - Array de IDs de los registros a reactivar
+   * @param tx - Contexto de transacción opcional
+   * @returns Array con los registros reactivados exitosamente
+   */
+  async reactivateManyWithTx<V = T>(
+    ids: string[],
+    tx?: PrismaTransaction,
+  ): Promise<V[]> {
+    const client = this.getClient(tx);
+
+    // Buscar registros que existen y están inactivos
+    const existingRecords = await (client[this.modelName] as any).findMany({
+      where: {
+        id: { in: ids },
+        isActive: false,
+      },
+    });
+
+    // Si no hay registros inactivos para procesar, termina
+    if (existingRecords.length === 0) {
+      return [] as unknown as V[];
+    }
+
+    // Obtiene solo los IDs de los registros inactivos
+    const inactiveIds = existingRecords.map((record) => record.id);
+
+    // Reactiva todos los registros inactivos encontrados
+    await (client[this.modelName] as any).updateMany({
+      where: { id: { in: inactiveIds } },
+      data: { isActive: true },
+    });
+
+    // Obtiene y retorna los registros reactivados
+    const result = await (client[this.modelName] as any).findMany({
+      where: { id: { in: inactiveIds } },
+    });
+
+    return result as unknown as V[];
+  }
+
+  /**
    * Ejecuta una transacción con la base de datos.
    * @param operation - Función que contiene las operaciones a ejecutar dentro de la transacción.
    * @returns El resultado de la transacción.
@@ -352,6 +635,22 @@ export abstract class BaseRepository<T extends BaseEntity> {
 
   mapManyToEntities<E, F>(baseEntities: E[]): F[] {
     return baseEntities as unknown as F[];
+  }
+
+  /**
+   * Encuentra registros dentro de una transacción
+   * @template V - Tipo opcional para el retorno, por defecto es T
+   * @param params - Parámetros de búsqueda
+   * @param tx - Contexto de transacción opcional
+   * @returns Los registros encontrados
+   */
+  async findManyWithTx<V = T>(
+    params?: QueryParams,
+    tx?: PrismaTransaction,
+  ): Promise<V[]> {
+    const client = this.getClient(tx);
+    const result = await (client[this.modelName] as any).findMany(params);
+    return result as unknown as V[];
   }
 
   /**

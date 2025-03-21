@@ -10,9 +10,9 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+import { ReservationStatus as ReservationStatusPrisma } from '@prisma/client';
 import { ReservationStatus } from '../entities/reservation-status.enum';
 import { GuestDto } from './companion-guest.dto';
-import { Optional } from '@nestjs/common';
 
 export class CompanionsDto {
   @ApiProperty({ description: 'List of guests', type: [GuestDto] })
@@ -64,13 +64,13 @@ export class CreateReservationDto {
   @ApiProperty({ description: 'Reservation status', enum: ReservationStatus })
   @IsNotEmpty()
   @IsEnum(ReservationStatus)
-  status: ReservationStatus;
+  status: ReservationStatusPrisma;
 
   @ApiPropertyOptional({
     description: 'Guest companions information',
     type: [GuestDto],
   })
-  @Optional()
+  @IsOptional()
   @IsArray()
   @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
   @ValidateNested({ each: true })

@@ -1,5 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { DocumentType } from './document-type.enum';
+import {
+  DocumentType,
+  DocumentTypeAccepetedValues,
+} from './document-type.enum';
 
 export class Guest {
   @ApiProperty({ description: 'The name of the guest' })
@@ -16,7 +19,7 @@ export class Guest {
     required: false,
     enum: DocumentType,
   })
-  documentType?: DocumentType;
+  documentType?: DocumentTypeAccepetedValues;
 
   @ApiProperty({
     description: 'The phone number of the guest',
@@ -42,17 +45,17 @@ export class Guest {
     required: false,
     type: Object,
   })
-  additionalInfo?: Record<string, any>;
+  additionalInfo?: string;
 
   constructor(
     name: string,
     age?: number,
     documentId?: string,
-    documentType?: DocumentType,
+    documentType?: DocumentTypeAccepetedValues,
     phone?: string,
     email?: string,
     birthDate?: Date,
-    additionalInfo?: Record<string, any>,
+    additionalInfo?: string,
   ) {
     this.name = name;
     this.age = age;
@@ -113,11 +116,11 @@ export class GuestBuilder {
   private name!: string;
   private age?: number;
   private documentId?: string;
-  private documentType?: DocumentType;
+  private documentType?: DocumentTypeAccepetedValues;
   private phone?: string;
   private email?: string;
   private birthDate?: Date;
-  private additionalInfo?: Record<string, any>;
+  private additionalInfo?: string;
 
   withName(name: string | undefined): GuestBuilder {
     if (name !== undefined) this.name = name;
@@ -134,7 +137,9 @@ export class GuestBuilder {
     return this;
   }
 
-  withDocumentType(documentType: DocumentType | undefined): GuestBuilder {
+  withDocumentType(
+    documentType: DocumentTypeAccepetedValues | undefined,
+  ): GuestBuilder {
     if (documentType !== undefined) this.documentType = documentType;
     return this;
   }
@@ -154,9 +159,7 @@ export class GuestBuilder {
     return this;
   }
 
-  withAdditionalInfo(
-    additionalInfo: Record<string, any> | undefined,
-  ): GuestBuilder {
+  withAdditionalInfo(additionalInfo: string | undefined): GuestBuilder {
     if (additionalInfo !== undefined) this.additionalInfo = additionalInfo;
     return this;
   }

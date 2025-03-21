@@ -1,7 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { RoomTypes, FloorTypes, RoomStatus } from '../dto';
 import { BaseEntity } from 'src/prisma/src/abstract/base.entity';
-
+import {
+  RoomTypes as PrismaRoomTypes,
+  RoomStatus as PrismaRoomStatus,
+  FloorTypes as PrismaFloorTypes,
+} from '@prisma/client';
 export class Room extends BaseEntity {
   @ApiProperty({
     description: 'Room number',
@@ -20,7 +24,7 @@ export class Room extends BaseEntity {
     description: 'Type of room',
     example: RoomTypes.SINGLE,
   })
-  type: RoomTypes;
+  type: PrismaRoomTypes;
 
   @ApiProperty({
     description: 'Price per night',
@@ -33,7 +37,7 @@ export class Room extends BaseEntity {
     description: 'Current status of the room',
     example: RoomStatus.AVAILABLE,
   })
-  status: RoomStatus;
+  status: PrismaRoomStatus;
 
   @ApiProperty({
     description: 'TV model or details',
@@ -46,7 +50,7 @@ export class Room extends BaseEntity {
     description: 'Type of floor',
     example: FloorTypes.CARPETING,
   })
-  floorType: FloorTypes;
+  floorType: PrismaFloorTypes;
 
   @ApiProperty({
     description: 'Room description',

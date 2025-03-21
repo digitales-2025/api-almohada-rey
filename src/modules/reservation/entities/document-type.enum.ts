@@ -1,5 +1,16 @@
 export enum DocumentType {
-  ID = 'ID',
+  DNI = 'DNI',
   PASSPORT = 'PASSPORT',
-  DRIVING_LICENSE = 'DRIVING_LICENSE',
+  FOREIGNER_CARD = 'FOREIGNER_CARD',
 }
+
+export type DocumentTypeAccepetedValues = 'DNI' | 'PASSPORT' | 'FOREIGNER_CARD';
+
+export const DocumentTypeValues: Record<
+  DocumentTypeAccepetedValues,
+  DocumentTypeAccepetedValues
+> = {
+  DNI: 'DNI',
+  PASSPORT: 'PASSPORT',
+  FOREIGNER_CARD: 'FOREIGNER_CARD',
+};

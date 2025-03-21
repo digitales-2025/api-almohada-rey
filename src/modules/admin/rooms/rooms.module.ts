@@ -24,6 +24,6 @@ import { RoomsRepository } from './repositories/rooms.repository';
     DeleteRoomsUseCase,
     ReactivateRoomUseCase,
   ],
-  exports: [RoomsService],
+  exports: [RoomsService, RoomsRepository],
 })
 export class RoomsModule {}
