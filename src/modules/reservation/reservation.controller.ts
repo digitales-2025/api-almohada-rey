@@ -36,7 +36,7 @@ import {
 @ApiUnauthorizedResponse({
   description: 'Unauthorized - No autorizado para realizar esta operación',
 })
-@Controller('reservation')
+@Controller({ path: 'reservation', version: '1' })
 @Auth()
 export class ReservationController {
   constructor(private readonly reservationService: ReservationService) {}
