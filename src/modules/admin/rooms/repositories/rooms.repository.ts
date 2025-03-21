@@ -26,20 +26,6 @@ export class RoomsRepository extends BaseRepository<Room> {
   } */
 
   /**
-   * Busca una habitación por su ID
-   * @param id ID de la habitación
-   * @returns Promise<Room>
-   */
-  async findById(id: string): Promise<Room> {
-    const room = await this.prisma.room.findUnique({
-      where: { id },
-    });
-
-    // Si necesitas devolver el resultado como Room, puedes usar type assertion
-    return room as unknown as Room;
-  }
-
-  /**
    * Busca una habitación por su número
    * @param number Número de habitación
    * @returns Promise<Room>

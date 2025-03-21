@@ -14,34 +14,34 @@ export class Reservation extends BaseEntity {
   checkInDate: Date;
   checkOutDate: Date;
   status: ReservationStatus;
-  guests?: any; // Json type for list of companions
+  guests?: string; // Json type for list of companions
   observations?: string;
-  isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  isActive?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
 
   constructor(partial: Partial<Reservation>) {
     super(partial);
     Object.assign(this, partial);
   }
 
-  toJSON(): Record<string, any> {
-    return {
-      id: this.id,
-      customerId: this.customerId,
-      roomId: this.roomId,
-      userId: this.userId,
-      reservationDate: this.reservationDate,
-      checkInDate: this.checkInDate,
-      checkOutDate: this.checkOutDate,
-      status: this.status,
-      guests: this.guests,
-      observations: this.observations,
-      isActive: this.isActive,
-      createdAt: this.createdAt,
-      updatedAt: this.updatedAt,
-    };
-  }
+  // toJSON(): Record<string, any> {
+  //   return {
+  //     id: this.id,
+  //     customerId: this.customerId,
+  //     roomId: this.roomId,
+  //     userId: this.userId,
+  //     reservationDate: this.reservationDate,
+  //     checkInDate: this.checkInDate,
+  //     checkOutDate: this.checkOutDate,
+  //     status: this.status,
+  //     guests: this.guests,
+  //     observations: this.observations,
+  //     isActive: this.isActive,
+  //     createdAt: this.createdAt,
+  //     updatedAt: this.updatedAt,
+  //   };
+  // }
 }
 
 // export class DetailedReservation extends Reservation {
