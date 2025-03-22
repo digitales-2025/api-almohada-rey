@@ -6,21 +6,12 @@ import {
   IsEnum,
   IsPositive,
   IsOptional,
+  IsBoolean,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { RoomTypes, RoomStatus, FloorTypes } from './create-room-type.dto';
+import { FloorTypes } from './create-room-type.dto';
 
-export class UpdateRoomDto {
-  @ApiProperty({
-    description: 'Número de habitación',
-    example: 101,
-    required: false,
-  })
-  @IsInt()
-  @IsPositive()
-  @IsOptional()
-  number?: number;
-
+export class UpdateRoomTypeDto {
   @ApiProperty({
     description: 'Capacidad máxima de huéspedes',
     example: 2,
@@ -32,16 +23,6 @@ export class UpdateRoomDto {
   guests?: number;
 
   @ApiProperty({
-    description: 'Tipo de habitación',
-    enum: RoomTypes,
-    example: 'DOUBLE_SINGLE',
-    required: false,
-  })
-  @IsEnum(RoomTypes)
-  @IsOptional()
-  type?: RoomTypes;
-
-  @ApiProperty({
     description: 'Precio por noche',
     example: 150.5,
     required: false,
@@ -50,16 +31,6 @@ export class UpdateRoomDto {
   @IsPositive()
   @IsOptional()
   price?: number;
-
-  @ApiProperty({
-    description: 'Estado de la habitación',
-    enum: RoomStatus,
-    example: 'AVAILABLE',
-    required: false,
-  })
-  @IsEnum(RoomStatus)
-  @IsOptional()
-  status?: RoomStatus;
 
   @ApiProperty({
     description: 'Descripción de la televisión',
@@ -82,8 +53,8 @@ export class UpdateRoomDto {
   floorType?: FloorTypes;
 
   @ApiProperty({
-    description: 'Descripción de la habitación',
-    example: 'Habitación con vista al mar y balcón privado',
+    description: 'Descripción del tipo de habitación',
+    example: 'Habitación con balcón privado',
     required: false,
   })
   @IsString()
@@ -103,11 +74,20 @@ export class UpdateRoomDto {
 
   @ApiProperty({
     description: 'Descripción de la cama',
-    example: 'cama 2 plasas',
+    example: 'Cama matrimonial king size',
     required: false,
   })
   @IsString()
   @IsOptional()
   @Transform(({ value }) => value?.trim())
   bed?: string;
+
+  @ApiProperty({
+    description: 'Estado de activación',
+    example: true,
+    required: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
 }
