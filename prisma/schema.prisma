@@ -94,32 +94,23 @@ enum FloorTypes {
   LIMINATING
   CARPETING
 }
-
-enum RoomStatus {
-  AVAILABLE
-  OCCUPIED
-  RESERVED
-  CLEANING
-}
-
 model RoomTypes {
-  id          String      @id @default(uuid())
-  guests      Int
-  price       Float
-  tv          String
-  floorType   FloorTypes
-  description String
-  area        Float
-  bed         String
-  // relacion con room images
-  isActive    Boolean     @default(true)
-  createdAt   DateTime    @default(now()) @db.Timestamptz(6)
-  updatedAt   DateTime    @updatedAt
-  ImageRoom   ImageRoom[]
-  Room        Room[]
+  id            String          @id @default(uuid())
+  guests        Int
+  price         Float
+  tv            String
+  floorType     FloorTypes
+  description   String
+  area          Float
+  bed           String
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime        @updatedAt
+  ImageRoomType ImageRoomType[]
+  Room          Room[]
 }
 
-model ImageRoom {
+model ImageRoomType {
   id        String    @id @default(uuid())
   imageUrl  String
   isMain    Boolean   @default(false)
@@ -128,6 +119,13 @@ model ImageRoom {
   isActive  Boolean   @default(true)
   createdAt DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt
+}
+
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  CLEANING
 }
 
 model Room {
