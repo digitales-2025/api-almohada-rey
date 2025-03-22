@@ -10,5 +10,5 @@ export class CreateRoomWithImagesDto extends CreateRoomDto {
     },
     description: 'Imágenes de la habitación (opcional)',
   })
-  images: any[];
+  images: File[];
 }
