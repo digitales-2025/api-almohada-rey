@@ -11,7 +11,7 @@ import { AuditActionType, Prisma } from '@prisma/client';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { GuestBuilder, Guests } from '../entities/guest.entity';
 import { Reservation } from '../entities/reservation.entity';
-import { RoomsRepository } from 'src/modules/admin/rooms/repositories/rooms.repository';
+import { RoomsRepository } from 'src/modules/admin/room-type/repositories/room-type.repository';
 import { AuditRepository } from 'src/modules/admin/audit/audit.repository';
 
 @Injectable()
