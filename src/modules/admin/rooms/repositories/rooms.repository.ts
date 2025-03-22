@@ -192,4 +192,24 @@ export class RoomsRepository extends BaseRepository<Room> {
       throw error;
     }
   }
+
+  // Implementa estos métodos en tu RoomsRepository
+  async resetMainImages(roomId: string): Promise<void> {
+    await this.prisma.imageRoom.updateMany({
+      where: {
+        room: roomId,
+        isMain: true,
+      },
+      data: {
+        isMain: false,
+      },
+    });
+  }
+
+  async updateImageMain(imageId: string, isMain: boolean): Promise<void> {
+    await this.prisma.imageRoom.update({
+      where: { id: imageId },
+      data: { isMain },
+    });
+  }
 }
