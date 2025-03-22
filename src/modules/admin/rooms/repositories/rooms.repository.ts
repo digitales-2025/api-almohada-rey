@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Room } from '../entities/rooms.entity';
 import { BaseRepository, PrismaService } from 'src/prisma/src';
+import { RoomStatus } from '../dto';
 
 export interface CreateImageRoomData {
   room: string;
@@ -24,20 +25,6 @@ export class RoomsRepository extends BaseRepository<Room> {
       orderBy: { number: 'asc' },
     });
   } */
-
-  /**
-   * Busca una habitación por su ID
-   * @param id ID de la habitación
-   * @returns Promise<Room>
-   */
-  async findById(id: string): Promise<Room> {
-    const room = await this.prisma.room.findUnique({
-      where: { id },
-    });
-
-    // Si necesitas devolver el resultado como Room, puedes usar type assertion
-    return room as unknown as Room;
-  }
 
   /**
    * Busca una habitación por su número
@@ -210,6 +197,28 @@ export class RoomsRepository extends BaseRepository<Room> {
     await this.prisma.imageRoom.update({
       where: { id: imageId },
       data: { isMain },
+    });
+  }
+
+  async findByStatus({
+    status,
+    id,
+  }: {
+    status: RoomStatus;
+    id?: string;
+  }): Promise<Room[]> {
+    if (id) {
+      return this.prisma.room.findMany({
+        where: {
+          id,
+          status,
+        },
+      });
+    }
+    return this.prisma.room.findMany({
+      where: {
+        status: status,
+      },
     });
   }
 }

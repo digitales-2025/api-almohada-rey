@@ -11,6 +11,7 @@ import { SeedsModule } from './modules/seeds/seeds.module';
 import { CustomersModule } from './modules/admin/customers/customers.module';
 import { CloudflareModule } from './cloudflare/cloudflare.module';
 import { RoomsModule } from './modules/admin/rooms/rooms.module';
+import { ReservationModule } from './modules/reservation/reservation.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { RoomsModule } from './modules/admin/rooms/rooms.module';
     CustomersModule,
     CloudflareModule,
     RoomsModule,
+    ReservationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -25,6 +25,8 @@ model User {
   // Relación con auditorías (acciones realizadas por este usuario)
   auditsPerformed Audit[] @relation("AuditPerformedBy")
 
+  reservations    Reservation[]
+
   @@unique([email, isActive])
 }
 
@@ -71,6 +73,8 @@ model Customer {
   isActive       Boolean               @default(true)
   createdAt      DateTime              @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime              @updatedAt
+  
+  reservations   Reservation[]
 }
 
 enum CustomerDocumentType {
@@ -124,6 +128,8 @@ model Room {
   updatedAt         DateTime            @updatedAt
   ImageRoom         ImageRoom[]
   CleaningChecklist CleaningChecklist[] //aun no considerar
+
+  reservations      Reservation[]
 }
 
 model ImageRoom {
@@ -152,39 +158,28 @@ model CleaningChecklist {
   updatedAt DateTime @updatedAt
 }
 
-model RoomType {
-    id          String     @id @default(uuid())
-  guests      Int
-  price       Float
-  tv          String
-  floorType   FloorTypes
-  description String
-  area        Float
-  bed         String
-
-// relacion con room images
-
-  isActive    Boolean    @default(true)
-
-  createdAt         DateTime            @default(now()) @db.Timestamptz(6)
-  updatedAt         DateTime            @updatedAt
+enum ReservationStatus {
+  PENDING
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELED
 }
 
-model Room_Oficial {
-  id          String     @id @default(uuid())
-  number      Int        @unique
-  status      RoomStatus
-
-  isActive    Boolean    @default(true)
-
-    trashBin     Boolean  @default(true) // Trash bin (Tacho)
-  towel        Boolean  @default(true) // Towel (Toalla)
-  toiletPaper  Boolean  @default(true) // Toilet paper (Papel higiénico)
-  showerSoap   Boolean  @default(true) // Shower soap (Jabón de ducha)
-  handSoap     Boolean  @default(true) // Hand soap (Jabón de lavado)
-  lamp         Boolean  @default(true) // Lamp (Lámpara)
-
-  createdAt         DateTime            @default(now()) @db.Timestamptz(6)
-  updatedAt         DateTime            @updatedAt
-  CleaningChecklist CleaningChecklist[] //aun no considerar
+model Reservation {
+  id              String            @id @default(uuid())
+  customer        Customer          @relation(fields: [customerId], references: [id])
+  customerId      String
+  room            Room              @relation(fields: [roomId], references: [id])
+  roomId          String
+  user            User              @relation(fields: [userId], references: [id])
+  userId          String
+  reservationDate DateTime          @default(now()) @db.Timestamptz(6)
+  checkInDate     DateTime          @db.Date
+  checkOutDate    DateTime          @db.Date
+  status          ReservationStatus
+  guests          Json?             // List of companions
+  observations    String?           // Additional notes
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime          @updatedAt
 }
