@@ -1,14 +1,17 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { CreateRoomDto } from './create-room-type.dto';
+import { CreateRoomTypeDto } from './create-room-type.dto';
+import { IsArray } from 'class-validator';
 
-export class CreateRoomWithImagesDto extends CreateRoomDto {
+export class CreateRoomTypeWithImagesDto extends CreateRoomTypeDto {
   @ApiProperty({
     type: 'array',
     items: {
       type: 'string',
       format: 'binary',
     },
-    description: 'Imágenes de la habitación (opcional)',
+    description: 'Imágenes del tipo de habitación (exactamente 5 requeridas)',
+    required: true,
   })
+  @IsArray()
   images: File[];
 }
