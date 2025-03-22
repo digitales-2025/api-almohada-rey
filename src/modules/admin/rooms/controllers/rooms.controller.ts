@@ -8,6 +8,8 @@ import {
   Delete,
   UseInterceptors,
   UploadedFiles,
+  BadRequestException,
+  UploadedFile,
 } from '@nestjs/common';
 import { RoomsService } from '../services/rooms.service';
 
@@ -25,16 +27,17 @@ import {
 
 import {
   CreateRoomDto,
-  UpdateRoomDto,
+  /*   UpdateRoomDto, */
   DeleteRoomDto,
   UpdateRoomWithImagesDto,
   CreateRoomWithImagesDto,
 } from '../dto';
 import { Room } from '../entities/rooms.entity';
 
-import { FilesInterceptor } from '@nestjs/platform-express';
-import { FormatDataInterceptor } from './format-data.interceptor';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { FormatDataInterceptor } from './format-data-update.interceptor';
+import { FormatDataCreateInterceptor } from './format-data-create.interceptor';
+/* import { FileFieldsInterceptor } from '@nestjs/platform-express'; */
 import { Auth, GetUser } from '../../auth/decorators';
 import { UserData } from 'src/interfaces';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
@@ -99,43 +102,54 @@ export class RoomsController {
   @Post('create-with-images')
   @ApiOperation({
     summary: 'Crear nueva habitación con imágenes',
+    description:
+      'Permite crear una habitación con exactamente 5 imágenes requeridas.',
   })
   @ApiConsumes('multipart/form-data')
-  @ApiBody({ type: CreateRoomWithImagesDto }) // Cambio aquí: usa el DTO en lugar del schema
-  @UseInterceptors(FilesInterceptor('images'), FormatDataInterceptor)
+  @ApiBody({ type: CreateRoomWithImagesDto })
+  @UseInterceptors(FilesInterceptor('images', 5), FormatDataCreateInterceptor)
   async createWithImages(
     @Body() createRoomDto: CreateRoomDto,
     @UploadedFiles() images: Express.Multer.File[],
     @GetUser() user: UserData,
   ): Promise<BaseApiResponse<Room>> {
+    // Validar que se hayan enviado exactamente 5 imágenes
+    if (!images || images.length !== 5) {
+      throw new BadRequestException(
+        'Se requieren exactamente 5 imágenes para crear una habitación. Por favor, cargue 5 imágenes.',
+      );
+    }
+
     return this.roomsService.createWithImages(createRoomDto, images, user);
   }
+
+  /**
+   * Actualizar habitación con imagen
+   */
   @Patch(':id/update-with-images')
-  @ApiOperation({ summary: 'Actualizar habitación con imágenes' })
+  @ApiOperation({
+    summary: 'Actualizar habitación con una imagen',
+    description:
+      'Permite actualizar la información de la habitación y una imagen específica.',
+  })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: UpdateRoomWithImagesDto })
-  @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'newImages', maxCount: 10 },
-      { name: 'imageUpdates', maxCount: 10 },
-    ]),
-    FormatDataInterceptor,
-  )
-  async updateWithImages(
+  @UseInterceptors(FileInterceptor('newImage'), FormatDataInterceptor) // ¡Añadir FormatDataInterceptor aquí!
+  async updateWithImage(
     @Param('id') id: string,
-    @Body() updateRoomDto: UpdateRoomDto,
-    @UploadedFiles()
-    files: {
-      newImages?: Express.Multer.File[];
-      imageUpdates?: Express.Multer.File[];
-    },
-    @Body('imageUpdates') imageUpdateData: string,
+    @Body() updateData: any, // Cambiar a any para evitar validación estricta
+    @UploadedFile() newImage: Express.Multer.File,
     @GetUser() user: UserData,
   ): Promise<
-    BaseApiResponse<Room & { images: Array<{ id: string; url: string }> }>
+    BaseApiResponse<
+      Room & { images: Array<{ id: string; url: string; isMain: boolean }> }
+    >
   > {
     try {
-      // Limpiamos los campos vacíos o nulos
+      // 1. Extraer correctamente los datos de la habitación excluyendo imageUpdate
+      const { imageUpdate, newImage, ...updateRoomDto } = updateData;
+
+      // 2. Limpiar campos vacíos o nulos
       Object.keys(updateRoomDto).forEach((key) => {
         if (
           updateRoomDto[key] === '' ||
@@ -146,38 +160,45 @@ export class RoomsController {
         }
       });
 
-      // Procesamos los datos de actualización de imágenes solo si existen
-      let imageUpdates = [];
-      if (imageUpdateData && files?.imageUpdates?.length) {
+      // 3. Procesar datos de imagen si existen
+      let processedImageUpdate = null;
+      if (imageUpdate) {
         try {
-          const updateData = JSON.parse(imageUpdateData);
-          imageUpdates = updateData
-            .map((update, index) => ({
-              imageId: update.imageId,
-              file: files.imageUpdates[index],
-            }))
-            .filter((update) => update.file && update.imageId);
-        } catch (parseError) {
-          console.error(parseError);
+          // Si viene como string (común en multipart/form-data), lo parseamos
+          if (typeof imageUpdate === 'string') {
+            processedImageUpdate = JSON.parse(imageUpdate);
+          } else {
+            // Si ya viene como objeto, lo usamos directamente
+            processedImageUpdate = imageUpdate;
+          }
+
+          // Validación básica
+          if (!processedImageUpdate.imageId) {
+            throw new BadRequestException(
+              'El objeto imageUpdate debe incluir el imageId',
+            );
+          }
+        } catch (error) {
+          if (error instanceof BadRequestException) throw error;
+          throw new BadRequestException(
+            `Error procesando imageUpdate: ${error.message}`,
+          );
         }
       }
 
-      // Validamos si hay nuevas imágenes
-      const newImages = files?.newImages?.length ? files.newImages : undefined;
-
-      return this.roomsService.updateWithImages(
+      // 4. Llamar al servicio con los datos procesados
+      return this.roomsService.updateWithImage(
         id,
         user,
-        updateRoomDto, // DTO limpiado
-        newImages,
-        imageUpdates.length > 0 ? imageUpdates : undefined,
+        updateRoomDto,
+        newImage || null,
+        processedImageUpdate,
       );
     } catch (error) {
-      console.error('Error en updateWithImages:', error);
+      console.error('Error en updateWithImage:', error);
       throw error;
     }
   }
-
   /**
    * Desactiva múltiples habitaciones
    */
