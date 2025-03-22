@@ -11,8 +11,8 @@ import { reservationErrorMessages } from './errors/errors.reservation';
 import { ReservationRepository } from './repository/reservation.repository';
 import { CreateReservationUseCase } from './use-cases/createReservation.use-case';
 import { UserData } from 'src/interfaces';
-import { RoomsRepository } from '../admin/rooms/repositories/rooms.repository';
-import { RoomStatus } from '../admin/rooms/dto';
+import { RoomsRepository } from '../admin/room-type/repositories/room-type.repository';
+import { RoomStatus } from '../admin/room-type/dto';
 import { PaginationParams } from 'src/utils/paginated-response/pagination.types';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 
