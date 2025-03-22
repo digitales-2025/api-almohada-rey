@@ -5,62 +5,72 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
-import { RoomsRepository } from '../repositories/room-type.repository';
-import { Room } from '../entities/room-type.entity';
+import { RoomTypeRepository } from '../repositories/room-type.repository';
+import { RoomType } from '../entities/room-type.entity';
 import { HttpResponse, UserData } from 'src/interfaces';
 
-import { roomErrorMessages } from '../errors/errors-room-type';
-import { CreateRoomDto, UpdateRoomDto, DeleteRoomDto } from '../dto';
+import { roomTypeErrorMessages } from '../errors/errors-room-type';
 import {
-  CreateRoomUseCase,
-  UpdateRoomUseCase,
-  DeleteRoomsUseCase,
-  ReactivateRoomUseCase,
+  CreateRoomTypeDto,
+  UpdateRoomTypeDto,
+  DeleteRoomTypeDto,
+} from '../dto';
+import {
+  CreateRoomTypeUseCase,
+  UpdateRoomTypeUseCase,
+  DeleteRoomTypesUseCase,
+  ReactivateRoomTypeUseCase,
 } from '../use-cases';
 
 import { CloudflareService } from 'src/cloudflare/cloudflare.service';
-import { CreateImageRoomData } from '../repositories/room-type.repository';
+import { CreateImageRoomTypeData } from '../repositories/room-type.repository';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
 import { validateArray, validateChanges } from 'src/prisma/src/utils';
 
 @Injectable()
-export class RoomsService {
-  private readonly logger = new Logger(RoomsService.name);
+export class RoomTypeService {
+  private readonly logger = new Logger(RoomTypeService.name);
   private readonly errorHandler: BaseErrorHandler;
 
   constructor(
-    private readonly roomsRepository: RoomsRepository,
-    private readonly createRoomUseCase: CreateRoomUseCase,
-    private readonly updateRoomUseCase: UpdateRoomUseCase,
-    private readonly deleteRoomsUseCase: DeleteRoomsUseCase,
-    private readonly reactivateRoomUseCase: ReactivateRoomUseCase,
+    private readonly roomTypeRepository: RoomTypeRepository,
+    private readonly createRoomTypeUseCase: CreateRoomTypeUseCase,
+    private readonly updateRoomTypeUseCase: UpdateRoomTypeUseCase,
+    private readonly deleteRoomTypesUseCase: DeleteRoomTypesUseCase,
+    private readonly reactivateRoomTypeUseCase: ReactivateRoomTypeUseCase,
     private readonly cloudflareService: CloudflareService,
   ) {
     this.errorHandler = new BaseErrorHandler(
       this.logger,
-      'Room',
-      roomErrorMessages,
+      'RoomType',
+      roomTypeErrorMessages,
     );
   }
 
   /**
-   * Crea una nueva habitación
+   * Crea un nuevo tipo de habitación
    */
   async create(
-    createRoomDto: CreateRoomDto,
+    createRoomTypeDto: CreateRoomTypeDto,
     user: UserData,
-  ): Promise<BaseApiResponse<Room>> {
+  ): Promise<BaseApiResponse<RoomType>> {
     try {
-      // Verificar si ya existe una habitación con el mismo número
-      const existingRoom = await this.roomsRepository.findByNumber(
-        createRoomDto.number,
-      );
-      if (existingRoom) {
-        throw new BadRequestException(roomErrorMessages.alreadyExists);
+      // Verificar si existe un tipo de habitación similar
+      const existingRoomTypes = await this.roomTypeRepository.findMany({
+        where: {
+          guests: createRoomTypeDto.guests,
+          area: createRoomTypeDto.area,
+          floorType: createRoomTypeDto.floorType,
+          price: createRoomTypeDto.price,
+        },
+      });
+
+      if (existingRoomTypes && existingRoomTypes.length > 0) {
+        throw new BadRequestException(roomTypeErrorMessages.alreadyExists);
       }
 
-      return await this.createRoomUseCase.execute(createRoomDto, user);
+      return await this.createRoomTypeUseCase.execute(createRoomTypeDto, user);
     } catch (error) {
       this.errorHandler.handleError(error, 'creating');
       throw error;
@@ -68,47 +78,29 @@ export class RoomsService {
   }
 
   /**
-   * Actualiza una habitación existente
+   * Actualiza un tipo de habitación existente
    */
   async update(
     id: string,
-    updateRoomDto: UpdateRoomDto,
+    updateRoomTypeDto: UpdateRoomTypeDto,
     user: UserData,
-  ): Promise<BaseApiResponse<Room>> {
+  ): Promise<BaseApiResponse<RoomType>> {
     try {
-      const currentRoom = await this.findById(id);
+      const currentRoomType = await this.findById(id);
 
-      if (!validateChanges(updateRoomDto, currentRoom)) {
+      if (!validateChanges(updateRoomTypeDto, currentRoomType)) {
         return {
           success: true,
-          message: 'No se detectaron cambios en la habitación',
-          data: currentRoom,
+          message: 'No se detectaron cambios en el tipo de habitación',
+          data: currentRoomType,
         };
       }
 
-      // Si se está actualizando el número, verificar que no exista otra habitación con ese número
-      if (updateRoomDto.number && updateRoomDto.number !== currentRoom.number) {
-        const existingRoom = await this.roomsRepository.findByNumber(
-          updateRoomDto.number,
-        );
-        if (existingRoom && existingRoom.id !== id) {
-          throw new BadRequestException(roomErrorMessages.alreadyExists);
-        }
-      }
-
-      // Validar cambio de estado
-      if (updateRoomDto.status && currentRoom.status !== updateRoomDto.status) {
-        // Validar si es posible cambiar el estado según reglas de negocio
-        if (
-          currentRoom.status === 'OCCUPIED' &&
-          updateRoomDto.status !== 'AVAILABLE' &&
-          updateRoomDto.status !== 'CLEANING'
-        ) {
-          throw new BadRequestException(roomErrorMessages.unavailableStatus);
-        }
-      }
-
-      return await this.updateRoomUseCase.execute(id, updateRoomDto, user);
+      return await this.updateRoomTypeUseCase.execute(
+        id,
+        updateRoomTypeDto,
+        user,
+      );
     } catch (error) {
       this.errorHandler.handleError(error, 'updating');
       throw error;
@@ -116,9 +108,9 @@ export class RoomsService {
   }
 
   /**
-   * Busca una habitación por su ID
+   * Busca un tipo de habitación por su ID
    */
-  async findOne(id: string): Promise<Room> {
+  async findOne(id: string): Promise<RoomType> {
     try {
       return this.findById(id);
     } catch (error) {
@@ -128,27 +120,29 @@ export class RoomsService {
   }
 
   /**
-   * Obtiene todas las habitaciones con sus imágenes
+   * Obtiene todos los tipos de habitaciones con sus imágenes
    */
   async findAll(): Promise<
-    Array<Room & { images: Array<{ id: string; url: string }> }>
+    Array<RoomType & { images: Array<{ id: string; url: string }> }>
   > {
     try {
-      // 1. Obtener todas las habitaciones
-      const rooms = await this.roomsRepository.findMany();
+      // 1. Obtener todos los tipos de habitaciones
+      const roomTypes = await this.roomTypeRepository.findMany();
 
-      // 2. Para cada habitación, obtener sus imágenes
-      const roomsWithImages = await Promise.all(
-        rooms.map(async (room) => {
-          const images = await this.roomsRepository.findImagesByRoomId(room.id);
+      // 2. Para cada tipo de habitación, obtener sus imágenes
+      const roomTypesWithImages = await Promise.all(
+        roomTypes.map(async (roomType) => {
+          const images = await this.roomTypeRepository.findImagesByRoomTypeId(
+            roomType.id,
+          );
           return {
-            ...room,
+            ...roomType,
             images,
           };
         }),
       );
 
-      return roomsWithImages;
+      return roomTypesWithImages;
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
       throw error;
@@ -156,35 +150,40 @@ export class RoomsService {
   }
 
   /**
-   * Busca una habitación por su ID
+   * Busca un tipo de habitación por su ID
    */
-  async findById(id: string): Promise<Room> {
-    const room = await this.roomsRepository.findById(id);
-    if (!room) {
-      throw new BadRequestException(roomErrorMessages.notFound);
+  async findById(id: string): Promise<RoomType> {
+    const roomType = await this.roomTypeRepository.findById(id);
+    if (!roomType) {
+      throw new BadRequestException(roomTypeErrorMessages.notFound);
     }
-    return room;
+    return roomType;
   }
 
   /**
-   * Desactiva múltiples habitaciones
+   * Desactiva múltiples tipos de habitaciones
    */
   async deleteMany(
-    deleteRoomDto: DeleteRoomDto,
+    deleteRoomTypeDto: DeleteRoomTypeDto,
     user: UserData,
-  ): Promise<BaseApiResponse<Room[]>> {
+  ): Promise<BaseApiResponse<RoomType[]>> {
     try {
-      validateArray(deleteRoomDto.ids, 'IDs de habitaciones');
+      validateArray(deleteRoomTypeDto.ids, 'IDs de tipos de habitaciones');
 
-      // Verificar que ninguna habitación esté ocupada
-      for (const id of deleteRoomDto.ids) {
-        const room = await this.roomsRepository.findById(id);
-        if (room && room.status === 'OCCUPIED') {
-          throw new BadRequestException(roomErrorMessages.inUse);
+      // Verificar que ningún tipo de habitación esté en uso
+      for (const id of deleteRoomTypeDto.ids) {
+        const roomType = await this.roomTypeRepository.findById(id);
+        if (!roomType) {
+          throw new BadRequestException(
+            `Tipo de habitación con ID ${id} no encontrado`,
+          );
         }
+
+        // Aquí podrías verificar si hay habitaciones usando este tipo
+        // Por ahora omitimos la validación ya que no tenemos esa relación implementada
       }
 
-      return await this.deleteRoomsUseCase.execute(deleteRoomDto, user);
+      return await this.deleteRoomTypesUseCase.execute(deleteRoomTypeDto, user);
     } catch (error) {
       this.errorHandler.handleError(error, 'deactivating');
       throw error;
@@ -192,15 +191,15 @@ export class RoomsService {
   }
 
   /**
-   * Reactiva múltiples habitaciones
+   * Reactiva múltiples tipos de habitaciones
    */
   async reactivateMany(
     ids: string[],
     user: UserData,
-  ): Promise<BaseApiResponse<Room[]>> {
+  ): Promise<BaseApiResponse<RoomType[]>> {
     try {
-      validateArray(ids, 'IDs de habitaciones');
-      return await this.reactivateRoomUseCase.execute(ids, user);
+      validateArray(ids, 'IDs de tipos de habitaciones');
+      return await this.reactivateRoomTypeUseCase.execute(ids, user);
     } catch (error) {
       this.errorHandler.handleError(error, 'reactivating');
       throw error;
@@ -214,11 +213,11 @@ export class RoomsService {
    */
   async uploadImage(image: Express.Multer.File): Promise<HttpResponse<string>> {
     if (!image) {
-      throw new BadRequestException('Image not provided');
+      throw new BadRequestException('Imagen no proporcionada');
     }
 
     if (Array.isArray(image)) {
-      throw new BadRequestException('Only one file can be uploaded at a time');
+      throw new BadRequestException('Solo se puede subir un archivo a la vez');
     }
 
     const validMimeTypes = [
@@ -229,7 +228,7 @@ export class RoomsService {
     ];
     if (!validMimeTypes.includes(image.mimetype)) {
       throw new BadRequestException(
-        'The file must be an image in JPEG, PNG, GIF, or WEBP format',
+        'El archivo debe ser una imagen en formato JPEG, PNG, GIF o WEBP',
       );
     }
 
@@ -237,11 +236,11 @@ export class RoomsService {
       const imageUrl = await this.cloudflareService.uploadImage(image);
       return {
         statusCode: HttpStatus.CREATED,
-        message: 'Image uploaded successfully',
+        message: 'Imagen subida exitosamente',
         data: imageUrl,
       };
     } catch (error) {
-      this.logger.error(`Error uploading image: ${error.message}`, error.stack);
+      this.logger.error(`Error subiendo imagen: ${error.message}`, error.stack);
       throw new InternalServerErrorException('Error subiendo la imagen');
     }
   }
@@ -254,11 +253,11 @@ export class RoomsService {
     existingFileName: string,
   ): Promise<HttpResponse<string>> {
     if (!image) {
-      throw new BadRequestException('Image not provided');
+      throw new BadRequestException('Imagen no proporcionada');
     }
 
     if (Array.isArray(image)) {
-      throw new BadRequestException('Only one file can be uploaded at a time');
+      throw new BadRequestException('Solo se puede subir un archivo a la vez');
     }
 
     const validMimeTypes = [
@@ -269,7 +268,7 @@ export class RoomsService {
     ];
     if (!validMimeTypes.includes(image.mimetype)) {
       throw new BadRequestException(
-        'The file must be an image in JPEG, PNG, GIF, or WEBP format',
+        'El archivo debe ser una imagen en formato JPEG, PNG, GIF o WEBP',
       );
     }
 
@@ -280,65 +279,62 @@ export class RoomsService {
       );
       return {
         statusCode: HttpStatus.OK,
-        message: 'Image updated successfully',
+        message: 'Imagen actualizada exitosamente',
         data: imageUrl,
       };
     } catch (error) {
-      this.logger.error(`Error updating image: ${error.message}`, error.stack);
-      throw new InternalServerErrorException('Error updating image');
+      this.logger.error(
+        `Error actualizando imagen: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Error actualizando la imagen');
     }
   }
 
   /**
-   * Crea una nueva habitación con imágenes
+   * Crea un nuevo tipo de habitación con imágenes
    */
   async createWithImages(
-    createRoomDto: CreateRoomDto,
+    createRoomTypeDto: CreateRoomTypeDto,
     images: Express.Multer.File[],
     user: UserData,
   ): Promise<
-    BaseApiResponse<Room & { images: Array<{ id: string; url: string }> }>
+    BaseApiResponse<RoomType & { images: Array<{ id: string; url: string }> }>
   > {
     try {
       // Validación: exactamente 5 imágenes
       if (!images || images.length !== 5) {
         throw new BadRequestException(
-          'Se requieren exactamente 5 imágenes para crear una habitación. Por favor, cargue 5 imágenes.',
+          'Se requieren exactamente 5 imágenes para crear un tipo de habitación. Por favor, cargue 5 imágenes.',
         );
       }
 
-      const roomResponse = await this.create(createRoomDto, user);
+      const roomTypeResponse = await this.create(createRoomTypeDto, user);
 
-      const imagePromises = images.map(async (image) => {
+      const imagePromises = images.map(async (image, index) => {
         try {
           const imageResponse = await this.uploadImage(image);
-          const imageData: CreateImageRoomData = {
-            room: roomResponse.data.id,
+          const imageData: CreateImageRoomTypeData = {
+            room: roomTypeResponse.data.id,
             imageUrl: imageResponse.data,
-            isMain: false, // Por defecto, no es la imagen principal
+            isMain: index === 0, // La primera imagen será la principal
           };
-          // Si es la primera imagen, marcarla como principal
-          if (images.indexOf(image) === 0) {
-            imageData.isMain = true;
-          }
-          await this.roomsRepository.createImageRoom(imageData);
+          await this.roomTypeRepository.createImageRoomType(imageData);
         } catch (imageError) {
           this.logger.error(`Error procesando imagen: ${imageError.message}`);
-          // Podríamos considerar eliminar la habitación si falla la carga de imágenes
-          // o al menos marcar esta situación específica en los logs
         }
       });
 
       await Promise.all(imagePromises);
 
       // Obtener las imágenes con sus IDs
-      const imagesData = await this.roomsRepository.findImagesByRoomId(
-        roomResponse.data.id,
+      const imagesData = await this.roomTypeRepository.findImagesByRoomTypeId(
+        roomTypeResponse.data.id,
       );
 
       return {
-        ...roomResponse,
-        data: { ...roomResponse.data, images: imagesData },
+        ...roomTypeResponse,
+        data: { ...roomTypeResponse.data, images: imagesData },
       };
     } catch (error) {
       this.errorHandler.handleError(error, 'creating');
@@ -347,12 +343,12 @@ export class RoomsService {
   }
 
   /**
-   * Actualiza una habitación con una imagen específica
+   * Actualiza un tipo de habitación con una imagen específica
    */
   async updateWithImage(
     id: string,
     user: UserData,
-    updateRoomDto: UpdateRoomDto,
+    updateRoomTypeDto: UpdateRoomTypeDto,
     newImage: Express.Multer.File | null,
     imageUpdate: {
       imageId: string;
@@ -361,24 +357,25 @@ export class RoomsService {
     } | null,
   ): Promise<
     BaseApiResponse<
-      Room & { images: Array<{ id: string; url: string; isMain: boolean }> }
+      RoomType & { images: Array<{ id: string; url: string; isMain: boolean }> }
     >
   > {
     try {
-      // 1. Obtener la habitación actual
-      const room = await this.findById(id);
-      const existingImages = await this.roomsRepository.findImagesByRoomId(id);
+      // 1. Obtener el tipo de habitación actual
+      const roomType = await this.findById(id);
+      const existingImages =
+        await this.roomTypeRepository.findImagesByRoomTypeId(id);
 
-      // 2. Actualizar la información básica de la habitación (si se proporcionó)
-      let roomResponse = { success: true, message: '', data: room };
-      if (Object.keys(updateRoomDto).length > 0) {
-        roomResponse = await this.update(id, updateRoomDto, user);
+      // 2. Actualizar la información básica del tipo de habitación (si se proporcionó)
+      let roomTypeResponse = { success: true, message: '', data: roomType };
+      if (Object.keys(updateRoomTypeDto).length > 0) {
+        roomTypeResponse = await this.update(id, updateRoomTypeDto, user);
       }
 
       // 3. Actualizar imagen existente si se proporcionó imageUpdate
       if (imageUpdate) {
         // Verificar que la imagen exista
-        const existingImage = await this.roomsRepository.findImageById(
+        const existingImage = await this.roomTypeRepository.findImageById(
           imageUpdate.imageId,
         );
         if (!existingImage) {
@@ -399,7 +396,7 @@ export class RoomsService {
           );
 
           // Actualizar la URL en la base de datos
-          await this.roomsRepository.updateImageUrl(
+          await this.roomTypeRepository.updateImageUrl(
             imageUpdate.imageId,
             imageResponse.data,
           );
@@ -412,9 +409,9 @@ export class RoomsService {
         ) {
           if (imageUpdate.isMain) {
             // Si se está marcando como principal, desmarcamos todas las demás
-            await this.roomsRepository.resetMainImages(id);
+            await this.roomTypeRepository.resetMainImages(id);
           }
-          await this.roomsRepository.updateImageMain(
+          await this.roomTypeRepository.updateImageMain(
             imageUpdate.imageId,
             imageUpdate.isMain,
           );
@@ -425,7 +422,7 @@ export class RoomsService {
         // Verificar que no se exceda el límite de 5 imágenes
         if (existingImages.length >= 5) {
           throw new BadRequestException(
-            'La habitación ya tiene el máximo de 5 imágenes permitidas. Debe actualizar una existente.',
+            'El tipo de habitación ya tiene el máximo de 5 imágenes permitidas. Debe actualizar una existente.',
           );
         }
 
@@ -436,24 +433,24 @@ export class RoomsService {
         const hasMainImage = existingImages.some((img) => img.isMain);
 
         // Crear registro de la nueva imagen
-        const imageData: CreateImageRoomData = {
+        const imageData: CreateImageRoomTypeData = {
           room: id,
           imageUrl: imageResponse.data,
           isMain: !hasMainImage, // Es principal solo si no hay otra imagen principal
         };
-        await this.roomsRepository.createImageRoom(imageData);
+        await this.roomTypeRepository.createImageRoomType(imageData);
       }
 
       // 5. Obtener imágenes actualizadas para incluirlas en la respuesta
       const updatedImagesData =
-        await this.roomsRepository.findImagesByRoomId(id);
+        await this.roomTypeRepository.findImagesByRoomTypeId(id);
 
       // 6. Retornar respuesta
       return {
         success: true,
-        message: 'Habitación actualizada exitosamente',
+        message: 'Tipo de habitación actualizado exitosamente',
         data: {
-          ...roomResponse.data,
+          ...roomTypeResponse.data,
           images: updatedImagesData,
         },
       };
@@ -465,22 +462,23 @@ export class RoomsService {
   }
 
   /**
-   * Busca una habitación por su ID incluyendo sus imágenes
+   * Busca un tipo de habitación por su ID incluyendo sus imágenes
    */
   async findOneWithImages(id: string): Promise<
-    Room & {
+    RoomType & {
       images: Array<{ id: string; url: string }>;
     }
   > {
     try {
-      // Obtenemos la habitación
-      const room = await this.findById(id);
+      // Obtenemos el tipo de habitación
+      const roomType = await this.findById(id);
 
       // Obtenemos las imágenes asociadas
-      const imagesData = await this.roomsRepository.findImagesByRoomId(id);
+      const imagesData =
+        await this.roomTypeRepository.findImagesByRoomTypeId(id);
 
       return {
-        ...room,
+        ...roomType,
         images: imagesData,
       };
     } catch (error) {
