@@ -140,18 +140,51 @@ model ImageRoom {
 
 model CleaningChecklist {
   id           Int     @id @default(autoincrement())
+  date String
   roomId       String // ID of room (Habitación)
   Room         Room    @relation(fields: [roomId], references: [id])
-  trashBin     Boolean // Trash bin (Tacho)
-  towel        Boolean // Towel (Toalla)
-  toiletPaper  Boolean // Toilet paper (Papel higiénico)
-  showerSoap   Boolean // Shower soap (Jabón de ducha)
-  handSoap     Boolean // Hand soap (Jabón de lavado)
-  lamp         Boolean // Lamp (Lámpara)
+
   staffName    String // ID of cleaning staff (Personal)
   userCheckId  String // ID of user who verifies (UserCheck)
   observations String? // Observations or comments (Observaciones)
 
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt
+}
+
+model RoomType {
+    id          String     @id @default(uuid())
+  guests      Int
+  price       Float
+  tv          String
+  floorType   FloorTypes
+  description String
+  area        Float
+  bed         String
+
+// relacion con room images
+
+  isActive    Boolean    @default(true)
+
+  createdAt         DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime            @updatedAt
+}
+
+model Room_Oficial {
+  id          String     @id @default(uuid())
+  number      Int        @unique
+  status      RoomStatus
+
+  isActive    Boolean    @default(true)
+
+    trashBin     Boolean  @default(true) // Trash bin (Tacho)
+  towel        Boolean  @default(true) // Towel (Toalla)
+  toiletPaper  Boolean  @default(true) // Toilet paper (Papel higiénico)
+  showerSoap   Boolean  @default(true) // Shower soap (Jabón de ducha)
+  handSoap     Boolean  @default(true) // Hand soap (Jabón de lavado)
+  lamp         Boolean  @default(true) // Lamp (Lámpara)
+
+  createdAt         DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime            @updatedAt
+  CleaningChecklist CleaningChecklist[] //aun no considerar
 }
