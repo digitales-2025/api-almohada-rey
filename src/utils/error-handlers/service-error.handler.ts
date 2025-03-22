@@ -1,5 +1,5 @@
 import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
-import { roomErrorMessages } from 'src/modules/admin/rooms/errors/errors-rooms';
+import { roomErrorMessages } from 'src/modules/admin/room-type/errors/errors-room-type';
 import { handleException } from 'src/utils';
 
 export type ServiceAction =
