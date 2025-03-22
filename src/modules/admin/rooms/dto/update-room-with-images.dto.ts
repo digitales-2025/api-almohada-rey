@@ -1,37 +1,54 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { UpdateRoomDto } from './update-rooms.dto';
-import { IsOptional } from 'class-validator';
-export class UpdateRoomWithImagesDto extends UpdateRoomDto {
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
+
+// DTO para operaciones con una imagen existente
+export class ImageUpdateDto {
   @ApiProperty({
-    type: 'array',
-    items: {
-      type: 'string',
-      format: 'binary',
-    },
-    description: 'Nuevas imágenes para agregar (opcional)',
-    required: false,
+    description: 'ID de la imagen a actualizar',
+    example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @IsOptional()
-  newImages?: any[];
+  @IsString()
+  @IsOptional() // Opcional para permitir actualizaciones parciales
+  imageId?: string;
 
   @ApiProperty({
-    type: 'array',
-    items: {
-      type: 'object',
-      properties: {
-        imageId: {
-          type: 'string',
-          example: '123e4567-e89b-12d3-a456-426614174000',
-        },
-        file: {
-          type: 'string',
-          format: 'binary',
-        },
-      },
-    },
-    description: 'Imágenes existentes a actualizar (opcional)',
+    description: 'URL actual de la imagen',
+    example: 'https://pub-c8a9c1f826c540b981f5cfb49c3a55ea.r2.dev/image.jpg',
+  })
+  @IsString()
+  @IsOptional()
+  url?: string;
+
+  @ApiProperty({
+    description: 'Indica si esta imagen es la principal',
+    example: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  isMain?: boolean;
+}
+
+export class UpdateRoomWithImagesDto extends UpdateRoomDto {
+  @ApiProperty({
+    type: 'string',
+    format: 'binary',
+    description: 'Nueva imagen para agregar o reemplazar',
     required: false,
   })
   @IsOptional()
-  imageUpdates?: any[];
+  newImage?: File; // Representación de un archivo único
+
+  @ApiProperty({
+    type: ImageUpdateDto,
+    description: 'Información para actualizar una imagen existente',
+    required: false,
+    example: {
+      imageId: '123e4567-e89b-12d3-a456-426614174000',
+      url: 'https://pub-c8a9c1f826c540b981f5cfb49c3a55ea.r2.dev/image.jpg',
+      isMain: true,
+    },
+  })
+  @IsOptional()
+  imageUpdate?: ImageUpdateDto;
 }
