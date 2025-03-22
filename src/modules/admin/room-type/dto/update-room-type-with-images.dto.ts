@@ -1,15 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { UpdateRoomDto } from './update-room-type.dto';
+import { UpdateRoomTypeDto } from './update-room-type.dto';
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 // DTO para operaciones con una imagen existente
-export class ImageUpdateDto {
+export class ImageRoomTypeUpdateDto {
   @ApiProperty({
     description: 'ID de la imagen a actualizar',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @IsString()
-  @IsOptional() // Opcional para permitir actualizaciones parciales
+  @IsOptional()
   imageId?: string;
 
   @ApiProperty({
@@ -29,7 +29,7 @@ export class ImageUpdateDto {
   isMain?: boolean;
 }
 
-export class UpdateRoomWithImagesDto extends UpdateRoomDto {
+export class UpdateRoomTypeWithImageDto extends UpdateRoomTypeDto {
   @ApiProperty({
     type: 'string',
     format: 'binary',
@@ -37,10 +37,10 @@ export class UpdateRoomWithImagesDto extends UpdateRoomDto {
     required: false,
   })
   @IsOptional()
-  newImage?: File; // Representación de un archivo único
+  newImage?: any;
 
   @ApiProperty({
-    type: ImageUpdateDto,
+    type: ImageRoomTypeUpdateDto,
     description: 'Información para actualizar una imagen existente',
     required: false,
     example: {
@@ -50,5 +50,5 @@ export class UpdateRoomWithImagesDto extends UpdateRoomDto {
     },
   })
   @IsOptional()
-  imageUpdate?: ImageUpdateDto;
+  imageUpdate?: ImageRoomTypeUpdateDto;
 }
