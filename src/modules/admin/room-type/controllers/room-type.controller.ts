@@ -11,7 +11,7 @@ import {
   BadRequestException,
   UploadedFile,
 } from '@nestjs/common';
-import { RoomsService } from '../services/room-type.service';
+import { RoomTypeService } from '../services/room-type.service';
 
 import {
   ApiTags,
@@ -26,27 +26,25 @@ import {
 } from '@nestjs/swagger';
 
 import {
-  CreateRoomDto,
-  /*   UpdateRoomDto, */
-  DeleteRoomDto,
-  UpdateRoomWithImagesDto,
-  CreateRoomWithImagesDto,
+  CreateRoomTypeDto,
+  DeleteRoomTypeDto,
+  UpdateRoomTypeWithImageDto,
+  CreateRoomTypeWithImagesDto,
 } from '../dto';
-import { Room } from '../entities/room-type.entity';
+import { RoomType } from '../entities/room-type.entity';
 
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { FormatDataInterceptor } from './format-data-update.interceptor';
 import { FormatDataCreateInterceptor } from './format-data-create.interceptor';
-/* import { FileFieldsInterceptor } from '@nestjs/platform-express'; */
 import { Auth, GetUser } from '../../auth/decorators';
 import { UserData } from 'src/interfaces';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 
 /**
- * Controlador REST para gestionar habitaciones del hotel.
- * Expone endpoints para operaciones CRUD sobre habitaciones.
+ * Controlador REST para gestionar tipos de habitaciones del hotel.
+ * Expone endpoints para operaciones CRUD sobre tipos de habitaciones.
  */
-@ApiTags('Admin Rooms')
+@ApiTags('Admin Room Types')
 @ApiBadRequestResponse({
   description:
     'Bad Request - Error en la validación de datos o solicitud incorrecta',
@@ -54,109 +52,113 @@ import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 @ApiUnauthorizedResponse({
   description: 'Unauthorized - No autorizado para realizar esta operación',
 })
-@Controller({ path: 'rooms', version: '1' })
+@Controller({ path: 'room-types', version: '1' })
 @Auth()
-export class RoomsController {
-  constructor(private readonly roomsService: RoomsService) {}
+export class RoomTypeController {
+  constructor(private readonly roomTypeService: RoomTypeService) {}
 
   /**
-   * Obtiene todas las habitaciones
+   * Obtiene todos los tipos de habitaciones
    */
   @Get()
   @ApiOperation({
-    summary: 'Obtener todas las habitaciones con sus imágenes',
+    summary: 'Obtener todos los tipos de habitaciones con sus imágenes',
   })
   @ApiResponse({
     status: 200,
-    description: 'Lista de todas las habitaciones con sus imágenes',
-    type: [Room], // Idealmente, deberías crear un DTO específico que incluya imágenes
+    description: 'Lista de todos los tipos de habitaciones con sus imágenes',
+    type: [RoomType],
   })
   findAll(): Promise<
-    Array<Room & { images: Array<{ id: string; url: string }> }>
+    Array<RoomType & { images: Array<{ id: string; url: string }> }>
   > {
-    return this.roomsService.findAll();
+    return this.roomTypeService.findAll();
   }
 
   /**
-   * Obtiene una habitación por ID
+   * Obtiene un tipo de habitación por ID
    */
   @Get(':id')
   @ApiOperation({
-    summary: 'Obtener una habitación por ID sin imagenes',
+    summary: 'Obtener un tipo de habitación por ID sin imágenes',
   })
   @ApiResponse({
     status: 200,
-    description: 'Habitación encontrada',
-    type: Room,
+    description: 'Tipo de habitación encontrado',
+    type: RoomType,
   })
   @ApiNotFoundResponse({
-    description: 'Habitación no encontrada',
+    description: 'Tipo de habitación no encontrado',
   })
-  findOne(@Param('id') id: string): Promise<Room> {
-    return this.roomsService.findOne(id);
+  findOne(@Param('id') id: string): Promise<RoomType> {
+    return this.roomTypeService.findOne(id);
   }
 
   /**
-   * Crea una nueva habitación con imágenes
+   * Crea un nuevo tipo de habitación con imágenes
    */
   @Post('create-with-images')
   @ApiOperation({
-    summary: 'Crear nueva habitación con imágenes',
+    summary: 'Crear nuevo tipo de habitación con imágenes',
     description:
-      'Permite crear una habitación con exactamente 5 imágenes requeridas.',
+      'Permite crear un tipo de habitación con exactamente 5 imágenes requeridas.',
   })
   @ApiConsumes('multipart/form-data')
-  @ApiBody({ type: CreateRoomWithImagesDto })
+  @ApiBody({ type: CreateRoomTypeWithImagesDto })
   @UseInterceptors(FilesInterceptor('images', 5), FormatDataCreateInterceptor)
   async createWithImages(
-    @Body() createRoomDto: CreateRoomDto,
+    @Body() createRoomTypeDto: CreateRoomTypeDto,
     @UploadedFiles() images: Express.Multer.File[],
     @GetUser() user: UserData,
-  ): Promise<BaseApiResponse<Room>> {
+  ): Promise<BaseApiResponse<RoomType>> {
     // Validar que se hayan enviado exactamente 5 imágenes
     if (!images || images.length !== 5) {
       throw new BadRequestException(
-        'Se requieren exactamente 5 imágenes para crear una habitación. Por favor, cargue 5 imágenes.',
+        'Se requieren exactamente 5 imágenes para crear un tipo de habitación. Por favor, cargue 5 imágenes.',
       );
     }
 
-    return this.roomsService.createWithImages(createRoomDto, images, user);
+    return this.roomTypeService.createWithImages(
+      createRoomTypeDto,
+      images,
+      user,
+    );
   }
 
   /**
-   * Actualizar habitación con imagen
+   * Actualizar tipo de habitación con imagen
    */
   @Patch(':id/update-with-images')
   @ApiOperation({
-    summary: 'Actualizar habitación con una imagen',
+    summary: 'Actualizar tipo de habitación con una imagen',
     description:
-      'Permite actualizar la información de la habitación y una imagen específica.',
+      'Permite actualizar la información del tipo de habitación y una imagen específica.',
   })
   @ApiConsumes('multipart/form-data')
-  @ApiBody({ type: UpdateRoomWithImagesDto })
-  @UseInterceptors(FileInterceptor('newImage'), FormatDataInterceptor) // ¡Añadir FormatDataInterceptor aquí!
+  @ApiBody({ type: UpdateRoomTypeWithImageDto })
+  @UseInterceptors(FileInterceptor('newImage'), FormatDataInterceptor)
   async updateWithImage(
     @Param('id') id: string,
-    @Body() updateData: any, // Cambiar a any para evitar validación estricta
+    @Body() updateData: any,
     @UploadedFile() newImage: Express.Multer.File,
     @GetUser() user: UserData,
   ): Promise<
     BaseApiResponse<
-      Room & { images: Array<{ id: string; url: string; isMain: boolean }> }
+      RoomType & { images: Array<{ id: string; url: string; isMain: boolean }> }
     >
   > {
     try {
-      // 1. Extraer correctamente los datos de la habitación excluyendo imageUpdate
-      const { imageUpdate, newImage, ...updateRoomDto } = updateData;
+      // 1. Extraer correctamente los datos del tipo de habitación excluyendo imageUpdate
+      const { imageUpdate, newImage, ...updateRoomTypeDto } = updateData;
 
       // 2. Limpiar campos vacíos o nulos
-      Object.keys(updateRoomDto).forEach((key) => {
+      Object.keys(updateRoomTypeDto).forEach((key) => {
         if (
-          updateRoomDto[key] === '' ||
-          updateRoomDto[key] === null ||
-          updateRoomDto[key] === undefined
+          updateRoomTypeDto[key] === '' ||
+          updateRoomTypeDto[key] === null ||
+          updateRoomTypeDto[key] === undefined
         ) {
-          delete updateRoomDto[key];
+          delete updateRoomTypeDto[key];
         }
       });
 
@@ -187,10 +189,10 @@ export class RoomsController {
       }
 
       // 4. Llamar al servicio con los datos procesados
-      return this.roomsService.updateWithImage(
+      return this.roomTypeService.updateWithImage(
         id,
         user,
-        updateRoomDto,
+        updateRoomTypeDto,
         newImage || null,
         processedImageUpdate,
       );
@@ -199,67 +201,68 @@ export class RoomsController {
       throw error;
     }
   }
+
   /**
-   * Desactiva múltiples habitaciones
+   * Desactiva múltiples tipos de habitaciones
    */
   @Delete('remove/all')
   @ApiOperation({
-    summary: 'Desactivar múltiples habitaciones',
+    summary: 'Desactivar múltiples tipos de habitaciones',
   })
   @ApiResponse({
     status: 200,
-    description: 'Habitaciones desactivadas exitosamente',
-    type: BaseApiResponse<Room[]>,
+    description: 'Tipos de habitaciones desactivados exitosamente',
+    type: BaseApiResponse<RoomType[]>,
   })
   @ApiBadRequestResponse({
-    description: 'IDs inválidos o habitaciones no existen',
+    description: 'IDs inválidos o tipos de habitaciones no existen',
   })
   deleteMany(
-    @Body() deleteRoomDto: DeleteRoomDto,
+    @Body() deleteRoomTypeDto: DeleteRoomTypeDto,
     @GetUser() user: UserData,
-  ): Promise<BaseApiResponse<Room[]>> {
-    return this.roomsService.deleteMany(deleteRoomDto, user);
+  ): Promise<BaseApiResponse<RoomType[]>> {
+    return this.roomTypeService.deleteMany(deleteRoomTypeDto, user);
   }
 
   /**
-   * Reactiva múltiples habitaciones
+   * Reactiva múltiples tipos de habitaciones
    */
   @Patch('reactivate/all')
   @ApiOperation({
-    summary: 'Reactivar múltiples habitaciones',
+    summary: 'Reactivar múltiples tipos de habitaciones',
   })
   @ApiOkResponse({
-    description: 'Habitaciones reactivadas exitosamente',
-    type: BaseApiResponse<Room[]>,
+    description: 'Tipos de habitaciones reactivados exitosamente',
+    type: BaseApiResponse<RoomType[]>,
   })
   @ApiBadRequestResponse({
-    description: 'IDs inválidos o habitaciones no existen',
+    description: 'IDs inválidos o tipos de habitaciones no existen',
   })
   reactivateAll(
-    @Body() deleteRoomDto: DeleteRoomDto,
+    @Body() deleteRoomTypeDto: DeleteRoomTypeDto,
     @GetUser() user: UserData,
-  ): Promise<BaseApiResponse<Room[]>> {
-    return this.roomsService.reactivateMany(deleteRoomDto.ids, user);
+  ): Promise<BaseApiResponse<RoomType[]>> {
+    return this.roomTypeService.reactivateMany(deleteRoomTypeDto.ids, user);
   }
 
   /**
-   * Obtiene una habitación por ID con sus imágenes
+   * Obtiene un tipo de habitación por ID con sus imágenes
    */
   @Get(':id/with-images')
-  @ApiOperation({ summary: 'Obtener habitación con imágenes por ID' })
+  @ApiOperation({ summary: 'Obtener tipo de habitación con imágenes por ID' })
   @ApiResponse({
     status: 200,
-    description: 'Habitación encontrada con sus imágenes',
-    type: Room,
+    description: 'Tipo de habitación encontrado con sus imágenes',
+    type: RoomType,
   })
   @ApiNotFoundResponse({
-    description: 'Habitación no encontrada',
+    description: 'Tipo de habitación no encontrado',
   })
   async findOneWithImages(@Param('id') id: string): Promise<
-    Room & {
+    RoomType & {
       images: Array<{ id: string; url: string }>;
     }
   > {
-    return this.roomsService.findOneWithImages(id);
+    return this.roomTypeService.findOneWithImages(id);
   }
 }
