@@ -300,21 +300,14 @@ export class RoomsService {
     BaseApiResponse<Room & { images: Array<{ id: string; url: string }> }>
   > {
     try {
-      // Validación: máximo 5 imágenes
-      if (images?.length > 5) {
+      // Validación: exactamente 5 imágenes
+      if (!images || images.length !== 5) {
         throw new BadRequestException(
-          'Solo se puede agregar un máximo de 5 imágenes por habitación',
+          'Se requieren exactamente 5 imágenes para crear una habitación. Por favor, cargue 5 imágenes.',
         );
       }
 
       const roomResponse = await this.create(createRoomDto, user);
-
-      if (!images?.length) {
-        return {
-          ...roomResponse,
-          data: { ...roomResponse.data, images: [] },
-        };
-      }
 
       const imagePromises = images.map(async (image) => {
         try {
@@ -331,6 +324,8 @@ export class RoomsService {
           await this.roomsRepository.createImageRoom(imageData);
         } catch (imageError) {
           this.logger.error(`Error procesando imagen: ${imageError.message}`);
+          // Podríamos considerar eliminar la habitación si falla la carga de imágenes
+          // o al menos marcar esta situación específica en los logs
         }
       });
 
@@ -352,97 +347,118 @@ export class RoomsService {
   }
 
   /**
-   * Actualiza una habitación con sus imágenes
+   * Actualiza una habitación con una imagen específica
    */
-  async updateWithImages(
+  async updateWithImage(
     id: string,
     user: UserData,
     updateRoomDto: UpdateRoomDto,
-    newImages?: Express.Multer.File[],
-    imageUpdates?: { imageId: string; file: Express.Multer.File }[],
+    newImage: Express.Multer.File | null,
+    imageUpdate: {
+      imageId: string;
+      url: string;
+      isMain?: boolean;
+    } | null,
   ): Promise<
-    BaseApiResponse<Room & { images: Array<{ id: string; url: string }> }>
+    BaseApiResponse<
+      Room & { images: Array<{ id: string; url: string; isMain: boolean }> }
+    >
   > {
     try {
-      // Actualizamos la habitación
-      const roomResponse = await this.update(id, updateRoomDto, user);
+      // 1. Obtener la habitación actual
+      const room = await this.findById(id);
+      const existingImages = await this.roomsRepository.findImagesByRoomId(id);
 
-      // Caso 1: Actualizar imágenes existentes
-      if (imageUpdates?.length) {
-        for (const update of imageUpdates) {
-          try {
-            // Obtenemos la imagen existente para obtener su URL
-            const existingImage = await this.roomsRepository.findImageById(
-              update.imageId,
-            );
-            if (!existingImage) {
-              this.logger.warn(`Imagen con ID ${update.imageId} no encontrada`);
-              continue;
-            }
+      // 2. Actualizar la información básica de la habitación (si se proporcionó)
+      let roomResponse = { success: true, message: '', data: room };
+      if (Object.keys(updateRoomDto).length > 0) {
+        roomResponse = await this.update(id, updateRoomDto, user);
+      }
 
-            // Obtenemos el nombre del archivo de la URL existente
-            const existingFileName = existingImage.imageUrl.split('/').pop();
+      // 3. Actualizar imagen existente si se proporcionó imageUpdate
+      if (imageUpdate) {
+        // Verificar que la imagen exista
+        const existingImage = await this.roomsRepository.findImageById(
+          imageUpdate.imageId,
+        );
+        if (!existingImage) {
+          throw new BadRequestException(
+            `No se encontró una imagen con el ID ${imageUpdate.imageId}`,
+          );
+        }
 
-            // Actualizamos la imagen en Cloudflare
-            const imageResponse = await this.updateImage(
-              update.file,
-              existingFileName,
-            );
+        // Si se proporcionó una nueva imagen, actualizar la existente
+        if (newImage) {
+          // Obtener el nombre del archivo de la URL existente
+          const existingFileName = existingImage.imageUrl.split('/').pop();
 
-            // Actualizamos la URL en la base de datos
-            await this.roomsRepository.updateImageUrl(
-              update.imageId,
-              imageResponse.data,
-            );
-          } catch (error) {
-            this.logger.error(
-              `Error actualizando imagen ${update.imageId}: ${error.message}`,
-            );
+          // Actualizar la imagen en Cloudflare
+          const imageResponse = await this.updateImage(
+            newImage,
+            existingFileName,
+          );
+
+          // Actualizar la URL en la base de datos
+          await this.roomsRepository.updateImageUrl(
+            imageUpdate.imageId,
+            imageResponse.data,
+          );
+        }
+
+        // Actualizar si es principal (solo si se especificó)
+        if (
+          imageUpdate.isMain !== undefined &&
+          imageUpdate.isMain !== existingImage.isMain
+        ) {
+          if (imageUpdate.isMain) {
+            // Si se está marcando como principal, desmarcamos todas las demás
+            await this.roomsRepository.resetMainImages(id);
           }
+          await this.roomsRepository.updateImageMain(
+            imageUpdate.imageId,
+            imageUpdate.isMain,
+          );
         }
       }
+      // 4. Si hay una nueva imagen pero no hay imageUpdate, significa que es una imagen nueva
+      else if (newImage) {
+        // Verificar que no se exceda el límite de 5 imágenes
+        if (existingImages.length >= 5) {
+          throw new BadRequestException(
+            'La habitación ya tiene el máximo de 5 imágenes permitidas. Debe actualizar una existente.',
+          );
+        }
 
-      // Caso 2: Agregar nuevas imágenes
-      if (newImages?.length) {
-        const existingImages =
-          await this.roomsRepository.findImagesByRoomId(id);
+        // Subir nueva imagen
+        const imageResponse = await this.uploadImage(newImage);
+
+        // Verificar si ya existe una imagen principal
         const hasMainImage = existingImages.some((img) => img.isMain);
 
-        const imagePromises = newImages.map(async (image, index) => {
-          try {
-            const imageResponse = await this.uploadImage(image);
-            const imageData: CreateImageRoomData = {
-              room: roomResponse.data.id,
-              imageUrl: imageResponse.data,
-              isMain: !hasMainImage && index === 0, // Es principal solo si no hay otra imagen principal y es la primera
-            };
-            await this.roomsRepository.createImageRoom(imageData);
-          } catch (imageError) {
-            this.logger.error(
-              `Error procesando nueva imagen: ${imageError.message}`,
-            );
-          }
-        });
-
-        await Promise.all(imagePromises);
+        // Crear registro de la nueva imagen
+        const imageData: CreateImageRoomData = {
+          room: id,
+          imageUrl: imageResponse.data,
+          isMain: !hasMainImage, // Es principal solo si no hay otra imagen principal
+        };
+        await this.roomsRepository.createImageRoom(imageData);
       }
 
-      // Siempre obtenemos todas las imágenes actualizadas para incluirlas en la respuesta
-      const imagesData = await this.roomsRepository.findImagesByRoomId(
-        roomResponse.data.id,
-      );
+      // 5. Obtener imágenes actualizadas para incluirlas en la respuesta
+      const updatedImagesData =
+        await this.roomsRepository.findImagesByRoomId(id);
 
-      // Retornamos la respuesta con las imágenes actualizadas
+      // 6. Retornar respuesta
       return {
         success: true,
         message: 'Habitación actualizada exitosamente',
         data: {
           ...roomResponse.data,
-          images: imagesData, // Incluye todas las imágenes, sean nuevas, actualizadas o sin cambios
+          images: updatedImagesData,
         },
       };
     } catch (error) {
-      this.logger.error(`Error en updateWithImages: ${error.message}`);
+      this.logger.error(`Error en updateWithImage: ${error.message}`);
       this.errorHandler.handleError(error, 'updating');
       throw error;
     }
