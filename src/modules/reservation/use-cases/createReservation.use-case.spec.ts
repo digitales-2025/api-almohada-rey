@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CreateReservationUseCase } from './createReservation.use-case';
 import { ReservationRepository } from '../repository/reservation.repository';
 import { AuditRepository } from 'src/modules/admin/audit/audit.repository';
-import { RoomsRepository } from 'src/modules/admin/rooms/repositories/rooms.repository';
+import { RoomsRepository } from 'src/modules/admin/room-type/repositories/room-type.repository';
 import { CreateReservationDto } from '../dto/create-reservation.dto';
 import { UserData } from 'src/interfaces';
 import { AuditActionType, ReservationStatus } from '@prisma/client';
