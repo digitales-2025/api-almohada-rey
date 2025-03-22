@@ -1,7 +1,7 @@
 import { BaseEntity } from 'src/prisma/src/abstract/base.entity';
 import { ReservationStatus } from './reservation-status.enum';
 import { ReservationStatus as ReservationStatusPrisma } from '@prisma/client';
-import { Room } from 'src/modules/admin/rooms/entities/rooms.entity';
+import { Room } from 'src/modules/admin/room-type/entities/room-type.entity';
 import { ApiProperty } from '@nestjs/swagger';
 // import { Customer } from '../../customer/entities/customer.entity';
 // import { Room } from '../../room/entities/room.entity';
