@@ -1,5 +1,5 @@
 import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
-import { roomErrorMessages } from 'src/modules/admin/room-type/errors/errors-room-type';
+import { roomTypeErrorMessages } from 'src/modules/admin/room-type/errors/errors-room-type';
 import { handleException } from 'src/utils';
 
 export type ServiceAction =
@@ -135,7 +135,7 @@ export class BaseErrorHandler {
 
 // Registro de todos los mensajes de error por entidad
 export const entityErrorMessages = {
-  roomErrorMessages,
+  roomTypeErrorMessages,
   // Para agregar un nuevo módulo:
   // 1. Crear constante de mensajes de error siguiendo la interfaz ErrorMessages
   // 2. Agregar aquí con una clave apropiada
