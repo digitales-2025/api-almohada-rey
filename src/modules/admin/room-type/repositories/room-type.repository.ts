@@ -1,53 +1,27 @@
 import { Injectable } from '@nestjs/common';
-import { Room } from '../entities/room-type.entity';
+import { RoomType } from '../entities/room-type.entity';
 import { BaseRepository, PrismaService } from 'src/prisma/src';
-import { RoomStatus } from '../dto';
 
-export interface CreateImageRoomData {
-  room: string;
+export interface CreateImageRoomTypeData {
+  room: string; // ID del RoomType asociado
   imageUrl: string;
   isMain: boolean;
 }
 
 @Injectable()
-export class RoomsRepository extends BaseRepository<Room> {
+export class RoomTypeRepository extends BaseRepository<RoomType> {
   constructor(prisma: PrismaService) {
-    super(prisma, 'room'); // Tabla del esquema de prisma
+    super(prisma, 'roomTypes'); // Tabla del esquema de prisma (ahora es RoomTypes)
   }
 
   /**
-   * Obtiene todas las habitaciones
-   * @returns Promise<Room[]>
-   */
-  /*   async findMany(): Promise<Room[]> {
-    return this.prisma.room.findMany({
-      where: {},
-      orderBy: { number: 'asc' },
-    });
-  } */
-
-  /**
-   * Busca una habitación por su número
-   * @param number Número de habitación
-   * @returns Promise<Room>
-   */
-  async findByNumber(number: number): Promise<Room> {
-    const room = await this.prisma.room.findUnique({
-      where: { number },
-    });
-
-    // Si necesitas devolver el resultado como Room, puedes usar type assertion
-    return room as unknown as Room;
-  }
-
-  /**
-   * Registra una nueva imagen de habitación
+   * Registra una nueva imagen de tipo de habitación
    * @param data Datos de la imagen a crear
    * @returns Promise<void>
    */
-  async createImageRoom(data: CreateImageRoomData): Promise<void> {
+  async createImageRoomType(data: CreateImageRoomTypeData): Promise<void> {
     try {
-      await this.prisma.imageRoom.create({
+      await this.prisma.imageRoomType.create({
         data: {
           room: data.room,
           imageUrl: data.imageUrl,
@@ -55,7 +29,7 @@ export class RoomsRepository extends BaseRepository<Room> {
         },
       });
     } catch (error) {
-      console.error('Error creando imagen de habitación:', error);
+      console.error('Error creando imagen de tipo de habitación:', error);
       throw error;
     }
   }
@@ -71,7 +45,7 @@ export class RoomsRepository extends BaseRepository<Room> {
     isMain: boolean;
   }> {
     try {
-      const image = await this.prisma.imageRoom.findUnique({
+      const image = await this.prisma.imageRoomType.findUnique({
         where: { id },
         select: {
           id: true,
@@ -95,7 +69,7 @@ export class RoomsRepository extends BaseRepository<Room> {
    */
   async updateImageUrl(id: string, url: string): Promise<void> {
     try {
-      await this.prisma.imageRoom.update({
+      await this.prisma.imageRoomType.update({
         where: {
           id,
           isActive: true,
@@ -112,17 +86,17 @@ export class RoomsRepository extends BaseRepository<Room> {
   }
 
   /**
-   * Obtiene todas las imágenes asociadas a una habitación
-   * @param roomId ID de la habitación
+   * Obtiene todas las imágenes asociadas a un tipo de habitación
+   * @param roomTypeId ID del tipo de habitación
    * @returns Promise con array de objetos de imágenes
    */
-  async findImagesByRoomId(
-    roomId: string,
+  async findImagesByRoomTypeId(
+    roomTypeId: string,
   ): Promise<Array<{ id: string; url: string; isMain: boolean }>> {
     try {
-      const images = await this.prisma.imageRoom.findMany({
+      const images = await this.prisma.imageRoomType.findMany({
         where: {
-          room: roomId,
+          room: roomTypeId,
           isActive: true,
         },
         select: {
@@ -142,7 +116,7 @@ export class RoomsRepository extends BaseRepository<Room> {
         isMain: img.isMain,
       }));
     } catch (error) {
-      console.error('Error obteniendo imágenes de habitación:', error);
+      console.error('Error obteniendo imágenes de tipo de habitación:', error);
       return [];
     }
   }
@@ -150,14 +124,14 @@ export class RoomsRepository extends BaseRepository<Room> {
   /**
    * Marca una imagen como principal y desmarca las demás
    * @param imageId ID de la imagen a marcar como principal
-   * @param roomId ID de la habitación
+   * @param roomTypeId ID del tipo de habitación
    */
-  async setMainImage(imageId: string, roomId: string): Promise<void> {
+  async setMainImage(imageId: string, roomTypeId: string): Promise<void> {
     try {
       // Primero desmarcamos todas las imágenes como principales
-      await this.prisma.imageRoom.updateMany({
+      await this.prisma.imageRoomType.updateMany({
         where: {
-          room: roomId,
+          room: roomTypeId,
           isMain: true,
         },
         data: {
@@ -166,7 +140,7 @@ export class RoomsRepository extends BaseRepository<Room> {
       });
 
       // Luego marcamos la imagen seleccionada como principal
-      await this.prisma.imageRoom.update({
+      await this.prisma.imageRoomType.update({
         where: {
           id: imageId,
         },
@@ -180,45 +154,41 @@ export class RoomsRepository extends BaseRepository<Room> {
     }
   }
 
-  // Implementa estos métodos en tu RoomsRepository
-  async resetMainImages(roomId: string): Promise<void> {
-    await this.prisma.imageRoom.updateMany({
-      where: {
-        room: roomId,
-        isMain: true,
-      },
-      data: {
-        isMain: false,
-      },
-    });
-  }
-
-  async updateImageMain(imageId: string, isMain: boolean): Promise<void> {
-    await this.prisma.imageRoom.update({
-      where: { id: imageId },
-      data: { isMain },
-    });
-  }
-
-  async findByStatus({
-    status,
-    id,
-  }: {
-    status: RoomStatus;
-    id?: string;
-  }): Promise<Room[]> {
-    if (id) {
-      return this.prisma.room.findMany({
+  /**
+   * Desmarca todas las imágenes principales de un tipo de habitación
+   * @param roomTypeId ID del tipo de habitación
+   */
+  async resetMainImages(roomTypeId: string): Promise<void> {
+    try {
+      await this.prisma.imageRoomType.updateMany({
         where: {
-          id,
-          status,
+          room: roomTypeId,
+          isMain: true,
+        },
+        data: {
+          isMain: false,
         },
       });
+    } catch (error) {
+      console.error('Error reseteando imágenes principales:', error);
+      throw error;
     }
-    return this.prisma.room.findMany({
-      where: {
-        status: status,
-      },
-    });
+  }
+
+  /**
+   * Actualiza el estado de imagen principal
+   * @param imageId ID de la imagen
+   * @param isMain Estado de imagen principal
+   */
+  async updateImageMain(imageId: string, isMain: boolean): Promise<void> {
+    try {
+      await this.prisma.imageRoomType.update({
+        where: { id: imageId },
+        data: { isMain },
+      });
+    } catch (error) {
+      console.error('Error actualizando estado de imagen principal:', error);
+      throw error;
+    }
   }
 }
