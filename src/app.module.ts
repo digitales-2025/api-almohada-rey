@@ -10,7 +10,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { SeedsModule } from './modules/seeds/seeds.module';
 import { CustomersModule } from './modules/admin/customers/customers.module';
 import { CloudflareModule } from './cloudflare/cloudflare.module';
-import { RoomsModule } from './modules/admin/rooms/rooms.module';
+import { RoomsModule } from './modules/admin/room-type/room-type.module';
 import { ReservationModule } from './modules/reservation/reservation.module';
 
 @Module({
