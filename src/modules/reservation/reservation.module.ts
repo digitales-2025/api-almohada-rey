@@ -4,7 +4,7 @@ import { ReservationController } from './reservation.controller';
 import { ReservationRepository } from './repository/reservation.repository';
 import { CreateReservationUseCase } from './use-cases/createReservation.use-case';
 import { AuditModule } from '../admin/audit/audit.module';
-import { RoomsModule } from '../admin/rooms/rooms.module';
+import { RoomsModule } from '../admin/room-type/room-type.module';
 
 @Module({
   imports: [AuditModule, RoomsModule],
