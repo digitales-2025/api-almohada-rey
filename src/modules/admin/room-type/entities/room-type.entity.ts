@@ -1,97 +1,59 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { RoomTypes, FloorTypes, RoomStatus } from '../dto';
 import { BaseEntity } from 'src/prisma/src/abstract/base.entity';
-import {
-  RoomTypes as PrismaRoomTypes,
-  RoomStatus as PrismaRoomStatus,
-  FloorTypes as PrismaFloorTypes,
-} from '@prisma/client';
-export class Room extends BaseEntity {
-  @ApiProperty({
-    description: 'Room number',
-    example: 101,
-  })
-  number: number;
+import { FloorTypes } from '../dto';
 
+export class RoomType extends BaseEntity {
   @ApiProperty({
-    description: 'Maximum number of guests',
+    description: 'Capacidad máxima de huéspedes',
     example: 2,
   })
   guests: number;
 
   @ApiProperty({
-    enum: RoomTypes,
-    description: 'Type of room',
-    example: RoomTypes.SINGLE,
-  })
-  type: PrismaRoomTypes;
-
-  @ApiProperty({
-    description: 'Price per night',
-    example: 99.99,
+    description: 'Precio por noche',
+    example: 150.5,
   })
   price: number;
 
   @ApiProperty({
-    enum: RoomStatus,
-    description: 'Current status of the room',
-    example: RoomStatus.AVAILABLE,
-  })
-  status: PrismaRoomStatus;
-
-  @ApiProperty({
-    description: 'TV model or details',
-    example: 'Samsung 50" Smart TV',
+    description: 'Descripción de la televisión',
+    example: 'Smart TV 42 pulgadas',
   })
   tv: string;
 
   @ApiProperty({
     enum: FloorTypes,
-    description: 'Type of floor',
-    example: FloorTypes.CARPETING,
+    description: 'Tipo de piso',
+    example: FloorTypes.LIMINATING,
   })
-  floorType: PrismaFloorTypes;
+  floorType: FloorTypes;
 
   @ApiProperty({
-    description: 'Room description',
-    example: 'Spacious room with ocean view',
+    description: 'Descripción del tipo de habitación',
+    example: 'Habitación con vista al mar y balcón privado',
   })
   description: string;
 
   @ApiProperty({
-    description: 'Room area in square meters',
-    example: 25,
+    description: 'Área en metros cuadrados',
+    example: 25.5,
   })
   area: number;
 
   @ApiProperty({
-    description: 'Whether the room is active',
+    description: 'Descripción de la cama',
+    example: 'Cama matrimonial king size',
+  })
+  bed: string;
+
+  /*   @ApiProperty({
+    description: 'Estado de activación del tipo de habitación',
     example: true,
   })
-  isActive: boolean;
+  isActive: boolean; */
 
-  constructor(partial: Partial<Room> = {}) {
+  constructor(partial: Partial<RoomType> = {}) {
     super(partial);
     Object.assign(this, partial);
   }
-
-  // toJSON(): Record<string, any> {
-  //   return {
-  //     id: this.id,
-  //     number: this.number,
-  //     guests: this.guests,
-  //     type: this.type,
-  //     price: this.price,
-  //     status: this.status,
-  //     tv: this.tv,
-  //     floorType: this.floorType,
-  //     description: this.description,
-  //     area: this.area,
-  //     isActive: this.isActive,
-  //     createdAt: this.createdAt,
-  //     updatedAt: this.updatedAt,
-  //   };
-  // }
-  @ApiProperty()
-  bed: string;
 }
