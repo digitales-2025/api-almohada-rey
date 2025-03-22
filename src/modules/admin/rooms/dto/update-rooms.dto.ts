@@ -104,7 +104,7 @@ export class UpdateRoomDto {
   @ApiProperty({
     description: 'Descripción de la cama',
     example: 'cama 2 plasas',
-    required: true,
+    required: false,
   })
   @IsString()
   @IsOptional()
