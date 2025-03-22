@@ -9,37 +9,12 @@ import {
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 
-export enum RoomTypes {
-  SINGLE = 'SINGLE',
-  DOUBLE_SINGLE = 'DOUBLE_SINGLE',
-  DOUBLE_FAMILY = 'DOUBLE_FAMILY',
-  SUITE = 'SUITE',
-  MATRIMONIAL = 'MATRIMONIAL',
-}
-
-export enum RoomStatus {
-  AVAILABLE = 'AVAILABLE',
-  OCCUPIED = 'OCCUPIED',
-  RESERVED = 'RESERVED',
-  CLEANING = 'CLEANING',
-}
-
 export enum FloorTypes {
   LIMINATING = 'LIMINATING',
   CARPETING = 'CARPETING',
 }
 
-export class CreateRoomDto {
-  @ApiProperty({
-    description: 'Número de habitación',
-    example: 101,
-    required: true,
-  })
-  @IsInt()
-  @IsPositive()
-  @IsNotEmpty()
-  number: number;
-
+export class CreateRoomTypeDto {
   @ApiProperty({
     description: 'Capacidad máxima de huéspedes',
     example: 2,
@@ -51,16 +26,6 @@ export class CreateRoomDto {
   guests: number;
 
   @ApiProperty({
-    description: 'Tipo de habitación',
-    enum: RoomTypes,
-    example: 'DOUBLE_SINGLE',
-    required: true,
-  })
-  @IsEnum(RoomTypes)
-  @IsNotEmpty()
-  type: RoomTypes;
-
-  @ApiProperty({
     description: 'Precio por noche',
     example: 150.5,
     required: true,
@@ -69,16 +34,6 @@ export class CreateRoomDto {
   @IsPositive()
   @IsNotEmpty()
   price: number;
-
-  @ApiProperty({
-    description: 'Estado de la habitación',
-    enum: RoomStatus,
-    example: 'AVAILABLE',
-    required: true,
-  })
-  @IsEnum(RoomStatus)
-  @IsNotEmpty()
-  status: RoomStatus;
 
   @ApiProperty({
     description: 'Descripción de la televisión',
@@ -101,8 +56,8 @@ export class CreateRoomDto {
   floorType: FloorTypes;
 
   @ApiProperty({
-    description: 'Descripción de la habitación',
-    example: 'Habitación con vista al mar y balcón privado',
+    description: 'Descripción del tipo de habitación',
+    example: 'Habitación con balcón privado',
     required: true,
   })
   @IsString()
@@ -122,7 +77,7 @@ export class CreateRoomDto {
 
   @ApiProperty({
     description: 'Descripción de la cama',
-    example: 'cama 2 plasas',
+    example: 'Cama matrimonial king size',
     required: true,
   })
   @IsString()
