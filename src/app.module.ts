@@ -10,8 +10,9 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { SeedsModule } from './modules/seeds/seeds.module';
 import { CustomersModule } from './modules/admin/customers/customers.module';
 import { CloudflareModule } from './cloudflare/cloudflare.module';
-import { RoomsModule } from './modules/admin/rooms/rooms.module';
-import { ReservationModule } from './modules/reservation/reservation.module';
+import { RoomTypeModule } from './modules/admin/room-type/room-type.module';
+import { ReservationModule } from './modules/admin/reservation/reservation.module';
+import { RoomModule } from './modules/admin/room/room.module';
 
 @Module({
   imports: [
@@ -26,8 +27,9 @@ import { ReservationModule } from './modules/reservation/reservation.module';
     TypedEventEmitterModule,
     CustomersModule,
     CloudflareModule,
-    RoomsModule,
+    RoomTypeModule,
     ReservationModule,
+    RoomModule,
   ],
   controllers: [AppController],
   providers: [AppService],
