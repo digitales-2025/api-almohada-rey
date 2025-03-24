@@ -1,4 +1,6 @@
 import { PartialType } from '@nestjs/swagger';
-import { CreatePrescriptionDto } from './create-room.dto';
+import { CreateRoomDto } from './create-room.dto';
 
-export class UpdatePrescriptionDto extends PartialType(CreatePrescriptionDto) {}
+export class UpdateRoomDto extends PartialType(CreateRoomDto) {
+  // Sin campos adicionales, todos son opcionales gracias a PartialType
+}
