@@ -191,4 +191,15 @@ export class RoomTypeRepository extends BaseRepository<RoomType> {
       throw error;
     }
   }
+
+  /**
+   * Busca un tipo de habitación por su nombre
+   * @param name Nombre del tipo de habitación
+   * @returns Promise con el tipo de habitación si existe
+   */
+  async findOneByName(name: string): Promise<RoomType | null> {
+    return this.prisma.roomTypes.findFirst({
+      where: { name, isActive: true },
+    });
+  }
 }

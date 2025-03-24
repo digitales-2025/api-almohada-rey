@@ -105,16 +105,28 @@ export class RoomTypeController {
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: CreateRoomTypeWithImagesDto })
-  @UseInterceptors(FilesInterceptor('images', 5), FormatDataCreateInterceptor)
+  @UseInterceptors(FilesInterceptor('images', 10), FormatDataCreateInterceptor) // Aumentamos el límite a 10 para validar manualmente
   async createWithImages(
     @Body() createRoomTypeDto: CreateRoomTypeDto,
     @UploadedFiles() images: Express.Multer.File[],
     @GetUser() user: UserData,
   ): Promise<BaseApiResponse<RoomType>> {
     // Validar que se hayan enviado exactamente 5 imágenes
-    if (!images || images.length !== 5) {
+    if (!images) {
       throw new BadRequestException(
-        'Se requieren exactamente 5 imágenes para crear un tipo de habitación. Por favor, cargue 5 imágenes.',
+        'Se requieren imágenes para crear un tipo de habitación.',
+      );
+    }
+
+    if (images.length > 5) {
+      throw new BadRequestException(
+        'No se pueden enviar más de 5 imágenes para crear un tipo de habitación.',
+      );
+    }
+
+    if (images.length < 5) {
+      throw new BadRequestException(
+        'Se requieren 5 imágenes como mínimo para crear un tipo de habitación.',
       );
     }
 

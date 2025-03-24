@@ -302,10 +302,21 @@ export class RoomTypeService {
     BaseApiResponse<RoomType & { images: Array<{ id: string; url: string }> }>
   > {
     try {
+      // Verificar si ya existe un tipo de habitación con el mismo nombre
+      const existingRoomType = await this.roomTypeRepository.findOneByName(
+        createRoomTypeDto.name,
+      );
+
+      if (existingRoomType) {
+        throw new BadRequestException(
+          `Ya existe un tipo de habitación con el mismo nombre`,
+        );
+      }
+
       // Validación: exactamente 5 imágenes
       if (!images || images.length !== 5) {
         throw new BadRequestException(
-          'Se requieren exactamente 5 imágenes para crear un tipo de habitación. Por favor, cargue 5 imágenes.',
+          'Se requieren 5 imágenes como minimo para crear un tipo de habitación.',
         );
       }
 
