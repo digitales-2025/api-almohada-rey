@@ -5,6 +5,7 @@ import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { AuditModule } from './audit/audit.module';
 import { PrismaModule } from 'src/prisma/prisma.module';
+import { ProductModule } from './product/product.module';
 import { ReservationModule } from './reservation/reservation.module';
 
 @Module({
@@ -13,6 +14,7 @@ import { ReservationModule } from './reservation/reservation.module';
     AuthModule,
     PrismaModule,
     AuditModule,
+    ProductModule,
     ReservationModule,
   ],
   controllers: [AdminController],
