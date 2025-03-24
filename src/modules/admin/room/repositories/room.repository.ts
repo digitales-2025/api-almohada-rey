@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Room, RoomStatus } from '../entities/room.entity';
+import { Room, RoomStatusAcceptedValues } from '../entities/room.entity';
 import { BaseRepository, PrismaService } from 'src/prisma/src';
 
 @Injectable()
@@ -24,9 +24,25 @@ export class RoomRepository extends BaseRepository<Room> {
    * @param status Estado de la habitación
    * @returns Promise con array de habitaciones
    */
-  async findByStatus(status: RoomStatus): Promise<Room[]> {
+  async findByStatus({
+    status,
+    id,
+  }: {
+    status: RoomStatusAcceptedValues;
+    id?: string;
+  }): Promise<Room[]> {
+    if (id) {
+      return this.prisma.room.findMany({
+        where: {
+          id,
+          status,
+        },
+      });
+    }
     return this.prisma.room.findMany({
-      where: { status, isActive: true },
+      where: {
+        status: status,
+      },
     });
   }
 

@@ -9,6 +9,12 @@ export enum RoomStatus {
   CLEANING = 'CLEANING',
 }
 
+export type RoomStatusAcceptedValues =
+  | 'AVAILABLE'
+  | 'OCCUPIED'
+  | 'RESERVED'
+  | 'CLEANING';
+
 export class Room extends BaseEntity {
   @ApiProperty({
     description: 'ID del tipo de habitación asociado',
