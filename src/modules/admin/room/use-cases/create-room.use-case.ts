@@ -30,7 +30,6 @@ export class CreateRoomUseCase {
         showerSoap: true,
         handSoap: true,
         lamp: true,
-        isActive: true,
       });
 
       // Registrar auditoría

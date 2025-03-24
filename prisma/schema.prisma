@@ -150,7 +150,7 @@ model Room {
 }
 
 model CleaningChecklist {
-  id           Int      @id @default(autoincrement())
+  id           String   @id @default(uuid())
   date         String
   roomId       String // ID of room (Habitación)
   Room         Room     @relation(fields: [roomId], references: [id])

@@ -77,13 +77,6 @@ export class Room extends BaseEntity {
   })
   status: RoomStatusPrisma;
 
-  @ApiProperty({
-    description: 'Indica si la habitación está activa',
-    example: true,
-    default: true,
-  })
-  isActive: boolean;
-
   constructor(partial: Partial<Room> = {}) {
     super(partial);
     Object.assign(this, partial);

@@ -57,6 +57,8 @@ async function bootstrap() {
       description: 'Gestión de tipos de habitaciones',
     },
     { name: 'Admin Rooms', description: 'Gestión de habitaciones' },
+
+    { name: 'Room Cleaning', description: 'Gestión de limpiezas' },
   ];
 
   SwaggerModule.setup('api', app, document);
