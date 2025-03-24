@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { FloorTypes as FloorTypesPrisma } from '@prisma/client';
 import { BaseEntity } from 'src/prisma/src/abstract/base.entity';
 import { FloorTypes } from '../dto';
 
@@ -26,7 +27,7 @@ export class RoomType extends BaseEntity {
     description: 'Tipo de piso',
     example: FloorTypes.LIMINATING,
   })
-  floorType: FloorTypes;
+  floorType: FloorTypesPrisma;
 
   @ApiProperty({
     description: 'Descripción del tipo de habitación',
