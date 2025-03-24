@@ -12,6 +12,7 @@ import { CustomersModule } from './modules/admin/customers/customers.module';
 import { CloudflareModule } from './cloudflare/cloudflare.module';
 import { RoomTypeModule } from './modules/admin/room-type/room-type.module';
 import { ReservationModule } from './modules/reservation/reservation.module';
+import { RoomModule } from './modules/admin/room/room.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ReservationModule } from './modules/reservation/reservation.module';
     CloudflareModule,
     RoomTypeModule,
     ReservationModule,
+    RoomModule,
   ],
   controllers: [AppController],
   providers: [AppService],
