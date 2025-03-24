@@ -1,29 +1,29 @@
 import { Module } from '@nestjs/common';
 
-import { CloudflareModule } from 'src/cloudflare/cloudflare.module';
-import { RoomTypeController } from './controllers/room-type.controller';
-import { RoomTypeService } from './services/room-type.service';
 import { AuditModule } from '../audit/audit.module';
+import { RoomController } from './controllers/room.controller';
+import { RoomService } from './services/room.service';
 import {
-  CreateRoomTypeUseCase,
-  DeleteRoomTypesUseCase,
-  ReactivateRoomTypeUseCase,
-  UpdateRoomTypeUseCase,
+  CreateRoomUseCase,
+  UpdateRoomUseCase,
+  DeleteRoomsUseCase,
+  ReactivateRoomUseCase,
 } from './use-cases';
-import { RoomTypeRepository } from './repositories/room-type.repository';
+import { RoomRepository } from './repositories/room.repository';
+import { RoomTypeModule } from '../room-type/room-type.module';
 
 @Module({
-  controllers: [RoomTypeController],
-  imports: [AuditModule, CloudflareModule],
+  controllers: [RoomController],
+  imports: [AuditModule, RoomTypeModule],
   providers: [
-    // use cases para tipos de habitación
-    RoomTypeRepository,
-    RoomTypeService,
-    CreateRoomTypeUseCase,
-    UpdateRoomTypeUseCase,
-    DeleteRoomTypesUseCase,
-    ReactivateRoomTypeUseCase,
+    // use cases para habitaciones
+    RoomRepository,
+    RoomService,
+    CreateRoomUseCase,
+    UpdateRoomUseCase,
+    DeleteRoomsUseCase,
+    ReactivateRoomUseCase,
   ],
-  exports: [RoomTypeService, RoomTypeRepository],
+  exports: [RoomService, RoomRepository],
 })
-export class RoomTypeModule {}
+export class RoomModule {}
