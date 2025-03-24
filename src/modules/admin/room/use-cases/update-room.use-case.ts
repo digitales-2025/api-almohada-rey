@@ -24,6 +24,12 @@ export class UpdateRoomUseCase {
       const room = await this.roomRepository.update(id, {
         roomTypeId: updateRoomDto.roomTypeId,
         number: updateRoomDto.number,
+        trashBin: updateRoomDto.trashBin,
+        towel: updateRoomDto.towel,
+        toiletPaper: updateRoomDto.toiletPaper,
+        showerSoap: updateRoomDto.showerSoap,
+        handSoap: updateRoomDto.handSoap,
+        lamp: updateRoomDto.lamp,
       });
 
       // Registrar auditoría
