@@ -1,113 +1,43 @@
-import { Injectable, Logger } from '@nestjs/common';
-import {
-  Prescription,
-  PrescriptionItemResponse,
-  PrescriptionWithPatient,
-} from '../entities/room.entity';
-import { BaseRepository, PrismaService } from '@prisma/prisma';
-import { plainToInstance } from 'class-transformer';
+import { Injectable } from '@nestjs/common';
+import { Room, RoomStatus } from '../entities/room.entity';
+import { BaseRepository, PrismaService } from 'src/prisma/src';
 
 @Injectable()
-export class PrescriptionRepository extends BaseRepository<Prescription> {
+export class RoomRepository extends BaseRepository<Room> {
   constructor(prisma: PrismaService) {
-    super(prisma, 'prescription'); // Tabla del esquema de prisma
+    super(prisma, 'room'); // Tabla del esquema de prisma (con R mayúscula)
   }
 
   /**
-   * Valida si existe un registro en una tabla específica por ID
-   * @param table - Nombre de la tabla donde buscar
-   * @param id - ID a buscar
-   * @returns true si existe el registro, false si no
+   * Busca una habitación por su número
+   * @param number Número de la habitación
+   * @returns Promise con la habitación si existe
    */
-  async findByIdValidate(table: string, id: string): Promise<boolean> {
-    const result = await this.prisma.measureQuery(`findBy${table}Id`, () =>
-      (this.prisma[table] as any).findUnique({
-        where: { id },
-      }),
-    );
-
-    return !!result; // Convierte el resultado en booleano
-  }
-
-  async updatePrescriptionInHistory(
-    updateHistoryId: string,
-    prescriptionId: string,
-  ): Promise<boolean> {
-    try {
-      await this.prisma.updateHistory.update({
-        where: { id: updateHistoryId },
-        data: { prescriptionId },
-      });
-      return true;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  async findPrescriptionsWithPatient(
-    limit: number = 10,
-    offset: number = 0,
-  ): Promise<PrescriptionWithPatient[]> {
-    const prescriptions = await this.prisma.prescription.findMany({
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: limit,
-      skip: offset,
-      include: {
-        patient: {
-          select: {
-            id: true,
-            name: true,
-            lastName: true,
-            dni: true,
-            birthDate: true,
-            gender: true,
-            address: true,
-            phone: true,
-            email: true,
-            isActive: true,
-          },
-        },
-      },
-    });
-
-    return prescriptions.map((prescription) => {
-      // Convertir los JSON a arrays tipados
-      const medicaments = this.parseJsonToType<PrescriptionItemResponse[]>(
-        prescription.prescriptionMedicaments,
-        [],
-      );
-
-      const services = this.parseJsonToType<PrescriptionItemResponse[]>(
-        prescription.prescriptionServices,
-        [],
-      );
-
-      // Crear una instancia de PrescriptionWithPatient con los datos transformados
-      return plainToInstance(PrescriptionWithPatient, {
-        ...prescription,
-        prescriptionMedicaments: medicaments.map((med) =>
-          plainToInstance(PrescriptionItemResponse, med),
-        ),
-        prescriptionServices: services.map((svc) =>
-          plainToInstance(PrescriptionItemResponse, svc),
-        ),
-      });
+  async findByNumber(number: number): Promise<Room | null> {
+    return this.prisma.room.findFirst({
+      where: { number, isActive: true },
     });
   }
 
-  // Función auxiliar para parsear JSON a tipos específicos
-  private parseJsonToType<T>(jsonValue: any, defaultValue: T): T {
-    if (!jsonValue) return defaultValue;
-    try {
-      if (typeof jsonValue === 'string') {
-        return JSON.parse(jsonValue);
-      }
-      return jsonValue as T;
-    } catch (error) {
-      Logger.error('Error parsing JSON:', error);
-      return defaultValue;
-    }
+  /**
+   * Busca habitaciones por estado
+   * @param status Estado de la habitación
+   * @returns Promise con array de habitaciones
+   */
+  async findByStatus(status: RoomStatus): Promise<Room[]> {
+    return this.prisma.room.findMany({
+      where: { status, isActive: true },
+    });
+  }
+
+  /**
+   * Busca habitaciones por tipo
+   * @param typeId ID del tipo de habitación
+   * @returns Promise con array de habitaciones
+   */
+  async findByType(typeId: string): Promise<Room[]> {
+    return this.prisma.room.findMany({
+      where: { type: typeId, isActive: true },
+    });
   }
 }
