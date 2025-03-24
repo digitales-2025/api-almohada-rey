@@ -7,7 +7,12 @@ import {
 } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { HttpResponse, ProductData, UserData } from 'src/interfaces';
+import {
+  HttpResponse,
+  ProductData,
+  UserData,
+  UserPayload,
+} from 'src/interfaces';
 import { handleException } from 'src/utils';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -100,12 +105,85 @@ export class ProductService {
     }
   }
 
-  findAll() {
-    return `This action returns all product`;
+  /**
+   * Obtener todos los productos
+   * @param user Usuario que realiza la petición
+   * @returns Lista de productos
+   */
+  async findAll(user: UserPayload): Promise<ProductData[]> {
+    try {
+      const products = await this.prisma.product.findMany({
+        where: {
+          ...(user.isSuperAdmin ? {} : { isActive: true }), // Filtrar por isActive solo si no es super admin
+        },
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          unitCost: true,
+          isActive: true,
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+      });
+
+      // Mapea los resultados al tipo ProductData
+      return products.map((product) => ({
+        id: product.id,
+        name: product.name,
+        type: product.type,
+        unitCost: product.unitCost,
+        isActive: product.isActive,
+      })) as ProductData[];
+    } catch (error) {
+      this.logger.error('Error getting all products');
+      handleException(error, 'Error getting all products');
+    }
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} product`;
+  /**
+   * Buscar un producto por su id
+   * @param id Id del producto
+   * @returns Producto encontrado
+   */
+  async findOne(id: string): Promise<ProductData> {
+    try {
+      return await this.findById(id);
+    } catch (error) {
+      this.logger.error('Error get product');
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      handleException(error, 'Error get product');
+    }
+  }
+
+  /**
+   * Buscar un producto por su id con validaciones
+   * @param id Id del producto
+   * @returns Producto encontrado
+   */
+  async findById(id: string): Promise<ProductData> {
+    const productDb = await this.prisma.product.findFirst({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        unitCost: true,
+        isActive: true,
+      },
+    });
+    if (!productDb) {
+      throw new BadRequestException('This product doesnt exist');
+    }
+
+    if (!!productDb && !productDb.isActive) {
+      throw new BadRequestException('This product exist, but is inactive');
+    }
+
+    return productDb;
   }
 
   /**

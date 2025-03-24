@@ -15,11 +15,17 @@ import {
   ApiBadRequestResponse,
   ApiCreatedResponse,
   ApiInternalServerErrorResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { HttpResponse, ProductData, UserData } from 'src/interfaces';
+import {
+  HttpResponse,
+  ProductData,
+  UserData,
+  UserPayload,
+} from 'src/interfaces';
 
 @ApiTags('Admin Products')
 @ApiUnauthorizedResponse({ description: 'Unauthorized' })
@@ -43,14 +49,18 @@ export class ProductController {
     return this.productService.create(createProductDto, user);
   }
 
+  @ApiOkResponse({ description: 'Products found successfully' })
+  @ApiOperation({ summary: 'Get all products' })
   @Get()
-  findAll() {
-    return this.productService.findAll();
+  findAll(@GetUser() user: UserPayload): Promise<ProductData[]> {
+    return this.productService.findAll(user);
   }
 
+  @ApiOkResponse({ description: 'Product found successfully' })
+  @ApiOperation({ summary: 'Get a product by ID' })
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.productService.findOne(+id);
+  findOne(@Param('id') id: string): Promise<ProductData> {
+    return this.productService.findOne(id);
   }
 
   @Patch(':id')
