@@ -4,10 +4,10 @@ import { ReservationController } from './reservation.controller';
 import { ReservationRepository } from './repository/reservation.repository';
 import { CreateReservationUseCase } from './use-cases/createReservation.use-case';
 import { AuditModule } from '../admin/audit/audit.module';
-import { RoomsModule } from '../admin/room-type/room-type.module';
+import { RoomModule } from '../admin/room/room.module';
 
 @Module({
-  imports: [AuditModule, RoomsModule],
+  imports: [AuditModule, RoomModule],
   controllers: [ReservationController],
   providers: [
     ReservationService,

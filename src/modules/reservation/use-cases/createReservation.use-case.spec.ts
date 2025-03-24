@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CreateReservationUseCase } from './createReservation.use-case';
 import { ReservationRepository } from '../repository/reservation.repository';
 import { AuditRepository } from 'src/modules/admin/audit/audit.repository';
-import { RoomsRepository } from 'src/modules/admin/room-type/repositories/room-type.repository';
 import { CreateReservationDto } from '../dto/create-reservation.dto';
 import { UserData } from 'src/interfaces';
 import { AuditActionType, ReservationStatus } from '@prisma/client';
@@ -10,6 +9,7 @@ import { ModuleMocker, MockFunctionMetadata } from 'jest-mock';
 import { DocumentTypeValues } from '../entities/document-type.enum';
 import { ReservationModule } from '../reservation.module';
 import { PrismaModule } from 'src/prisma/prisma.module';
+import { RoomRepository } from 'src/modules/admin/room/repositories/room.repository';
 
 const moduleMocker = new ModuleMocker(global);
 
@@ -17,7 +17,7 @@ describe('CreateReservationUseCase', () => {
   let useCase: CreateReservationUseCase;
   let reservationRepository: jest.Mocked<ReservationRepository>;
   let auditRepository: jest.Mocked<AuditRepository>;
-  let roomsRepository: jest.Mocked<RoomsRepository>;
+  let roomsRepository: jest.Mocked<RoomRepository>;
 
   //   type UserData = {
   //     name: string;
@@ -97,7 +97,7 @@ describe('CreateReservationUseCase', () => {
             createWithTx: jest.fn().mockResolvedValue({ id: 'audit-id-1' }),
           };
         }
-        if (token === RoomsRepository) {
+        if (token === RoomRepository) {
           return {
             updateWithTx: jest
               .fn()
@@ -122,9 +122,7 @@ describe('CreateReservationUseCase', () => {
     auditRepository = module.get(
       AuditRepository,
     ) as jest.Mocked<AuditRepository>;
-    roomsRepository = module.get(
-      RoomsRepository,
-    ) as jest.Mocked<RoomsRepository>;
+    roomsRepository = module.get(RoomRepository) as jest.Mocked<RoomRepository>;
   });
 
   it('should be defined', () => {
