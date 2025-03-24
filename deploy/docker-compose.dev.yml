@@ -27,6 +27,15 @@ services:
       API_S3: "${API_S3}"
       CLOUDFLARE_BUCKET_NAME: "${CLOUDFLARE_BUCKET_NAME}"
       PUBLIC_URL_IMAGE: "${PUBLIC_URL_IMAGE}"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.almohada-backend-develop.rule=Host(`almohada-backend-develop.acide.win`)"
+      - "traefik.http.routers.almohada-backend-develop.entrypoints=websecure"
+      - "traefik.http.routers.almohada-backend-develop.tls=true"
+      - "traefik.http.routers.almohada-backend-develop.tls.certresolver=dns-cloudflare"
+      - "traefik.http.routers.almohada-backend-develop.tls.domains[0].main=acide.win"
+      - "traefik.http.routers.almohada-backend-develop.tls.domains[0].sans=*.acide.win"
+      - "traefik.http.services.almohada-backend-develop.loadbalancer.server.port=4000"
     networks:
       - proxy
       - almohada-network-develop
