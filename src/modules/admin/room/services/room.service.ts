@@ -41,8 +41,7 @@ export class RoomService {
   private async validateRoomTypeExists(typeId: string): Promise<void> {
     try {
       await this.roomTypeService.findOne(typeId);
-    } catch (error) {
-      console.log('🚀 ~ RoomService ~ validateRoomTypeExists ~ error:', error);
+    } catch {
       throw new BadRequestException(roomErrorMessages.invalidRoomType);
     }
   }

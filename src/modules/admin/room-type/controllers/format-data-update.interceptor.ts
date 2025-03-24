@@ -59,8 +59,7 @@ export class FormatDataInterceptor implements NestInterceptor {
     if (body.imageUpdate && typeof body.imageUpdate === 'string') {
       try {
         body.imageUpdate = JSON.parse(body.imageUpdate);
-      } catch (e) {
-        console.log('🚀 ~ FormatDataInterceptor ~ intercept ~ e:', e);
+      } catch {
         throw new BadRequestException('imageUpdate must be a valid JSON');
       }
     }

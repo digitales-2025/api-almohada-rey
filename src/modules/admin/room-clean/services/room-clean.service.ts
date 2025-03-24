@@ -48,11 +48,7 @@ export class CleaningChecklistService {
   private async validateRoomExists(roomId: string): Promise<void> {
     try {
       await this.roomService.findOne(roomId);
-    } catch (error) {
-      console.log(
-        '🚀 ~ CleaningChecklistService ~ validateRoomExists ~ error:',
-        error,
-      );
+    } catch {
       throw new BadRequestException(roomCleanErrorMessages.roomNotFound);
     }
   }
