@@ -48,6 +48,7 @@ async function bootstrap() {
       name: 'Reservations',
       description: 'Gestión de reservaciones de habitaciones',
     },
+    { name: 'Admin Products', description: 'Gestión de productos' },
   ];
 
   SwaggerModule.setup('api', app, document);
