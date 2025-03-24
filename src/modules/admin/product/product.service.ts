@@ -17,6 +17,10 @@ import { handleException } from 'src/utils';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AuditActionType } from '@prisma/client';
+import {
+  createDynamicUpdateObject,
+  hasNoChanges,
+} from 'src/utils/update-validations.util';
 
 @Injectable()
 export class ProductService {
@@ -45,7 +49,7 @@ export class ProductService {
 
       newProduct = await this.prisma.$transaction(async () => {
         // Crear el nuevo producto
-        const customer = await this.prisma.product.create({
+        const product = await this.prisma.product.create({
           data: {
             name,
             type,
@@ -60,16 +64,16 @@ export class ProductService {
           },
         });
 
-        // Registrar la auditoría de la creación del cliente
+        // Registrar la auditoría de la creación del producto
         await this.audit.create({
-          entityId: customer.id,
+          entityId: product.id,
           entityType: 'product',
           action: AuditActionType.CREATE,
           performedById: user.id,
           createdAt: new Date(),
         });
 
-        return customer;
+        return product;
       });
 
       return {
@@ -212,8 +216,86 @@ export class ProductService {
     }
   }
 
-  update(id: number, updateProductDto: UpdateProductDto) {
-    return `This action updates a #${id} ${updateProductDto}  product`;
+  /**
+   * Actualizar un producto
+   * @param id Id del producto
+   * @param updateProductDto Datos a actualizar del producto
+   * @param user Usuario que realiza la petición
+   * @returns Producto actualizado
+   */
+  async update(
+    id: string,
+    updateProductDto: UpdateProductDto,
+    user: UserData,
+  ): Promise<HttpResponse<ProductData>> {
+    const { name } = updateProductDto;
+
+    try {
+      const productDB = await this.findById(id);
+
+      if (name) await this.findByName(name, id);
+
+      // Validar si hay cambios
+      if (hasNoChanges(updateProductDto, productDB)) {
+        return {
+          statusCode: HttpStatus.OK,
+          message: 'Product updated successfully',
+          data: {
+            ...productDB,
+          },
+        };
+      }
+
+      // Construir el objeto de actualización dinámicamente solo con los campos presentes
+      const updateData = createDynamicUpdateObject(updateProductDto, productDB);
+
+      // Transacción para realizar la actualización
+      const updatedProduct = await this.prisma.$transaction(async (prisma) => {
+        const product = await prisma.product.update({
+          where: { id },
+          data: updateData,
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            unitCost: true,
+            isActive: true,
+          },
+        });
+        // Crear un registro de auditoría
+        await this.audit.create({
+          entityId: product.id,
+          entityType: 'product',
+          action: AuditActionType.UPDATE,
+          performedById: user.id,
+          createdAt: new Date(),
+        });
+
+        return product;
+      });
+
+      return {
+        statusCode: HttpStatus.OK,
+        message: 'Product updated successfully',
+        data: {
+          ...updatedProduct,
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error updating product: ${error.message}`,
+        error.stack,
+      );
+
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+
+      handleException(error, 'Error updating a product');
+    }
   }
 
   remove(id: number) {

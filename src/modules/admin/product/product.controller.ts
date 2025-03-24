@@ -63,9 +63,15 @@ export class ProductController {
     return this.productService.findOne(id);
   }
 
+  @ApiOkResponse({ description: 'Product updated successfully' })
+  @ApiOperation({ summary: 'Update a product by ID' })
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
-    return this.productService.update(+id, updateProductDto);
+  update(
+    @Param('id') id: string,
+    @Body() updateProductDto: UpdateProductDto,
+    @GetUser() user: UserData,
+  ) {
+    return this.productService.update(id, updateProductDto, user);
   }
 
   @Delete(':id')
