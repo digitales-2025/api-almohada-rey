@@ -26,6 +26,7 @@ import {
   UserData,
   UserPayload,
 } from 'src/interfaces';
+import { DeleteProductDto } from './dto/delete-product.dto';
 
 @ApiTags('Admin Products')
 @ApiUnauthorizedResponse({ description: 'Unauthorized' })
@@ -74,8 +75,23 @@ export class ProductController {
     return this.productService.update(id, updateProductDto, user);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.productService.remove(+id);
+  @ApiOkResponse({ description: 'Products deactivated successfully' })
+  @ApiOperation({ summary: 'Deactivate a product by id' })
+  @Delete('remove/all')
+  deactivate(
+    @Body() products: DeleteProductDto,
+    @GetUser() user: UserData,
+  ): Promise<Omit<HttpResponse, 'data'>> {
+    return this.productService.removeAll(products, user);
+  }
+
+  @ApiOkResponse({ description: 'Products reactivated successfully' })
+  @ApiOperation({ summary: 'Reactivate a product by id' })
+  @Patch('reactivate/all')
+  reactivateAll(
+    @GetUser() user: UserData,
+    @Body() products: DeleteProductDto,
+  ): Promise<Omit<HttpResponse, 'data'>> {
+    return this.productService.reactivateAll(user, products);
   }
 }

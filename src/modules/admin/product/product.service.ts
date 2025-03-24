@@ -21,6 +21,7 @@ import {
   createDynamicUpdateObject,
   hasNoChanges,
 } from 'src/utils/update-validations.util';
+import { DeleteProductDto } from './dto/delete-product.dto';
 
 @Injectable()
 export class ProductService {
@@ -298,7 +299,159 @@ export class ProductService {
     }
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} product`;
+  /**
+   * Desactivar todos los productos
+   * @param user Usuario que realiza la petición
+   * @param products Productos a desactivar
+   * @returns Mensaje de éxito
+   */
+  async reactivateAll(
+    user: UserData,
+    products: DeleteProductDto,
+  ): Promise<Omit<HttpResponse, 'data'>> {
+    try {
+      await this.prisma.$transaction(async (prisma) => {
+        // Buscar los productos en la base de datos
+        const productsDB = await prisma.product.findMany({
+          where: {
+            id: { in: products.ids },
+          },
+          select: {
+            id: true,
+            isActive: true,
+          },
+        });
+
+        // Validar que se encontraron los productos
+        if (productsDB.length === 0) {
+          throw new NotFoundException('Products not found');
+        }
+
+        // Filtrar solo los productos inactivos
+        const inactiveProducts = productsDB.filter(
+          (product) => !product.isActive,
+        );
+
+        // Si no hay productos inactivos, simplemente retornamos sin hacer cambios
+        if (inactiveProducts.length === 0) {
+          return [];
+        }
+
+        // Reactivar solo los productos inactivos
+        const reactivatePromises = inactiveProducts.map(async (product) => {
+          // Activar el producto
+          await prisma.product.update({
+            where: { id: product.id },
+            data: { isActive: true },
+          });
+
+          await this.audit.create({
+            entityId: product.id,
+            entityType: 'product',
+            action: AuditActionType.REACTIVATE,
+            performedById: user.id,
+            createdAt: new Date(),
+          });
+
+          return {
+            id: product.id,
+            isActive: true,
+          };
+        });
+
+        return Promise.all(reactivatePromises);
+      });
+
+      return {
+        statusCode: HttpStatus.OK,
+        message: 'Products reactivated successfully',
+      };
+    } catch (error) {
+      this.logger.error('Error reactivating products', error.stack);
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      handleException(error, 'Error reactivating products');
+    }
+  }
+
+  /**
+   * Desactivar todos los productos
+   * @param products Productos a desactivar
+   * @param user Usuario que realiza la petición
+   * @returns Mensaje de éxito
+   */
+  async removeAll(
+    products: DeleteProductDto,
+    user: UserData,
+  ): Promise<Omit<HttpResponse, 'data'>> {
+    try {
+      await this.prisma.$transaction(async (prisma) => {
+        // Buscar los productos en la base de datos
+        const productsDB = await prisma.product.findMany({
+          where: {
+            id: { in: products.ids },
+          },
+          select: {
+            id: true,
+            isActive: true,
+          },
+        });
+
+        // Validar que se encontraron los productos
+        if (productsDB.length === 0) {
+          throw new NotFoundException('Products not found');
+        }
+
+        // Filtrar solo los productos activos
+        const activeProducts = productsDB.filter((product) => product.isActive);
+
+        // Si no hay productos activos, simplemente retornamos sin hacer cambios
+        if (activeProducts.length === 0) {
+          return [];
+        }
+
+        // Desactivar solo los productos activos
+        const deactivatePromises = activeProducts.map(async (product) => {
+          // Desactivar producto
+          await prisma.product.update({
+            where: { id: product.id },
+            data: { isActive: false },
+          });
+
+          await this.audit.create({
+            entityId: product.id,
+            entityType: 'product',
+            action: AuditActionType.DELETE,
+            performedById: user.id,
+            createdAt: new Date(),
+          });
+
+          return {
+            id: product.id,
+            isActive: false,
+          };
+        });
+
+        return Promise.all(deactivatePromises);
+      });
+
+      return {
+        statusCode: HttpStatus.OK,
+        message: 'Products deactivated successfully',
+      };
+    } catch (error) {
+      this.logger.error('Error deactivating products', error.stack);
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      handleException(error, 'Error deactivating products');
+    }
   }
 }
