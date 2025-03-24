@@ -21,7 +21,7 @@ export class CreateRoomUseCase {
     const newRoom = await this.roomRepository.transaction(async () => {
       // Crear habitación
       const room = await this.roomRepository.create({
-        type: createRoomDto.type,
+        roomTypeId: createRoomDto.roomTypeId,
         number: createRoomDto.number,
         status: RoomStatus.AVAILABLE, // Por defecto, habitaciones nuevas están disponibles
         trashBin: true,

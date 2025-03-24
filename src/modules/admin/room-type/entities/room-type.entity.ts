@@ -5,6 +5,12 @@ import { FloorTypes } from '../dto';
 
 export class RoomType extends BaseEntity {
   @ApiProperty({
+    description: 'Nombre del tipo de habitación',
+    example: 'Habitación doble',
+  })
+  name: string;
+
+  @ApiProperty({
     description: 'Capacidad máxima de huéspedes',
     example: 2,
   })

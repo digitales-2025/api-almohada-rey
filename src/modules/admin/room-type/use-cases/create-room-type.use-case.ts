@@ -21,6 +21,7 @@ export class CreateRoomTypeUseCase {
     const newRoomType = await this.roomTypeRepository.transaction(async () => {
       // Crear tipo de habitación
       const roomType = await this.roomTypeRepository.create({
+        name: createRoomTypeDto.name,
         guests: createRoomTypeDto.guests,
         price: createRoomTypeDto.price,
         tv: createRoomTypeDto.tv,

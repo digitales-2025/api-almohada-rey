@@ -6,12 +6,22 @@ import {
   IsEnum,
   IsPositive,
   IsOptional,
-  IsBoolean,
+  IsNotEmpty,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { FloorTypes } from './create-room-type.dto';
 
 export class UpdateRoomTypeDto {
+  @ApiProperty({
+    description: 'Nombre del tipo de habitación',
+    example: 'Habitación doble',
+    required: false,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => value?.trim())
+  name: string;
+
   @ApiProperty({
     description: 'Capacidad máxima de huéspedes',
     example: 2,
@@ -81,13 +91,4 @@ export class UpdateRoomTypeDto {
   @IsOptional()
   @Transform(({ value }) => value?.trim())
   bed?: string;
-
-  @ApiProperty({
-    description: 'Estado de activación',
-    example: true,
-    required: false,
-  })
-  @IsBoolean()
-  @IsOptional()
-  isActive?: boolean;
 }

@@ -37,7 +37,7 @@ export class RoomRepository extends BaseRepository<Room> {
    */
   async findByType(typeId: string): Promise<Room[]> {
     return this.prisma.room.findMany({
-      where: { type: typeId, isActive: true },
+      where: { roomTypeId: typeId, isActive: true },
     });
   }
 }

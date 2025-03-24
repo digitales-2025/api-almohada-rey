@@ -27,7 +27,7 @@ export class ReactivateRoomUseCase {
           this.auditService.create({
             entityId: room.id,
             entityType: 'room',
-            action: AuditActionType.UPDATE,
+            action: AuditActionType.REACTIVATE,
             performedById: user.id,
             createdAt: new Date(),
           }),

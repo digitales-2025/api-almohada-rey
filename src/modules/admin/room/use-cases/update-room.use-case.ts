@@ -22,7 +22,7 @@ export class UpdateRoomUseCase {
     const updatedRoom = await this.roomRepository.transaction(async () => {
       // Actualizar habitación
       const room = await this.roomRepository.update(id, {
-        type: updateRoomDto.type,
+        roomTypeId: updateRoomDto.roomTypeId,
         number: updateRoomDto.number,
       });
 
