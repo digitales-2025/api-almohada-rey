@@ -25,7 +25,7 @@ model User {
   // Relación con auditorías (acciones realizadas por este usuario)
   auditsPerformed Audit[] @relation("AuditPerformedBy")
 
-  reservations    Reservation[]
+  reservations Reservation[]
 
   @@unique([email, isActive])
 }
@@ -73,8 +73,8 @@ model Customer {
   isActive       Boolean               @default(true)
   createdAt      DateTime              @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime              @updatedAt
-  
-  reservations   Reservation[]
+
+  reservations Reservation[]
 }
 
 enum CustomerDocumentType {
@@ -94,6 +94,32 @@ enum FloorTypes {
   LIMINATING
   CARPETING
 }
+model RoomTypes {
+  id            String          @id @default(uuid())
+  guests        Int
+  price         Float
+  tv            String
+  floorType     FloorTypes
+  description   String
+  area          Float
+  bed           String
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime        @updatedAt
+  ImageRoomType ImageRoomType[]
+  Room          Room[]
+}
+
+model ImageRoomType {
+  id        String    @id @default(uuid())
+  imageUrl  String
+  isMain    Boolean   @default(false)
+  room      String
+  RoomTypes RoomTypes @relation(fields: [room], references: [id])
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt
+}
 
 enum RoomStatus {
   AVAILABLE
@@ -102,63 +128,36 @@ enum RoomStatus {
   CLEANING
 }
 
-enum RoomTypes {
-  SINGLE
-  DOUBLE_SINGLE
-  DOUBLE_FAMILY
-  SUITE
-  MATRIMONIAL
-}
-
 model Room {
-  id          String     @id @default(uuid())
-  number      Int        @unique
-  guests      Int
-  type        RoomTypes
-  price       Float
-  status      RoomStatus
-  tv          String
-  floorType   FloorTypes
-  description String
-  area        Float
-  isActive    Boolean    @default(true)
-
+  id                String              @id @default(uuid())
+  type              String
+  RoomTypes         RoomTypes           @relation(fields: [type], references: [id])
+  number            Int                 @unique
+  trashBin          Boolean             @default(true) // Trash bin (Tacho)
+  towel             Boolean             @default(true) // Towel (Toalla)
+  toiletPaper       Boolean             @default(true) // Toilet paper (Papel higiénico)
+  showerSoap        Boolean             @default(true) // Shower soap (Jabón de ducha)
+  handSoap          Boolean             @default(true) // Hand soap (Jabón de lavado)
+  lamp              Boolean             @default(true) // Lamp (Lámpara)
+  status            RoomStatus
+  isActive          Boolean             @default(true)
   createdAt         DateTime            @default(now()) @db.Timestamptz(6)
   updatedAt         DateTime            @updatedAt
-  ImageRoom         ImageRoom[]
   CleaningChecklist CleaningChecklist[] //aun no considerar
-
   reservations      Reservation[]
 }
 
-model ImageRoom {
-  id       String  @id @default(uuid())
-  imageUrl String
-  isMain   Boolean @default(false)
-  room     String
-  rooms    Room    @relation(fields: [room], references: [id])
-  isActive Boolean @default(true)
-
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt
-}
-
 model CleaningChecklist {
-  id           Int     @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
+  date         String
   roomId       String // ID of room (Habitación)
-  Room         Room    @relation(fields: [roomId], references: [id])
-  trashBin     Boolean // Trash bin (Tacho)
-  towel        Boolean // Towel (Toalla)
-  toiletPaper  Boolean // Toilet paper (Papel higiénico)
-  showerSoap   Boolean // Shower soap (Jabón de ducha)
-  handSoap     Boolean // Hand soap (Jabón de lavado)
-  lamp         Boolean // Lamp (Lámpara)
+  Room         Room     @relation(fields: [roomId], references: [id])
   staffName    String // ID of cleaning staff (Personal)
   userCheckId  String // ID of user who verifies (UserCheck)
   observations String? // Observations or comments (Observaciones)
-
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt
 }
 
 enum ReservationStatus {
@@ -180,8 +179,8 @@ model Reservation {
   checkInDate     DateTime          @db.Date
   checkOutDate    DateTime          @db.Date
   status          ReservationStatus
-  guests          Json?             // List of companions
-  observations    String?           // Additional notes
+  guests          Json? // List of companions
+  observations    String? // Additional notes
   isActive        Boolean           @default(true)
   createdAt       DateTime          @default(now()) @db.Timestamptz(6)
   updatedAt       DateTime          @updatedAt
