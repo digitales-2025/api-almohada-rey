@@ -6,12 +6,9 @@ import {
   Patch,
   Param,
   Delete,
-  Query,
-  DefaultValuePipe,
-  ParseIntPipe,
 } from '@nestjs/common';
-import { PrescriptionService } from '../services/room.service';
-import { Auth, GetUser } from '@login/login/admin/auth/decorators';
+import { RoomService } from '../services/room.service';
+
 import {
   ApiTags,
   ApiOperation,
@@ -22,21 +19,17 @@ import {
   ApiOkResponse,
   ApiNotFoundResponse,
 } from '@nestjs/swagger';
-import { UserData } from '@login/login/interfaces';
-import {
-  CreatePrescriptionDto,
-  UpdatePrescriptionDto,
-  DeletePrescriptionDto,
-} from '../dto';
-import { Prescription, PrescriptionWithPatient } from '../entities/room.entity';
-import { BaseApiResponse } from 'src/dto/BaseApiResponse.dto';
-import { PatientPrescriptions } from '@pacient/pacient/pacient/entities/pacient.entity';
+import { UserData } from 'src/interfaces';
+import { CreateRoomDto, UpdateRoomDto, DeleteRoomDto } from '../dto';
+import { Room } from '../entities/room.entity';
+import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
+import { Auth, GetUser } from '../../auth/decorators';
 
 /**
- * Controlador REST para gestionar recetas médicas.
- * Expone endpoints para operaciones CRUD sobre recetas.
+ * Controlador REST para gestionar habitaciones.
+ * Expone endpoints para operaciones CRUD sobre habitaciones.
  */
-@ApiTags('Recipe')
+@ApiTags('Rooms')
 @ApiBadRequestResponse({
   description:
     'Bad Request - Error en la validación de datos o solicitud incorrecta',
@@ -44,182 +37,133 @@ import { PatientPrescriptions } from '@pacient/pacient/pacient/entities/pacient.
 @ApiUnauthorizedResponse({
   description: 'Unauthorized - No autorizado para realizar esta operación',
 })
-@Controller({ path: 'receta', version: '1' })
+@Controller({ path: 'rooms', version: '1' })
 @Auth()
-export class PrescriptionController {
-  constructor(private readonly prescriptionService: PrescriptionService) {}
+export class RoomController {
+  constructor(private readonly roomService: RoomService) {}
 
   /**
-   * Crea una nueva receta médica
+   * Crea una nueva habitación
    */
   @Post()
-  @ApiOperation({ summary: 'Crear nueva receta médica' })
+  @ApiOperation({ summary: 'Crear nueva habitación' })
   @ApiResponse({
     status: 201,
-    description: 'Receta médica creada exitosamente',
-    type: BaseApiResponse<Prescription>,
+    description: 'Habitación creada exitosamente',
+    type: BaseApiResponse,
   })
   @ApiBadRequestResponse({
-    description: 'Datos de entrada inválidos o receta ya existe',
+    description: 'Datos de entrada inválidos o habitación ya existe',
   })
   create(
-    @Body() createPrescriptionDto: CreatePrescriptionDto,
+    @Body() createRoomDto: CreateRoomDto,
     @GetUser() user: UserData,
-  ): Promise<BaseApiResponse<Prescription>> {
-    return this.prescriptionService.create(createPrescriptionDto, user);
+  ): Promise<BaseApiResponse<Room>> {
+    return this.roomService.create(createRoomDto, user);
   }
 
   /**
-   * Obtiene todas las recetas médicas
+   * Obtiene todas las habitaciones
    */
   @Get()
-  @ApiOperation({ summary: 'Obtener todas las recetas médicas' })
+  @ApiOperation({ summary: 'Obtener todas las habitaciones' })
   @ApiResponse({
     status: 200,
-    description: 'Lista de todas las recetas médicas',
-    type: [Prescription],
+    description: 'Lista de todas las habitaciones',
+    type: [Room],
   })
-  findAll(): Promise<Prescription[]> {
-    return this.prescriptionService.findAll();
+  findAll(): Promise<Room[]> {
+    return this.roomService.findAll();
   }
 
   /**
-   * Obtiene una recetas médicas por DNI del paciente
-   */
-  @Get('/patients')
-  @ApiOperation({ summary: 'Obtener receta médica de los pacientes' })
-  @ApiOkResponse({
-    status: 200,
-    description: 'Recetas médicas encontrada',
-    type: [PatientPrescriptions],
-  })
-  @ApiNotFoundResponse({
-    description: 'Recetas médicas no encontrada',
-  })
-  findByPatientsPrescriptions(
-    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
-    @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset: number,
-  ): Promise<PatientPrescriptions[]> {
-    return this.prescriptionService.findPatientsPrescriptions(limit, offset);
-  }
-
-  /**
-   * Obtiene una recetas médicas por DNI del paciente
-   */
-  @Get('/withPatient')
-  @ApiOperation({ summary: 'Obtener receta médica de los pacientes' })
-  @ApiOkResponse({
-    status: 200,
-    description: 'Recetas médicas encontrada',
-    type: [PrescriptionWithPatient],
-  })
-  @ApiNotFoundResponse({
-    description: 'Recetas médicas no encontrada',
-  })
-  findByPrescriptionsWithPatients(
-    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
-    @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset: number,
-  ): Promise<PrescriptionWithPatient[]> {
-    return this.prescriptionService.findPrescriptionsWithPatient(limit, offset);
-  }
-
-  /**
-   * Obtiene una recetas médicas por DNI del paciente
-   */
-  @Get('/patient/:dni')
-  @ApiOperation({ summary: 'Obtener receta médica por ID' })
-  @ApiParam({
-    name: 'dni',
-    description: 'Número de DNI y deberia tambien el CE',
-  })
-  @ApiOkResponse({
-    status: 200,
-    description: 'Recetas médicas encontrada',
-    type: PatientPrescriptions,
-  })
-  @ApiNotFoundResponse({
-    description: 'Recetas médicas no encontrada',
-  })
-  findByPatientIdCard(
-    @Param('dni') dni: string,
-  ): Promise<PatientPrescriptions> {
-    return this.prescriptionService.findPrescriptionsByPatientIdCard(dni);
-  }
-
-  /**
-   * Obtiene una receta médica por su ID
+   * Obtiene una habitación por su ID
    */
   @Get(':id')
-  @ApiOperation({ summary: 'Obtener receta médica por ID' })
-  @ApiParam({ name: 'id', description: 'ID de la receta médica' })
+  @ApiOperation({ summary: 'Obtener habitación por ID' })
+  @ApiParam({ name: 'id', description: 'ID de la habitación' })
   @ApiOkResponse({
-    description: 'Receta médica encontrada',
-    type: Prescription,
+    description: 'Habitación encontrada',
+    type: Room,
   })
   @ApiNotFoundResponse({
-    description: 'Receta médica no encontrada',
+    description: 'Habitación no encontrada',
   })
-  findOne(@Param('id') id: string): Promise<Prescription> {
-    return this.prescriptionService.findOne(id);
+  findOne(@Param('id') id: string): Promise<Room> {
+    return this.roomService.findOne(id);
   }
 
   /**
-   * Actualiza una receta médica existente
+   * Obtiene una habitación por su número
+   */
+  @Get('number/:number')
+  @ApiOperation({ summary: 'Obtener habitación por número' })
+  @ApiParam({ name: 'number', description: 'Número de la habitación' })
+  @ApiOkResponse({
+    description: 'Habitación encontrada',
+    type: Room,
+  })
+  @ApiNotFoundResponse({
+    description: 'Habitación no encontrada',
+  })
+  findByNumber(@Param('number') number: string): Promise<Room> {
+    return this.roomService.findByNumber(parseInt(number));
+  }
+
+  /**
+   * Actualiza una habitación existente
    */
   @Patch(':id')
-  @ApiOperation({ summary: 'Actualizar receta médica existente' })
+  @ApiOperation({ summary: 'Actualizar habitación existente' })
   @ApiResponse({
     status: 200,
-    description: 'Receta médica actualizada exitosamente',
-    type: Prescription,
+    description: 'Habitación actualizada exitosamente',
+    type: BaseApiResponse,
   })
   update(
     @Param('id') id: string,
-    @Body() updatePrescriptionDto: UpdatePrescriptionDto,
+    @Body() updateRoomDto: UpdateRoomDto,
     @GetUser() user: UserData,
-  ): Promise<BaseApiResponse<Prescription>> {
-    return this.prescriptionService.update(id, updatePrescriptionDto, user);
+  ): Promise<BaseApiResponse<Room>> {
+    return this.roomService.update(id, updateRoomDto, user);
   }
 
   /**
-   * Desactiva múltiples recetas médicas
+   * Desactiva múltiples habitaciones
    */
   @Delete('remove/all')
-  @ApiOperation({ summary: 'Desactivar múltiples recetas médicas' })
+  @ApiOperation({ summary: 'Desactivar múltiples habitaciones' })
   @ApiResponse({
     status: 200,
-    description: 'Recetas médicas desactivadas exitosamente',
-    type: BaseApiResponse<Prescription[]>,
+    description: 'Habitaciones desactivadas exitosamente',
+    type: BaseApiResponse,
   })
   @ApiBadRequestResponse({
-    description: 'IDs inválidos o recetas no existen',
+    description: 'IDs inválidos o habitaciones no existen',
   })
   deleteMany(
-    @Body() deletePrescriptionDto: DeletePrescriptionDto,
+    @Body() deleteRoomDto: DeleteRoomDto,
     @GetUser() user: UserData,
-  ): Promise<BaseApiResponse<Prescription[]>> {
-    return this.prescriptionService.deleteMany(deletePrescriptionDto, user);
+  ): Promise<BaseApiResponse<Room[]>> {
+    return this.roomService.deleteMany(deleteRoomDto, user);
   }
 
   /**
-   * Reactiva múltiples recetas médicas
+   * Reactiva múltiples habitaciones
    */
   @Patch('reactivate/all')
-  @ApiOperation({ summary: 'Reactivar múltiples recetas médicas' })
+  @ApiOperation({ summary: 'Reactivar múltiples habitaciones' })
   @ApiOkResponse({
-    description: 'Recetas médicas reactivadas exitosamente',
-    type: BaseApiResponse<Prescription[]>,
+    description: 'Habitaciones reactivadas exitosamente',
+    type: BaseApiResponse,
   })
   @ApiBadRequestResponse({
-    description: 'IDs inválidos o recetas no existen',
+    description: 'IDs inválidos o habitaciones no existen',
   })
   reactivateAll(
-    @Body() deletePrescriptionDto: DeletePrescriptionDto,
+    @Body() deleteRoomDto: DeleteRoomDto,
     @GetUser() user: UserData,
-  ): Promise<BaseApiResponse<Prescription[]>> {
-    return this.prescriptionService.reactivateMany(
-      deletePrescriptionDto.ids,
-      user,
-    );
+  ): Promise<BaseApiResponse<Room[]>> {
+    return this.roomService.reactivateMany(deleteRoomDto.ids, user);
   }
 }
