@@ -1,51 +1,47 @@
 import { Injectable } from '@nestjs/common';
-import { PrescriptionRepository } from '../repositories/room.repository';
-import { Prescription } from '../entities/room.entity';
-import { UserData } from '@login/login/interfaces';
-import { AuditService } from '@login/login/admin/audit/audit.service';
+import { RoomRepository } from '../repositories/room.repository';
+import { Room } from '../entities/room.entity';
 import { AuditActionType } from '@prisma/client';
-import { DeletePrescriptionDto } from '../dto/delete-room.dto';
-import { BaseApiResponse } from 'src/dto/BaseApiResponse.dto';
+import { DeleteRoomDto } from '../dto/delete-room.dto';
+import { UserData } from 'src/interfaces';
+import { AuditService } from '../../audit/audit.service';
+import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 
 @Injectable()
-export class DeletePrescriptionsUseCase {
+export class DeleteRoomsUseCase {
   constructor(
-    private readonly prescriptionRepository: PrescriptionRepository,
+    private readonly roomRepository: RoomRepository,
     private readonly auditService: AuditService,
   ) {}
 
   async execute(
-    deletePrescriptionsDto: DeletePrescriptionDto,
+    deleteRoomDto: DeleteRoomDto,
     user: UserData,
-  ): Promise<BaseApiResponse<Prescription[]>> {
-    const deletedPrescriptions = await this.prescriptionRepository.transaction(
-      async () => {
-        // Perform soft delete and get updated prescriptions
-        const prescriptions = await this.prescriptionRepository.softDeleteMany(
-          deletePrescriptionsDto.ids,
-        );
+  ): Promise<BaseApiResponse<Room[]>> {
+    const deletedRooms = await this.roomRepository.transaction(async () => {
+      // Realizar soft delete y obtener habitaciones actualizadas
+      const rooms = await this.roomRepository.softDeleteMany(deleteRoomDto.ids);
 
-        // Register audit for each deleted prescription
-        await Promise.all(
-          prescriptions.map((prescription) =>
-            this.auditService.create({
-              entityId: prescription.id,
-              entityType: 'prescription',
-              action: AuditActionType.DELETE,
-              performedById: user.id,
-              createdAt: new Date(),
-            }),
-          ),
-        );
+      // Registrar auditoría para cada habitación eliminada
+      await Promise.all(
+        rooms.map((room) =>
+          this.auditService.create({
+            entityId: room.id,
+            entityType: 'room',
+            action: AuditActionType.DELETE,
+            performedById: user.id,
+            createdAt: new Date(),
+          }),
+        ),
+      );
 
-        return prescriptions;
-      },
-    );
+      return rooms;
+    });
 
     return {
       success: true,
-      message: 'Recetas médicas eliminadas exitosamente',
-      data: deletedPrescriptions,
+      message: 'Habitaciones desactivadas exitosamente',
+      data: deletedRooms,
     };
   }
 }
