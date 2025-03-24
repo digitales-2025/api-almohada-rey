@@ -16,6 +16,7 @@ import {
   ApiCreatedResponse,
   ApiInternalServerErrorResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -40,6 +41,7 @@ export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
 
   @ApiCreatedResponse({ description: 'Customer created successfully' })
+  @ApiOperation({ summary: 'Create a new customer' })
   @Post()
   create(
     @Body() createCustomerDto: CreateCustomerDto,
@@ -49,24 +51,28 @@ export class CustomersController {
   }
 
   @ApiOkResponse({ description: 'Customers found successfully' })
+  @ApiOperation({ summary: 'Get all customers' })
   @Get()
   findAll(@GetUser() user: UserPayload): Promise<CustomerData[]> {
     return this.customersService.findAll(user);
   }
 
   @ApiOkResponse({ description: 'Customer found successfully' })
+  @ApiOperation({ summary: 'Get a customer by id' })
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.customersService.findOne(id);
   }
 
   @ApiOkResponse({ description: 'Customer found successfully' })
+  @ApiOperation({ summary: 'Get a customer by document number' })
   @Get('document/number/:documentNumber')
   findDocumentNumber(@Param('documentNumber') documentNumber: string) {
     return this.customersService.findDocumentNumber(documentNumber);
   }
 
   @ApiOkResponse({ description: 'Customer updated successfully' })
+  @ApiOperation({ summary: 'Update a customer by id' })
   @Patch(':id')
   update(
     @Param('id') id: string,
@@ -77,6 +83,7 @@ export class CustomersController {
   }
 
   @ApiOkResponse({ description: 'Customers deactivated successfully' })
+  @ApiOperation({ summary: 'Deactivate a customer by id' })
   @Delete('remove/all')
   deactivate(
     @Body() customers: DeleteCustomerDto,
@@ -86,6 +93,7 @@ export class CustomersController {
   }
 
   @ApiOkResponse({ description: 'Customers reactivated successfully' })
+  @ApiOperation({ summary: 'Reactivate a customer by id' })
   @Patch('reactivate/all')
   reactivateAll(
     @GetUser() user: UserData,

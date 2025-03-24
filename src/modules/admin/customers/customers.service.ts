@@ -458,7 +458,6 @@ export class CustomersService {
     user: UserData,
   ): Promise<HttpResponse<CustomerData>> {
     const { documentNumber, email, ruc, country } = updateCustomerDto;
-    console.log(JSON.stringify(updateCustomerDto, null, 2));
 
     try {
       const customerDB = await this.findById(id);
