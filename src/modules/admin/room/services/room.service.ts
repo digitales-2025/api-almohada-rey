@@ -1,173 +1,115 @@
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { RoomRepository } from '../repositories/room.repository';
+import { Room } from '../entities/room.entity';
+import { CreateRoomDto, UpdateRoomDto, DeleteRoomDto } from '../dto';
+import { UserData } from 'src/interfaces';
+import { validateArray, validateChanges } from 'src/prisma/src/utils';
+import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
+import { roomErrorMessages } from '../errors/errors-room';
 import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
-import { PrescriptionRepository } from '../repositories/room.repository';
-import { Prescription, PrescriptionWithPatient } from '../entities/room.entity';
-import {
-  CreatePrescriptionDto,
-  UpdatePrescriptionDto,
-  DeletePrescriptionDto,
-} from '../dto';
-import { UserData } from '@login/login/interfaces';
-import { validateArray, validateChanges } from '@prisma/prisma/utils';
-import { BaseErrorHandler } from 'src/common/error-handlers/service-error.handler';
-import { recipeErrorMessages } from '../errors/errors-room';
-import {
-  CreatePrescriptionUseCase,
-  UpdatePrescriptionUseCase,
-  DeletePrescriptionsUseCase,
-  ReactivatePrescriptionUseCase,
+  CreateRoomUseCase,
+  UpdateRoomUseCase,
+  DeleteRoomsUseCase,
+  ReactivateRoomUseCase,
 } from '../use-cases';
-import { BaseApiResponse } from 'src/dto/BaseApiResponse.dto';
-import { PacientRepository } from '@pacient/pacient/pacient/repositories/pacient.repository';
-import { PatientPrescriptions } from '@pacient/pacient/pacient/entities/pacient.entity';
-
-// Constantes para nombres de tablas
-const TABLE_NAMES = {
-  UPDATE_HISTORIA: 'updateHistory',
-  SUCURSAL: 'branch',
-  PERSONAL: 'staff',
-  PACIENTE: 'patient',
-} as const;
+import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
+import { RoomTypeService } from '../../room-type/services/room-type.service';
 
 @Injectable()
-export class PrescriptionService {
-  private readonly logger = new Logger(PrescriptionService.name);
+export class RoomService {
+  private readonly logger = new Logger(RoomService.name);
   private readonly errorHandler: BaseErrorHandler;
 
   constructor(
-    private readonly prescriptionRepository: PrescriptionRepository,
-    private readonly createPrescriptionUseCase: CreatePrescriptionUseCase,
-    private readonly updatePrescriptionUseCase: UpdatePrescriptionUseCase,
-    private readonly deletePrescriptionsUseCase: DeletePrescriptionsUseCase,
-    private readonly reactivatePrescriptionUseCase: ReactivatePrescriptionUseCase,
-    private readonly patientRepository: PacientRepository,
+    private readonly roomRepository: RoomRepository,
+    private readonly createRoomUseCase: CreateRoomUseCase,
+    private readonly updateRoomUseCase: UpdateRoomUseCase,
+    private readonly deleteRoomsUseCase: DeleteRoomsUseCase,
+    private readonly reactivateRoomUseCase: ReactivateRoomUseCase,
+    private readonly roomTypeService: RoomTypeService,
   ) {
     this.errorHandler = new BaseErrorHandler(
       this.logger,
-      'Recipe',
-      recipeErrorMessages,
+      'Room',
+      roomErrorMessages,
     );
   }
 
   /**
-   * Valida las referencias a otras tablas
+   * Valida que el tipo de habitación exista
    */
-  private async validateReferences(
-    dto: CreatePrescriptionDto | UpdatePrescriptionDto,
-  ) {
-    // Validar UpdateHistoria
-    const updateHistoriaExists =
-      await this.prescriptionRepository.findByIdValidate(
-        TABLE_NAMES.UPDATE_HISTORIA,
-        dto.updateHistoryId,
-      );
-    if (!updateHistoriaExists) {
-      throw new BadRequestException(
-        `Registro de Actualizacion de Historia Médica no encontrado`,
-      );
-    }
-
-    // Validar Sucursal
-    const sucursalExists = await this.prescriptionRepository.findByIdValidate(
-      TABLE_NAMES.SUCURSAL,
-      dto.branchId,
-    );
-    if (!sucursalExists) {
-      throw new BadRequestException(`Registro de Sucursal no encontrado`);
-    }
-
-    // Validar Personal
-    const personalExists = await this.prescriptionRepository.findByIdValidate(
-      TABLE_NAMES.PERSONAL,
-      dto.staffId,
-    );
-    if (!personalExists) {
-      throw new BadRequestException(`Registro de Personal no encontrado`);
-    }
-
-    // Validar Paciente
-    const pacienteExists = await this.prescriptionRepository.findByIdValidate(
-      TABLE_NAMES.PACIENTE,
-      dto.patientId,
-    );
-
-    if (!pacienteExists) {
-      throw new BadRequestException(`Registro de Paciente no encontrado`);
-    }
-  }
-
-  /**
-   * Crea una nueva receta médica
-   */
-  // ... existing code ...
-
-  async create(
-    createPrescriptionDto: CreatePrescriptionDto,
-    user: UserData,
-  ): Promise<BaseApiResponse<Prescription>> {
-    console.log(
-      '🚀 ~ PrescriptionService en el bakend con el id  ~ createPrescriptionDto:',
-      createPrescriptionDto,
-    );
+  private async validateRoomTypeExists(typeId: string): Promise<void> {
     try {
-      await this.validateReferences(createPrescriptionDto);
+      await this.roomTypeService.findOne(typeId);
+    } catch (error) {
+      console.log('🚀 ~ RoomService ~ validateRoomTypeExists ~ error:', error);
+      throw new BadRequestException(roomErrorMessages.invalidRoomType);
+    }
+  }
 
-      // Crear la receta y obtener la respuesta
-      const prescriptionResponse = await this.createPrescriptionUseCase.execute(
-        createPrescriptionDto,
-        user,
+  /**
+   * Crea una nueva habitación
+   */
+  async create(
+    createRoomDto: CreateRoomDto,
+    user: UserData,
+  ): Promise<BaseApiResponse<Room>> {
+    try {
+      // Verificar si ya existe una habitación con ese número
+      const existingRoom = await this.roomRepository.findByNumber(
+        createRoomDto.number,
       );
-
-      // Extraer los IDs necesarios
-      const prescriptionId = prescriptionResponse.data.id;
-      const updateHistoryId = createPrescriptionDto.updateHistoryId;
-
-      // Actualizar el historial
-      if (updateHistoryId) {
-        await this.prescriptionRepository.updatePrescriptionInHistory(
-          updateHistoryId,
-          prescriptionId,
-        );
+      if (existingRoom) {
+        throw new BadRequestException(roomErrorMessages.alreadyExists);
       }
 
-      return prescriptionResponse;
+      // Validar que el tipo de habitación exista
+      await this.validateRoomTypeExists(createRoomDto.type);
+
+      // Crear la habitación
+      return await this.createRoomUseCase.execute(createRoomDto, user);
     } catch (error) {
       this.errorHandler.handleError(error, 'creating');
+      throw error;
     }
   }
 
-  // ... existing code ...
-
   /**
-   * Actualiza una receta médica existente
+   * Actualiza una habitación existente
    */
   async update(
     id: string,
-    updatePrescriptionDto: UpdatePrescriptionDto,
+    updateRoomDto: UpdateRoomDto,
     user: UserData,
-  ): Promise<BaseApiResponse<Prescription>> {
+  ): Promise<BaseApiResponse<Room>> {
     try {
-      const currentPrescription = await this.findById(id);
+      const currentRoom = await this.findById(id);
 
-      if (!validateChanges(updatePrescriptionDto, currentPrescription)) {
+      // Verificar si hay cambios
+      if (!validateChanges(updateRoomDto, currentRoom)) {
         return {
           success: true,
-          message: 'No se detectaron cambios en la receta médica',
-          data: currentPrescription,
+          message: 'No se detectaron cambios en la habitación',
+          data: currentRoom,
         };
       }
 
-      // Validar referencias antes de actualizar
-      await this.validateReferences(updatePrescriptionDto);
-      return await this.updatePrescriptionUseCase.execute(
-        id,
-        updatePrescriptionDto,
-        user,
-      );
+      // Si se está actualizando el tipo, validar que exista
+      if (updateRoomDto.type) {
+        await this.validateRoomTypeExists(updateRoomDto.type);
+      }
+
+      // Si se está actualizando el número, verificar que no exista otra habitación con ese número
+      if (updateRoomDto.number && updateRoomDto.number !== currentRoom.number) {
+        const existingRoom = await this.roomRepository.findByNumber(
+          updateRoomDto.number,
+        );
+        if (existingRoom && existingRoom.id !== id) {
+          throw new BadRequestException(roomErrorMessages.alreadyExists);
+        }
+      }
+
+      return await this.updateRoomUseCase.execute(id, updateRoomDto, user);
     } catch (error) {
       this.errorHandler.handleError(error, 'updating');
       throw error;
@@ -175,9 +117,9 @@ export class PrescriptionService {
   }
 
   /**
-   * Busca una receta médica por su ID
+   * Busca una habitación por su ID
    */
-  async findOne(id: string): Promise<Prescription> {
+  async findOne(id: string): Promise<Room> {
     try {
       return this.findById(id);
     } catch (error) {
@@ -187,11 +129,11 @@ export class PrescriptionService {
   }
 
   /**
-   * Obtiene todas las recetas médicas
+   * Obtiene todas las habitaciones
    */
-  async findAll(): Promise<Prescription[]> {
+  async findAll(): Promise<Room[]> {
     try {
-      return this.prescriptionRepository.findMany();
+      return this.roomRepository.findMany();
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
       throw error;
@@ -199,73 +141,37 @@ export class PrescriptionService {
   }
 
   /**
-   * Obtiene una receta médica por DNI del paciente
+   * Busca una habitación por su ID
    */
-  async findPrescriptionsByPatientIdCard(
-    dni: string,
-  ): Promise<PatientPrescriptions> {
-    try {
-      return await this.patientRepository.findPrescriptionsByPatientDNI(dni);
-    } catch (error) {
-      this.errorHandler.handleError(error, 'getting');
+  async findById(id: string): Promise<Room> {
+    const room = await this.roomRepository.findById(id);
+    if (!room) {
+      throw new BadRequestException(roomErrorMessages.notFound);
     }
+    return room;
   }
 
   /**
-   * Obtiene una receta médica por paciente
+   * Busca una habitación por su número
    */
-  async findPatientsPrescriptions(
-    limit = 10,
-    offset = 0,
-  ): Promise<PatientPrescriptions[]> {
-    try {
-      return await this.patientRepository.findPatientPrescriptions(
-        limit,
-        offset,
-      );
-    } catch (error) {
-      this.errorHandler.handleError(error, 'getting');
+  async findByNumber(number: number): Promise<Room> {
+    const room = await this.roomRepository.findByNumber(number);
+    if (!room) {
+      throw new BadRequestException(roomErrorMessages.notFound);
     }
-  }
-
-  async findPrescriptionsWithPatient(
-    limit = 10,
-    offset = 0,
-  ): Promise<PrescriptionWithPatient[]> {
-    try {
-      return await this.prescriptionRepository.findPrescriptionsWithPatient(
-        limit,
-        offset,
-      );
-    } catch (error) {
-      this.errorHandler.handleError(error, 'getting');
-    }
+    return room;
   }
 
   /**
-   * Busca una receta médica por su ID
-   */
-  async findById(id: string): Promise<Prescription> {
-    const prescription = await this.prescriptionRepository.findById(id);
-    if (!prescription) {
-      throw new BadRequestException('Receta médica no encontrada');
-    }
-    return prescription;
-  }
-
-  /**
-   * Desactiva múltiples recetas médicas
+   * Desactiva múltiples habitaciones
    */
   async deleteMany(
-    deletePrescriptionDto: DeletePrescriptionDto,
+    deleteRoomDto: DeleteRoomDto,
     user: UserData,
-  ): Promise<BaseApiResponse<Prescription[]>> {
+  ): Promise<BaseApiResponse<Room[]>> {
     try {
-      validateArray(deletePrescriptionDto.ids, 'IDs de recetas médicas');
-      return await this.deletePrescriptionsUseCase.execute(
-        deletePrescriptionDto,
-        user,
-      );
+      validateArray(deleteRoomDto.ids, 'IDs de habitaciones');
+      return await this.deleteRoomsUseCase.execute(deleteRoomDto, user);
     } catch (error) {
       this.errorHandler.handleError(error, 'deactivating');
       throw error;
@@ -273,31 +179,18 @@ export class PrescriptionService {
   }
 
   /**
-   * Reactiva múltiples recetas médicas
+   * Reactiva múltiples habitaciones
    */
   async reactivateMany(
     ids: string[],
     user: UserData,
-  ): Promise<BaseApiResponse<Prescription[]>> {
+  ): Promise<BaseApiResponse<Room[]>> {
     try {
-      validateArray(ids, 'IDs de recetas médicas');
-      return await this.reactivatePrescriptionUseCase.execute(ids, user);
+      validateArray(ids, 'IDs de habitaciones');
+      return await this.reactivateRoomUseCase.execute(ids, user);
     } catch (error) {
       this.errorHandler.handleError(error, 'reactivating');
       throw error;
-    }
-  }
-
-  async findByConsultaId(consultaId: string): Promise<Prescription> {
-    try {
-      const prescription =
-        await this.prescriptionRepository.findById(consultaId);
-      if (!prescription) {
-        throw new NotFoundException('Receta no encontrada para esta consulta');
-      }
-      return prescription;
-    } catch (error) {
-      this.errorHandler.handleError(error, 'getting');
     }
   }
 }
