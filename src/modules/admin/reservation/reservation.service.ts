@@ -13,7 +13,7 @@ import { CreateReservationUseCase } from './use-cases/createReservation.use-case
 import { UserData } from 'src/interfaces';
 import { PaginationParams } from 'src/utils/paginated-response/pagination.types';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
-import { RoomRepository } from '../admin/room/repositories/room.repository';
+import { RoomRepository } from '../room/repositories/room.repository';
 import { RoomStatus } from '@prisma/client';
 
 @Injectable()

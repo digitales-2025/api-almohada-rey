@@ -11,7 +11,7 @@ import {
 import { ReservationService } from './reservation.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 // import { UpdateReservationDto } from './dto/update-reservation.dto';
-import { Auth, GetUser } from '../admin/auth/decorators';
+import { Auth, GetUser } from '../auth/decorators';
 import { UserData } from 'src/interfaces';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 import {

@@ -11,7 +11,7 @@ import { SeedsModule } from './modules/seeds/seeds.module';
 import { CustomersModule } from './modules/admin/customers/customers.module';
 import { CloudflareModule } from './cloudflare/cloudflare.module';
 import { RoomTypeModule } from './modules/admin/room-type/room-type.module';
-import { ReservationModule } from './modules/reservation/reservation.module';
+import { ReservationModule } from './modules/admin/reservation/reservation.module';
 import { RoomModule } from './modules/admin/room/room.module';
 
 @Module({
