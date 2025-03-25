@@ -43,7 +43,7 @@ export class BaseErrorHandler {
     ) {
       this.logger.warn(`${logMessage}: ${error.message}`);
       const message = this.getDefaultOrCustomMessage(error.message);
-      throw new BadRequestException(message);
+      throw new BadRequestException(message, message);
     }
 
     this.logger.error(`${logMessage}: ${error.message}`, error.stack);
@@ -59,7 +59,7 @@ export class BaseErrorHandler {
     ) {
       this.logger.warn(`${logMessage}: ${error.message}`);
       const message = this.getDefaultOrCustomMessage(error.message);
-      throw new BadRequestException(message);
+      throw new BadRequestException(message, message);
     }
 
     this.logger.error(`${logMessage}: ${error.message}`, error.stack);

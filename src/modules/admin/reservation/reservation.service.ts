@@ -74,6 +74,8 @@ export class ReservationService {
         {
           include: {
             room: true,
+            user: true,
+            customer: true,
           },
         },
       );

@@ -13,20 +13,26 @@ import { CreateReservationDto } from './dto/create-reservation.dto';
 // import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { Auth, GetUser } from '../auth/decorators';
 import { UserData } from 'src/interfaces';
-import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
+import {
+  PaginatedResponse,
+  PaginationMetadata,
+} from 'src/utils/paginated-response/PaginatedResponse.dto';
 import {
   DetailedReservation,
   Reservation,
 } from './entities/reservation.entity';
 import {
   ApiBadRequestResponse,
+  ApiExtraModels,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
+  getSchemaPath,
 } from '@nestjs/swagger';
+import { Guest } from './entities/guest.entity';
 
 @ApiTags('Reservations')
 @ApiBadRequestResponse({
@@ -36,6 +42,12 @@ import {
 @ApiUnauthorizedResponse({
   description: 'Unauthorized - No autorizado para realizar esta operación',
 })
+@ApiExtraModels(
+  PaginatedResponse,
+  PaginationMetadata,
+  DetailedReservation,
+  Guest,
+)
 @Controller({ path: 'reservation', version: '1' })
 @Auth()
 export class ReservationController {
@@ -77,8 +89,48 @@ export class ReservationController {
     example: 10,
     required: false,
   })
+  // export class PaginationMetadata {
+  //   @ApiProperty({ description: 'Total number of items', type: Number })
+  //   total: number;
+
+  //   @ApiProperty({ description: 'Current page number', type: Number })
+  //   page: number;
+
+  //   @ApiProperty({ description: 'Number of items per page', type: Number })
+  //   pageSize: number;
+
+  //   @ApiProperty({ description: 'Total number of pages', type: Number })
+  //   totalPages: number;
+
+  //   @ApiProperty({ description: 'Whether there is a next page', type: Boolean })
+  //   hasNext: boolean;
+
+  //   @ApiProperty({
+  //     description: 'Whether there is a previous page',
+  //     type: Boolean,
+  //   })
+  //   hasPrevious: boolean;
+  // }
+
+  // export class PaginatedResponse<T> implements PaginatedResult<T> {
+  //   @ApiProperty({ description: 'The paginated data', isArray: true })
+  //   data: T[];
+
+  //   @ApiProperty({ description: 'Pagination metadata', type: PaginationMetadata })
+  //   meta: PaginationMetadata;
+  // }
   @ApiOkResponse({
-    type: [DetailedReservation],
+    schema: {
+      title: 'DetailedReservationPaginatedResponse',
+      type: 'object',
+      properties: {
+        data: {
+          type: 'array',
+          items: { $ref: getSchemaPath(DetailedReservation) },
+        },
+        meta: { $ref: getSchemaPath(PaginationMetadata) },
+      },
+    },
     description: 'Paginated list of detailed reservations',
   })
   findAllPaginated(

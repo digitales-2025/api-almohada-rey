@@ -3,6 +3,8 @@ import { ReservationStatus } from './reservation-status.enum';
 import { ReservationStatus as ReservationStatusPrisma } from '@prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
 import { Room } from 'src/modules/admin/room/entities/room.entity';
+import { Customer } from '../../customers/entity/customer.entity';
+import { User } from '../../users/entity/user.entity.';
 // import { Customer } from '../../customer/entities/customer.entity';
 // import { Room } from '../../room/entities/room.entity';
 // import { User } from '../../user/entities/user.entity';
@@ -98,8 +100,18 @@ export class Reservation extends BaseEntity {
 }
 
 export class DetailedReservation extends Reservation {
-  // customer: Customer;
-  // user: User;
+  @ApiProperty({
+    description: 'Customer associated with the reservation',
+    type: Customer,
+  })
+  customer: Customer;
+
+  @ApiProperty({
+    description: 'User associated with the reservation',
+    type: User,
+  })
+  user: User;
+
   @ApiProperty({
     description: 'Room associated with the reservation',
     type: Room,
