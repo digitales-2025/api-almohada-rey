@@ -159,7 +159,7 @@ model CleaningChecklist {
   staffName    String // ID of cleaning staff (Personal)
   userCheckId  String // ID of user who verifies (UserCheck)
   observations String? // Observations or comments (Observaciones)
-  isActive     Boolean  @default(true)
+
   createdAt    DateTime @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt
 }

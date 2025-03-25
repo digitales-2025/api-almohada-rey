@@ -22,7 +22,7 @@ export class CreateRoomTypeDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => value?.trim())
+  @Transform(({ value }) => value?.trim().toLowerCase())
   name: string;
 
   @ApiProperty({

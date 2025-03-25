@@ -30,6 +30,7 @@ export class UpdateRoomTypeUseCase {
           description: updateRoomTypeDto.description,
           area: updateRoomTypeDto.area,
           bed: updateRoomTypeDto.bed,
+          name: updateRoomTypeDto.name,
         });
 
         // Registrar auditoría

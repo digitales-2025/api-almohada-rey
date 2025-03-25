@@ -3,9 +3,9 @@ import {
   Get,
   Post,
   Body,
-  Patch,
+  /*   Patch, */
   Param,
-  Delete,
+  /*   Delete, */
 } from '@nestjs/common';
 import { CleaningChecklistService } from '../services/room-clean.service';
 import {
@@ -21,8 +21,8 @@ import {
 import { UserData } from 'src/interfaces';
 import {
   CreateCleaningChecklistDto,
-  UpdateCleaningChecklistDto,
-  DeleteCleaningChecklistDto,
+  /*   UpdateCleaningChecklistDto,
+  DeleteCleaningChecklistDto, */
 } from '../dto';
 import { CleaningChecklist } from '../entities/room-clean.entity';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
@@ -125,27 +125,13 @@ export class CleaningChecklistController {
   }
 
   /**
-   * Actualiza un registro de limpieza existente
-   */
-  @Patch(':id')
-  @ApiOperation({ summary: 'Actualizar registro de limpieza existente' })
-  @ApiResponse({
-    status: 200,
-    description: 'Registro de limpieza actualizado exitosamente',
-    type: BaseApiResponse,
-  })
-  update(
-    @Param('id') id: string,
-    @Body() updateCleaningDto: UpdateCleaningChecklistDto,
-    @GetUser() user: UserData,
-  ): Promise<BaseApiResponse<CleaningChecklist>> {
-    return this.cleaningService.update(id, updateCleaningDto, user);
-  }
+   * Actualiza un registro de limpieza existente   */
+  A;
 
   /**
    * Desactiva múltiples registros de limpieza
    */
-  @Delete('remove/all')
+  /*  @Delete('remove/all')
   @ApiOperation({ summary: 'Desactivar múltiples registros de limpieza' })
   @ApiResponse({
     status: 200,
@@ -160,12 +146,12 @@ export class CleaningChecklistController {
     @GetUser() user: UserData,
   ): Promise<BaseApiResponse<CleaningChecklist[]>> {
     return this.cleaningService.deleteMany(deleteCleaningDto, user);
-  }
+  } */
 
   /**
    * Reactiva múltiples registros de limpieza
    */
-  @Patch('reactivate/all')
+  /*   @Patch('reactivate/all')
   @ApiOperation({ summary: 'Reactivar múltiples registros de limpieza' })
   @ApiOkResponse({
     description: 'Registros de limpieza reactivados exitosamente',
@@ -179,5 +165,5 @@ export class CleaningChecklistController {
     @GetUser() user: UserData,
   ): Promise<BaseApiResponse<CleaningChecklist[]>> {
     return this.cleaningService.reactivateMany(deleteCleaningDto.ids, user);
-  }
+  } */
 }

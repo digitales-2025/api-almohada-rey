@@ -59,9 +59,6 @@ export class RoomTypeService {
       // Verificar si existe un tipo de habitación similar
       const existingRoomTypes = await this.roomTypeRepository.findMany({
         where: {
-          guests: createRoomTypeDto.guests,
-          area: createRoomTypeDto.area,
-          floorType: createRoomTypeDto.floorType,
           price: createRoomTypeDto.price,
         },
       });
@@ -372,6 +369,19 @@ export class RoomTypeService {
     >
   > {
     try {
+      // Verificar si ya existe un tipo de habitación con el mismo nombre
+      if (updateRoomTypeDto.name) {
+        const existingRoomType = await this.roomTypeRepository.findOneByName(
+          updateRoomTypeDto.name.toLowerCase(),
+        );
+
+        // Verificar que no sea el mismo tipo de habitación que estamos actualizando
+        if (existingRoomType && existingRoomType.id !== id) {
+          throw new BadRequestException(
+            `Ya existe un tipo de habitación con el mismo nombre`,
+          );
+        }
+      }
       // 1. Obtener el tipo de habitación actual
       const roomType = await this.findById(id);
       const existingImages =

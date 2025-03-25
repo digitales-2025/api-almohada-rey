@@ -19,7 +19,8 @@ export class UpdateRoomTypeDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => value?.trim())
+  @IsOptional()
+  @Transform(({ value }) => value?.trim().toLowerCase())
   name: string;
 
   @ApiProperty({

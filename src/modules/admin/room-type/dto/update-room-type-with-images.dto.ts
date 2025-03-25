@@ -37,7 +37,7 @@ export class UpdateRoomTypeWithImageDto extends UpdateRoomTypeDto {
     required: false,
   })
   @IsOptional()
-  newImage?: any;
+  newImage?: File;
 
   @ApiProperty({
     type: ImageRoomTypeUpdateDto,
