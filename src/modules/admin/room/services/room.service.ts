@@ -14,6 +14,9 @@ import {
 } from '../use-cases';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { RoomTypeService } from '../../room-type/services/room-type.service';
+import { StatusRoomDto } from '../dto/status.dto';
+import { AuditActionType } from '@prisma/client';
+import { AuditService } from '../../audit/audit.service';
 
 @Injectable()
 export class RoomService {
@@ -27,6 +30,7 @@ export class RoomService {
     private readonly deleteRoomsUseCase: DeleteRoomsUseCase,
     private readonly reactivateRoomUseCase: ReactivateRoomUseCase,
     private readonly roomTypeService: RoomTypeService,
+    private readonly auditService: AuditService,
   ) {
     this.errorHandler = new BaseErrorHandler(
       this.logger,
@@ -189,6 +193,58 @@ export class RoomService {
       return await this.reactivateRoomUseCase.execute(ids, user);
     } catch (error) {
       this.errorHandler.handleError(error, 'reactivating');
+      throw error;
+    }
+  }
+  /**
+   * Actualiza el estado de una habitación
+   */
+  async updateStatus(
+    id: string,
+    statusRoomDto: StatusRoomDto,
+    user: UserData,
+  ): Promise<BaseApiResponse<Room>> {
+    try {
+      // Verificar que la habitación existe
+      const room = await this.findById(id);
+
+      // Verificar si se está intentando cambiar al estado CLEANING
+      if (statusRoomDto.status === 'CLEANING') {
+        throw new BadRequestException(
+          'No es posible actualizar al estado a CLEANING desde este proceso. Use el proceso específico de limpieza.',
+        );
+      }
+
+      // Verificar si el estado es igual al actual
+      if (room.status === statusRoomDto.status) {
+        return {
+          success: true,
+          message: `La habitación ya se encuentra en estado ${statusRoomDto.status}`,
+          data: room,
+        };
+      }
+
+      // Actualizar el estado usando el repositorio
+      const updatedRoom = await this.roomRepository.updateStatus(
+        id,
+        statusRoomDto.status,
+      );
+
+      // Registrar auditoría
+      await this.auditService.create({
+        entityId: id,
+        entityType: 'room',
+        action: AuditActionType.UPDATE_STATUS,
+        performedById: user.id,
+        createdAt: new Date(),
+      });
+
+      return {
+        success: true,
+        message: `Estado de habitación actualizado a ${statusRoomDto.status} exitosamente`,
+        data: updatedRoom,
+      };
+    } catch (error) {
       throw error;
     }
   }
