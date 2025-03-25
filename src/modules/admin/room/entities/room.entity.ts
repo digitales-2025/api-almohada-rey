@@ -20,7 +20,7 @@ export class Room extends BaseEntity {
     description: 'ID del tipo de habitación asociado',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  type: string;
+  roomTypeId: string;
 
   @ApiProperty({
     description: 'Número de la habitación',
@@ -76,13 +76,6 @@ export class Room extends BaseEntity {
     example: RoomStatus.AVAILABLE,
   })
   status: RoomStatusPrisma;
-
-  @ApiProperty({
-    description: 'Indica si la habitación está activa',
-    example: true,
-    default: true,
-  })
-  isActive: boolean;
 
   constructor(partial: Partial<Room> = {}) {
     super(partial);

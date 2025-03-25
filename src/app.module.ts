@@ -13,6 +13,7 @@ import { CloudflareModule } from './cloudflare/cloudflare.module';
 import { RoomTypeModule } from './modules/admin/room-type/room-type.module';
 import { ReservationModule } from './modules/admin/reservation/reservation.module';
 import { RoomModule } from './modules/admin/room/room.module';
+import { RoomCleanModule } from './modules/admin/room-clean/room-clean.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { RoomModule } from './modules/admin/room/room.module';
     RoomTypeModule,
     ReservationModule,
     RoomModule,
+    RoomCleanModule,
   ],
   controllers: [AppController],
   providers: [AppService],

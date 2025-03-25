@@ -41,8 +41,7 @@ export class RoomService {
   private async validateRoomTypeExists(typeId: string): Promise<void> {
     try {
       await this.roomTypeService.findOne(typeId);
-    } catch (error) {
-      console.log('🚀 ~ RoomService ~ validateRoomTypeExists ~ error:', error);
+    } catch {
       throw new BadRequestException(roomErrorMessages.invalidRoomType);
     }
   }
@@ -64,7 +63,7 @@ export class RoomService {
       }
 
       // Validar que el tipo de habitación exista
-      await this.validateRoomTypeExists(createRoomDto.type);
+      await this.validateRoomTypeExists(createRoomDto.roomTypeId);
 
       // Crear la habitación
       return await this.createRoomUseCase.execute(createRoomDto, user);
@@ -95,8 +94,8 @@ export class RoomService {
       }
 
       // Si se está actualizando el tipo, validar que exista
-      if (updateRoomDto.type) {
-        await this.validateRoomTypeExists(updateRoomDto.type);
+      if (updateRoomDto.roomTypeId) {
+        await this.validateRoomTypeExists(updateRoomDto.roomTypeId);
       }
 
       // Si se está actualizando el número, verificar que no exista otra habitación con ese número

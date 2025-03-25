@@ -29,7 +29,7 @@ import { Auth, GetUser } from '../../auth/decorators';
  * Controlador REST para gestionar habitaciones.
  * Expone endpoints para operaciones CRUD sobre habitaciones.
  */
-@ApiTags('Rooms')
+@ApiTags('Admin Rooms')
 @ApiBadRequestResponse({
   description:
     'Bad Request - Error en la validación de datos o solicitud incorrecta',

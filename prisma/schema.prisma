@@ -97,6 +97,7 @@ enum FloorTypes {
 
 model RoomTypes {
   id            String          @id @default(uuid())
+  name          String
   guests        Int
   price         Float
   tv            String
@@ -112,14 +113,14 @@ model RoomTypes {
 }
 
 model ImageRoomType {
-  id        String    @id @default(uuid())
-  imageUrl  String
-  isMain    Boolean   @default(false)
-  room      String
-  RoomTypes RoomTypes @relation(fields: [room], references: [id])
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime  @updatedAt
+  id         String    @id @default(uuid())
+  imageUrl   String
+  isMain     Boolean   @default(false)
+  roomTypeId String
+  RoomTypes  RoomTypes @relation(fields: [roomTypeId], references: [id])
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt
 }
 
 enum RoomStatus {
@@ -131,8 +132,8 @@ enum RoomStatus {
 
 model Room {
   id                String              @id @default(uuid())
-  type              String
-  RoomTypes         RoomTypes           @relation(fields: [type], references: [id])
+  roomTypeId        String
+  RoomTypes         RoomTypes           @relation(fields: [roomTypeId], references: [id])
   number            Int                 @unique
   trashBin          Boolean             @default(true) // Trash bin (Tacho)
   towel             Boolean             @default(true) // Towel (Toalla)
@@ -151,14 +152,14 @@ model Room {
 }
 
 model CleaningChecklist {
-  id           Int      @id @default(autoincrement())
+  id           String   @id @default(uuid())
   date         String
   roomId       String // ID of room (Habitación)
   Room         Room     @relation(fields: [roomId], references: [id])
   staffName    String // ID of cleaning staff (Personal)
   userCheckId  String // ID of user who verifies (UserCheck)
   observations String? // Observations or comments (Observaciones)
-  isActive     Boolean  @default(true)
+
   createdAt    DateTime @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt
 }
