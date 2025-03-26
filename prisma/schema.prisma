@@ -262,6 +262,7 @@ model PaymentDetail {
 
 model Product {
   id       String      @id @default(uuid())
+  code     String      @unique
   name     String      @unique
   unitCost Float
   type     ProductType
