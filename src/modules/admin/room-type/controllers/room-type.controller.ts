@@ -105,16 +105,28 @@ export class RoomTypeController {
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: CreateRoomTypeWithImagesDto })
-  @UseInterceptors(FilesInterceptor('images', 5), FormatDataCreateInterceptor)
+  @UseInterceptors(FilesInterceptor('images', 10), FormatDataCreateInterceptor) // Aumentamos el límite a 10 para validar manualmente
   async createWithImages(
     @Body() createRoomTypeDto: CreateRoomTypeDto,
     @UploadedFiles() images: Express.Multer.File[],
     @GetUser() user: UserData,
   ): Promise<BaseApiResponse<RoomType>> {
     // Validar que se hayan enviado exactamente 5 imágenes
-    if (!images || images.length !== 5) {
+    if (!images) {
       throw new BadRequestException(
-        'Se requieren exactamente 5 imágenes para crear un tipo de habitación. Por favor, cargue 5 imágenes.',
+        'Se requieren imágenes para crear un tipo de habitación.',
+      );
+    }
+
+    if (images.length > 5) {
+      throw new BadRequestException(
+        'No se pueden enviar más de 5 imágenes para crear un tipo de habitación.',
+      );
+    }
+
+    if (images.length < 5) {
+      throw new BadRequestException(
+        'Se requieren 5 imágenes como mínimo para crear un tipo de habitación.',
       );
     }
 
@@ -129,18 +141,13 @@ export class RoomTypeController {
    * Actualizar tipo de habitación con imagen
    */
   @Patch(':id/update-with-images')
-  @ApiOperation({
-    summary: 'Actualizar tipo de habitación con una imagen',
-    description:
-      'Permite actualizar la información del tipo de habitación y una imagen específica.',
-  })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: UpdateRoomTypeWithImageDto })
   @UseInterceptors(FileInterceptor('newImage'), FormatDataInterceptor)
   async updateWithImage(
     @Param('id') id: string,
     @Body() updateData: any,
-    @UploadedFile() newImage: Express.Multer.File,
+    @UploadedFile() newImageFile: Express.Multer.File, // Cambio de nombre para evitar conflicto
     @GetUser() user: UserData,
   ): Promise<
     BaseApiResponse<
@@ -148,8 +155,8 @@ export class RoomTypeController {
     >
   > {
     try {
-      // 1. Extraer correctamente los datos del tipo de habitación excluyendo imageUpdate
-      const { imageUpdate, newImage, ...updateRoomTypeDto } = updateData;
+      // 1. Extraer los datos del tipo de habitación (sin sobrescribir newImageFile)
+      const { imageUpdate, ...updateRoomTypeDto } = updateData;
 
       // 2. Limpiar campos vacíos o nulos
       Object.keys(updateRoomTypeDto).forEach((key) => {
@@ -166,15 +173,12 @@ export class RoomTypeController {
       let processedImageUpdate = null;
       if (imageUpdate) {
         try {
-          // Si viene como string (común en multipart/form-data), lo parseamos
           if (typeof imageUpdate === 'string') {
             processedImageUpdate = JSON.parse(imageUpdate);
           } else {
-            // Si ya viene como objeto, lo usamos directamente
             processedImageUpdate = imageUpdate;
           }
 
-          // Validación básica
           if (!processedImageUpdate.imageId) {
             throw new BadRequestException(
               'El objeto imageUpdate debe incluir el imageId',
@@ -188,12 +192,12 @@ export class RoomTypeController {
         }
       }
 
-      // 4. Llamar al servicio con los datos procesados
+      // 4. Llamar al servicio con los datos procesados (ojo al parámetro correcto)
       return this.roomTypeService.updateWithImage(
         id,
         user,
         updateRoomTypeDto,
-        newImage || null,
+        newImageFile || null, // Usar el parámetro correcto
         processedImageUpdate,
       );
     } catch (error) {

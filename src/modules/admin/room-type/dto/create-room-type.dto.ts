@@ -16,6 +16,16 @@ export enum FloorTypes {
 
 export class CreateRoomTypeDto {
   @ApiProperty({
+    description: 'Nombre del tipo de habitación',
+    example: 'Habitación doble',
+    required: true,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => value?.trim().toLowerCase())
+  name: string;
+
+  @ApiProperty({
     description: 'Capacidad máxima de huéspedes',
     example: 2,
     required: true,

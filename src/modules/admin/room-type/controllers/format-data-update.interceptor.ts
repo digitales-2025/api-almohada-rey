@@ -13,6 +13,11 @@ export class FormatDataInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest();
     const body = request.body;
 
+    // Verificar si existe el archivo y registrarlo en logs para depuración
+    if (request.file) {
+    } else {
+    }
+
     // Para actualizaciones, solo procesar campos que realmente existen y no están vacíos
     Object.keys(body).forEach((key) => {
       if (body[key] === '' || body[key] === null || body[key] === undefined) {
@@ -59,8 +64,7 @@ export class FormatDataInterceptor implements NestInterceptor {
     if (body.imageUpdate && typeof body.imageUpdate === 'string') {
       try {
         body.imageUpdate = JSON.parse(body.imageUpdate);
-      } catch (e) {
-        console.log('🚀 ~ FormatDataInterceptor ~ intercept ~ e:', e);
+      } catch {
         throw new BadRequestException('imageUpdate must be a valid JSON');
       }
     }

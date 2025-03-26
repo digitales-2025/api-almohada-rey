@@ -23,7 +23,7 @@ export class RoomTypeRepository extends BaseRepository<RoomType> {
     try {
       await this.prisma.imageRoomType.create({
         data: {
-          room: data.room,
+          roomTypeId: data.room,
           imageUrl: data.imageUrl,
           isMain: data.isMain,
         },
@@ -96,7 +96,7 @@ export class RoomTypeRepository extends BaseRepository<RoomType> {
     try {
       const images = await this.prisma.imageRoomType.findMany({
         where: {
-          room: roomTypeId,
+          roomTypeId: roomTypeId,
           isActive: true,
         },
         select: {
@@ -131,7 +131,7 @@ export class RoomTypeRepository extends BaseRepository<RoomType> {
       // Primero desmarcamos todas las imágenes como principales
       await this.prisma.imageRoomType.updateMany({
         where: {
-          room: roomTypeId,
+          roomTypeId: roomTypeId,
           isMain: true,
         },
         data: {
@@ -162,7 +162,7 @@ export class RoomTypeRepository extends BaseRepository<RoomType> {
     try {
       await this.prisma.imageRoomType.updateMany({
         where: {
-          room: roomTypeId,
+          roomTypeId: roomTypeId,
           isMain: true,
         },
         data: {
@@ -190,5 +190,16 @@ export class RoomTypeRepository extends BaseRepository<RoomType> {
       console.error('Error actualizando estado de imagen principal:', error);
       throw error;
     }
+  }
+
+  /**
+   * Busca un tipo de habitación por su nombre
+   * @param name Nombre del tipo de habitación
+   * @returns Promise con el tipo de habitación si existe
+   */
+  async findOneByName(name: string): Promise<RoomType | null> {
+    return this.prisma.roomTypes.findFirst({
+      where: { name, isActive: true },
+    });
   }
 }
