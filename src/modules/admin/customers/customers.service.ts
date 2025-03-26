@@ -22,13 +22,18 @@ import {
   hasNoChanges,
 } from 'src/utils/update-validations.util';
 import { DeleteCustomerDto } from './dto/delete-customer.dto';
+import { Customer } from './entity/customer.entity';
+import { CustomerRepository } from './repository/customer.repository';
+import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
 
 @Injectable()
 export class CustomersService {
   private readonly logger = new Logger(CustomersService.name);
+  private readonly errorHandler: BaseErrorHandler;
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly customerRepository: CustomerRepository,
   ) {}
 
   /**
@@ -445,6 +450,23 @@ export class CustomersService {
     return customerDb;
   }
 
+  async searchCustomerByDocumentIdCoincidence(
+    docId: string,
+  ): Promise<Customer[]> {
+    try {
+      const results =
+        docId === 'None'
+          ? await this.customerRepository.findLastCreated()
+          : await this.customerRepository.searchByCoincidenceField<Customer>({
+              field: 'documentNumber',
+              value: docId,
+              onlyActive: true,
+            });
+      return results;
+    } catch (error) {
+      this.errorHandler.handleError(error, 'getting');
+    }
+  }
   /**
    * Actualizar un cliente
    * @param id Id del cliente
