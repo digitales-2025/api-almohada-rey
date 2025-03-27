@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { RoomStatus as RoomStatusPrisma } from '@prisma/client';
 import { BaseEntity } from 'src/prisma/src/abstract/base.entity';
+import { RoomType } from '../../room-type/entities/room-type.entity';
 
 export enum RoomStatus {
   AVAILABLE = 'AVAILABLE',
@@ -88,4 +89,12 @@ export class Room extends BaseEntity {
     super(partial);
     Object.assign(this, partial);
   }
+}
+
+export class DetailedRoom extends Room {
+  @ApiProperty({
+    description: 'Nombre del tipo de habitación asociado',
+    type: RoomType,
+  })
+  RoomTypes: RoomType;
 }

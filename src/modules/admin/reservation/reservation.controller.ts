@@ -33,6 +33,10 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 import { Guest } from './entities/guest.entity';
+import {
+  CheckAvailabilityDto,
+  RoomAvailabilityDto,
+} from './dto/room-availability.dto';
 
 @ApiTags('Reservations')
 @ApiBadRequestResponse({
@@ -176,5 +180,45 @@ export class ReservationController {
   })
   remove(@Param('id') id: string) {
     return this.reservationService.remove(+id);
+  }
+
+  @Get('check-availability')
+  @ApiOperation({ summary: 'Verificar disponibilidad de habitación' })
+  @ApiQuery({
+    name: 'roomId',
+    description: 'ID de la habitación',
+    type: String,
+    required: true,
+  })
+  @ApiQuery({
+    name: 'checkInDate',
+    description: 'Fecha de check-in en formato ISO',
+    type: String,
+    required: true,
+    example: '2025-04-01T14:00:00.000Z',
+  })
+  @ApiQuery({
+    name: 'checkOutDate',
+    description: 'Fecha de check-out en formato ISO',
+    type: String,
+    required: true,
+    example: '2025-04-05T12:00:00.000Z',
+  })
+  @ApiOkResponse({
+    type: RoomAvailabilityDto,
+    description: 'Información de disponibilidad de la habitación',
+  })
+  async checkAvailability(
+    @Query('roomId') roomId: string,
+    @Query('checkInDate') checkInDate: string,
+    @Query('checkOutDate') checkOutDate: string,
+  ): Promise<RoomAvailabilityDto> {
+    const checkAvailabilityDto: CheckAvailabilityDto = {
+      roomId,
+      checkInDate,
+      checkOutDate,
+    };
+
+    return this.reservationService.checkAvailability(checkAvailabilityDto);
   }
 }

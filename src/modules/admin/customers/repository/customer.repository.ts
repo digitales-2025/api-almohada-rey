@@ -6,6 +6,6 @@ import { Customer } from '../entity/customer.entity';
 @Injectable()
 export class CustomerRepository extends BaseRepository<Customer> {
   constructor(prisma: PrismaService) {
-    super(prisma, 'reservation');
+    super(prisma, 'customer');
   }
 }
