@@ -94,8 +94,10 @@ enum FloorTypes {
   LIMINATING
   CARPETING
 }
+
 model RoomTypes {
   id            String          @id @default(uuid())
+  name          String
   guests        Int
   price         Float
   tv            String
@@ -111,14 +113,14 @@ model RoomTypes {
 }
 
 model ImageRoomType {
-  id        String    @id @default(uuid())
-  imageUrl  String
-  isMain    Boolean   @default(false)
-  room      String
-  RoomTypes RoomTypes @relation(fields: [room], references: [id])
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime  @updatedAt
+  id         String    @id @default(uuid())
+  imageUrl   String
+  isMain     Boolean   @default(false)
+  roomTypeId String
+  RoomTypes  RoomTypes @relation(fields: [roomTypeId], references: [id])
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt
 }
 
 enum RoomStatus {
@@ -130,8 +132,8 @@ enum RoomStatus {
 
 model Room {
   id                String              @id @default(uuid())
-  type              String
-  RoomTypes         RoomTypes           @relation(fields: [type], references: [id])
+  roomTypeId        String
+  RoomTypes         RoomTypes           @relation(fields: [roomTypeId], references: [id])
   number            Int                 @unique
   trashBin          Boolean             @default(true) // Trash bin (Tacho)
   towel             Boolean             @default(true) // Towel (Toalla)
@@ -144,18 +146,20 @@ model Room {
   createdAt         DateTime            @default(now()) @db.Timestamptz(6)
   updatedAt         DateTime            @updatedAt
   CleaningChecklist CleaningChecklist[] //aun no considerar
-  reservations      Reservation[]
+  paymentDetail     PaymentDetail[]     @relation("PaymentDetailRoom")
+
+  reservations Reservation[]
 }
 
 model CleaningChecklist {
-  id           Int      @id @default(autoincrement())
+  id           String   @id @default(uuid())
   date         String
   roomId       String // ID of room (Habitación)
   Room         Room     @relation(fields: [roomId], references: [id])
   staffName    String // ID of cleaning staff (Personal)
   userCheckId  String // ID of user who verifies (UserCheck)
   observations String? // Observations or comments (Observaciones)
-  isActive     Boolean  @default(true)
+
   createdAt    DateTime @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt
 }
@@ -181,7 +185,96 @@ model Reservation {
   status          ReservationStatus
   guests          Json? // List of companions
   observations    String? // Additional notes
-  isActive        Boolean           @default(true)
-  createdAt       DateTime          @default(now()) @db.Timestamptz(6)
-  updatedAt       DateTime          @updatedAt
+
+  payment Payment[] @relation("PaymentReservation")
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+}
+
+model Payment {
+  id            String              @id @default(uuid())
+  date          String?
+  amount        Float
+  status        PaymentDetailStatus @default(PENDING)
+  amountPaid    Float               @default(0)
+  reservation   Reservation         @relation("PaymentReservation", fields: [reservationId], references: [id])
+  reservationId String
+
+  observations String?
+
+  paymentDetail PaymentDetail[] @relation("PaymentDetailPayment")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+}
+
+enum PaymentDetailType {
+  ROOM_RESERVATION
+  EXTRA_SERVICE
+}
+
+enum PaymentDetailMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  TRANSFER
+  YAPE
+  PLIN
+  PAYPAL
+  IZI_PAY
+}
+
+enum PaymentDetailStatus {
+  PENDING
+  PAID
+}
+
+model PaymentDetail {
+  id          String              @id @default(uuid())
+  paymentDate String
+  description String
+  type        PaymentDetailType
+  method      PaymentDetailMethod
+  status      PaymentDetailStatus @default(PENDING)
+
+  transactionNumber String? @unique // Número de transacción en caso de pagos por la landing page
+
+  // Si es que el payment detail es para compra de productos
+  product   Product? @relation("PaymentDetailProduct", fields: [productId], references: [id])
+  productId String?
+  quantity  Int?
+
+  // Si el payment es del tipo reserva de la habitación
+  room   Room?   @relation("PaymentDetailRoom", fields: [roomId], references: [id])
+  roomId String?
+  days   Int?
+
+  unitPrice Float
+  subtotal  Float
+
+  payment   Payment @relation("PaymentDetailPayment", fields: [paymentId], references: [id])
+  paymentId String
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+}
+
+model Product {
+  id       String      @id @default(uuid())
+  name     String      @unique
+  unitCost Float
+  type     ProductType
+  isActive Boolean     @default(true)
+
+  paymentDetail PaymentDetail[] @relation("PaymentDetailProduct")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+}
+
+enum ProductType {
+  COMMERCIAL
+  INTERNAL_USE
 }

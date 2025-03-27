@@ -48,11 +48,18 @@ async function bootstrap() {
     { name: 'Admin Users', description: 'Gestión de usuarios administradores' },
     { name: 'Admin Audit', description: 'Gestión de auditoría' },
     { name: 'Admin Customers', description: 'Gestión de clientes' },
-    { name: 'Admin Rooms', description: 'Gestión de habitaciones' },
     {
       name: 'Reservations',
       description: 'Gestión de reservaciones de habitaciones',
     },
+    { name: 'Admin Products', description: 'Gestión de productos' },
+    {
+      name: 'Admin Room Types',
+      description: 'Gestión de tipos de habitaciones',
+    },
+    { name: 'Admin Rooms', description: 'Gestión de habitaciones' },
+
+    { name: 'Room Cleaning', description: 'Gestión de limpiezas' },
   ];
 
   SwaggerModule.setup('api', app, document);

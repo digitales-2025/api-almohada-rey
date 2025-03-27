@@ -496,8 +496,16 @@ export abstract class BaseRepository<T extends BaseEntity> {
         }),
     );
 
+    // Aquí está el cambio: en lugar de devolver existingRecords,
+    // buscamos y devolvemos los registros actualizados
+    const updatedRecords = await this.findMany({
+      where: {
+        id: { in: activeIds },
+      },
+    });
+
     // Retorna los registros que fueron desactivados
-    return existingRecords as unknown as V[];
+    return updatedRecords as unknown as V[];
   }
 
   /**

@@ -24,12 +24,13 @@ import { CreateRoomDto, UpdateRoomDto, DeleteRoomDto } from '../dto';
 import { Room } from '../entities/room.entity';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { Auth, GetUser } from '../../auth/decorators';
+import { StatusRoomDto } from '../dto/status.dto';
 
 /**
  * Controlador REST para gestionar habitaciones.
  * Expone endpoints para operaciones CRUD sobre habitaciones.
  */
-@ApiTags('Rooms')
+@ApiTags('Admin Rooms')
 @ApiBadRequestResponse({
   description:
     'Bad Request - Error en la validación de datos o solicitud incorrecta',
@@ -108,6 +109,30 @@ export class RoomController {
   })
   findByNumber(@Param('number') number: string): Promise<Room> {
     return this.roomService.findByNumber(parseInt(number));
+  }
+
+  // En room.controller.ts
+
+  /**
+   * Actualiza el estado de una habitación
+   */
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Actualizar estado de una habitación' })
+  @ApiParam({ name: 'id', description: 'ID de la habitación' })
+  @ApiResponse({
+    status: 200,
+    description: 'Estado de habitación actualizado exitosamente',
+    type: BaseApiResponse,
+  })
+  @ApiBadRequestResponse({
+    description: 'ID inválido o estado no permitido',
+  })
+  updateStatus(
+    @Param('id') id: string,
+    @Body() statusDto: StatusRoomDto,
+    @GetUser() user: UserData,
+  ): Promise<BaseApiResponse<Room>> {
+    return this.roomService.updateStatus(id, statusDto, user);
   }
 
   /**
