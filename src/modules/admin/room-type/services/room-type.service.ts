@@ -307,11 +307,6 @@ export class RoomTypeService {
       RoomType & { imagesRoomType: Array<{ id: string; url: string }> }
     >
   > {
-    console.log(
-      'dto que me lelgas',
-      JSON.stringify(createRoomTypeDto, null, 2),
-    );
-    console.log(images, 'images');
     try {
       // Verificar si ya existe un tipo de habitación con el mismo nombre
       const existingRoomType = await this.roomTypeRepository.findOneByName(
