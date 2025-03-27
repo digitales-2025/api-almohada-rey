@@ -37,7 +37,7 @@ import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { FormatDataInterceptor } from './format-data-update.interceptor';
 import { FormatDataCreateInterceptor } from './format-data-create.interceptor';
 import { Auth, GetUser } from '../../auth/decorators';
-import { UserData } from 'src/interfaces';
+import { UserData, UserPayload } from 'src/interfaces';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 
 /**
@@ -69,10 +69,12 @@ export class RoomTypeController {
     description: 'Lista de todos los tipos de habitaciones con sus imágenes',
     type: [RoomType],
   })
-  findAll(): Promise<
-    Array<RoomType & { images: Array<{ id: string; url: string }> }>
+  findAll(
+    @GetUser() user: UserPayload,
+  ): Promise<
+    Array<RoomType & { imagesRoomType: Array<{ id: string; url: string }> }>
   > {
-    return this.roomTypeService.findAll();
+    return this.roomTypeService.findAll(user);
   }
 
   /**
@@ -151,7 +153,9 @@ export class RoomTypeController {
     @GetUser() user: UserData,
   ): Promise<
     BaseApiResponse<
-      RoomType & { images: Array<{ id: string; url: string; isMain: boolean }> }
+      RoomType & {
+        imagesRoomType: Array<{ id: string; url: string; isMain: boolean }>;
+      }
     >
   > {
     try {
@@ -179,9 +183,9 @@ export class RoomTypeController {
             processedImageUpdate = imageUpdate;
           }
 
-          if (!processedImageUpdate.imageId) {
+          if (!processedImageUpdate.id) {
             throw new BadRequestException(
-              'El objeto imageUpdate debe incluir el imageId',
+              'El objeto imageUpdate debe incluir la imagena a acualizar',
             );
           }
         } catch (error) {
@@ -264,7 +268,7 @@ export class RoomTypeController {
   })
   async findOneWithImages(@Param('id') id: string): Promise<
     RoomType & {
-      images: Array<{ id: string; url: string }>;
+      imagesRoomType: Array<{ id: string; url: string }>;
     }
   > {
     return this.roomTypeService.findOneWithImages(id);

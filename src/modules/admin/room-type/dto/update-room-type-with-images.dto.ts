@@ -10,7 +10,7 @@ export class ImageRoomTypeUpdateDto {
   })
   @IsString()
   @IsOptional()
-  imageId?: string;
+  id?: string;
 
   @ApiProperty({
     description: 'URL actual de la imagen',
@@ -44,7 +44,7 @@ export class UpdateRoomTypeWithImageDto extends UpdateRoomTypeDto {
     description: 'Información para actualizar una imagen existente',
     required: false,
     example: {
-      imageId: '123e4567-e89b-12d3-a456-426614174000',
+      id: '123e4567-e89b-12d3-a456-426614174000',
       url: 'https://pub-c8a9c1f826c540b981f5cfb49c3a55ea.r2.dev/image.jpg',
       isMain: true,
     },

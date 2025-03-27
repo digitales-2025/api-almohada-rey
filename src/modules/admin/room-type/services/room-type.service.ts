@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { RoomTypeRepository } from '../repositories/room-type.repository';
 import { RoomType } from '../entities/room-type.entity';
-import { HttpResponse, UserData } from 'src/interfaces';
+import { HttpResponse, UserData, UserPayload } from 'src/interfaces';
 
 import { roomTypeErrorMessages } from '../errors/errors-room-type';
 import {
@@ -119,22 +119,29 @@ export class RoomTypeService {
   /**
    * Obtiene todos los tipos de habitaciones con sus imágenes
    */
-  async findAll(): Promise<
-    Array<RoomType & { images: Array<{ id: string; url: string }> }>
+  async findAll(
+    user: UserPayload,
+  ): Promise<
+    Array<RoomType & { imagesRoomType: Array<{ id: string; url: string }> }>
   > {
     try {
+      // Definir filtro según el rol del usuario
+      const filter = user.isSuperAdmin ? {} : { isActive: true };
+
       // 1. Obtener todos los tipos de habitaciones
-      const roomTypes = await this.roomTypeRepository.findMany();
+      const roomTypes = await this.roomTypeRepository.findMany({
+        where: filter,
+        orderBy: { createdAt: 'desc' },
+      });
 
       // 2. Para cada tipo de habitación, obtener sus imágenes
       const roomTypesWithImages = await Promise.all(
         roomTypes.map(async (roomType) => {
-          const images = await this.roomTypeRepository.findImagesByRoomTypeId(
-            roomType.id,
-          );
+          const imagesRoomType =
+            await this.roomTypeRepository.findImagesByRoomTypeId(roomType.id);
           return {
             ...roomType,
-            images,
+            imagesRoomType,
           };
         }),
       );
@@ -296,8 +303,15 @@ export class RoomTypeService {
     images: Express.Multer.File[],
     user: UserData,
   ): Promise<
-    BaseApiResponse<RoomType & { images: Array<{ id: string; url: string }> }>
+    BaseApiResponse<
+      RoomType & { imagesRoomType: Array<{ id: string; url: string }> }
+    >
   > {
+    console.log(
+      'dto que me lelgas',
+      JSON.stringify(createRoomTypeDto, null, 2),
+    );
+    console.log(images, 'images');
     try {
       // Verificar si ya existe un tipo de habitación con el mismo nombre
       const existingRoomType = await this.roomTypeRepository.findOneByName(
@@ -342,7 +356,7 @@ export class RoomTypeService {
 
       return {
         ...roomTypeResponse,
-        data: { ...roomTypeResponse.data, images: imagesData },
+        data: { ...roomTypeResponse.data, imagesRoomType: imagesData },
       };
     } catch (error) {
       this.errorHandler.handleError(error, 'creating');
@@ -359,13 +373,15 @@ export class RoomTypeService {
     updateRoomTypeDto: UpdateRoomTypeDto,
     newImage: Express.Multer.File | null,
     imageUpdate: {
-      imageId: string;
+      id: string;
       url: string;
       isMain?: boolean;
     } | null,
   ): Promise<
     BaseApiResponse<
-      RoomType & { images: Array<{ id: string; url: string; isMain: boolean }> }
+      RoomType & {
+        imagesRoomType: Array<{ id: string; url: string; isMain: boolean }>;
+      }
     >
   > {
     try {
@@ -397,11 +413,11 @@ export class RoomTypeService {
       if (imageUpdate) {
         // Verificar que la imagen exista
         const existingImage = await this.roomTypeRepository.findImageById(
-          imageUpdate.imageId,
+          imageUpdate.id,
         );
         if (!existingImage) {
           throw new BadRequestException(
-            `No se encontró una imagen con el ID ${imageUpdate.imageId}`,
+            `No se encontró una imagen con el ID ${imageUpdate.id}`,
           );
         }
 
@@ -418,7 +434,7 @@ export class RoomTypeService {
 
           // Actualizar la URL en la base de datos
           await this.roomTypeRepository.updateImageUrl(
-            imageUpdate.imageId,
+            imageUpdate.id,
             imageResponse.data,
           );
         }
@@ -433,7 +449,7 @@ export class RoomTypeService {
             await this.roomTypeRepository.resetMainImages(id);
           }
           await this.roomTypeRepository.updateImageMain(
-            imageUpdate.imageId,
+            imageUpdate.id,
             imageUpdate.isMain,
           );
         }
@@ -472,7 +488,7 @@ export class RoomTypeService {
         message: 'Tipo de habitación actualizado exitosamente',
         data: {
           ...roomTypeResponse.data,
-          images: updatedImagesData,
+          imagesRoomType: updatedImagesData,
         },
       };
     } catch (error) {
@@ -487,7 +503,7 @@ export class RoomTypeService {
    */
   async findOneWithImages(id: string): Promise<
     RoomType & {
-      images: Array<{ id: string; url: string }>;
+      imagesRoomType: Array<{ id: string; url: string }>;
     }
   > {
     try {
@@ -500,7 +516,7 @@ export class RoomTypeService {
 
       return {
         ...roomType,
-        images: imagesData,
+        imagesRoomType: imagesData,
       };
     } catch (error) {
       this.logger.error(`Error en findOneWithImages: ${error.message}`);

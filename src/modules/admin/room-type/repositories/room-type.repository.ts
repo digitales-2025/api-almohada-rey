@@ -94,7 +94,7 @@ export class RoomTypeRepository extends BaseRepository<RoomType> {
     roomTypeId: string,
   ): Promise<Array<{ id: string; url: string; isMain: boolean }>> {
     try {
-      const images = await this.prisma.imageRoomType.findMany({
+      const imagesRoomType = await this.prisma.imageRoomType.findMany({
         where: {
           roomTypeId: roomTypeId,
           isActive: true,
@@ -110,7 +110,7 @@ export class RoomTypeRepository extends BaseRepository<RoomType> {
       });
 
       // Transformar a formato de respuesta incluyendo isMain
-      return images.map((img) => ({
+      return imagesRoomType.map((img) => ({
         id: img.id,
         url: img.imageUrl,
         isMain: img.isMain,
@@ -123,10 +123,10 @@ export class RoomTypeRepository extends BaseRepository<RoomType> {
 
   /**
    * Marca una imagen como principal y desmarca las demás
-   * @param imageId ID de la imagen a marcar como principal
+   * @param id ID de la imagen a marcar como principal
    * @param roomTypeId ID del tipo de habitación
    */
-  async setMainImage(imageId: string, roomTypeId: string): Promise<void> {
+  async setMainImage(id: string, roomTypeId: string): Promise<void> {
     try {
       // Primero desmarcamos todas las imágenes como principales
       await this.prisma.imageRoomType.updateMany({
@@ -142,7 +142,7 @@ export class RoomTypeRepository extends BaseRepository<RoomType> {
       // Luego marcamos la imagen seleccionada como principal
       await this.prisma.imageRoomType.update({
         where: {
-          id: imageId,
+          id: id,
         },
         data: {
           isMain: true,
@@ -177,13 +177,13 @@ export class RoomTypeRepository extends BaseRepository<RoomType> {
 
   /**
    * Actualiza el estado de imagen principal
-   * @param imageId ID de la imagen
+   * @param id ID de la imagen
    * @param isMain Estado de imagen principal
    */
-  async updateImageMain(imageId: string, isMain: boolean): Promise<void> {
+  async updateImageMain(id: string, isMain: boolean): Promise<void> {
     try {
       await this.prisma.imageRoomType.update({
-        where: { id: imageId },
+        where: { id: id },
         data: { isMain },
       });
     } catch (error) {
