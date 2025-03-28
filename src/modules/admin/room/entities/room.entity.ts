@@ -6,15 +6,10 @@ import { RoomType } from '../../room-type/entities/room-type.entity';
 export enum RoomStatus {
   AVAILABLE = 'AVAILABLE',
   OCCUPIED = 'OCCUPIED',
-  RESERVED = 'RESERVED',
   CLEANING = 'CLEANING',
 }
 
-export type RoomStatusAcceptedValues =
-  | 'AVAILABLE'
-  | 'OCCUPIED'
-  | 'RESERVED'
-  | 'CLEANING';
+export type RoomStatusAcceptedValues = 'AVAILABLE' | 'OCCUPIED' | 'CLEANING';
 
 export class Room extends BaseEntity {
   @ApiProperty({
