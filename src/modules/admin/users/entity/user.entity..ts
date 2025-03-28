@@ -1,28 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { BaseEntity } from 'src/prisma/src/abstract/base.entity';
 
-// model User {
-//     id                 String      @id @unique @default(uuid())
-//     name               String
-//     userRol            UserRolType
-//     email              String
-//     password           String
-//     phone              String?
-//     isSuperAdmin       Boolean     @default(false)
-//     lastLogin          DateTime    @default(now()) @db.Timestamptz(6)
-//     isActive           Boolean     @default(true)
-//     mustChangePassword Boolean     @default(true)
-
-//     createdAt DateTime @default(now()) @db.Timestamptz(6)
-//     updatedAt DateTime @updatedAt
-
-//     // Relación con auditorías (acciones realizadas por este usuario)
-//     auditsPerformed Audit[] @relation("AuditPerformedBy")
-
-//     reservations Reservation[]
-
-//     @@unique([email, isActive])
-//   }
 export class User extends BaseEntity {
   @ApiProperty({ description: 'User name' })
   name: string;

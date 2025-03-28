@@ -1,30 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { CustomerDocumentType, CustomerMaritalStatus } from '@prisma/client';
 import { BaseEntity } from 'src/prisma/src/abstract/base.entity';
-
-// model Customer {
-//     id             String                @id @default(uuid())
-//     name           String
-//     address        String
-//     birthPlace     String
-//     country        String
-//     department     String?
-//     province       String?
-//     phone          String
-//     occupation     String
-//     documentType   CustomerDocumentType
-//     documentNumber String                @unique
-//     email          String                @unique
-//     maritalStatus  CustomerMaritalStatus
-//     companyName    String?
-//     ruc            String?               @unique
-//     companyAddress String?
-//     isActive       Boolean               @default(true)
-//     createdAt      DateTime              @default(now()) @db.Timestamptz(6)
-//     updatedAt      DateTime              @updatedAt
-
-//     reservations Reservation[]
-//   }
 export class Customer extends BaseEntity {
   @ApiProperty({ description: 'Customer name' })
   name: string;
