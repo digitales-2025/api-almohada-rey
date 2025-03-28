@@ -10,21 +10,12 @@ export function validateChanges<T extends object>(
   dto: Partial<T>,
   currentData: T,
 ): boolean {
-  console.log(
-    `[validateChanges] Validando cambios en DTO: ${JSON.stringify(dto, null, 2)}`,
-  );
-  console.log(
-    `[validateChanges] Datos actuales: ${JSON.stringify(currentData, null, 2)}`,
-  );
-
   // Verifica si todos los campos son undefined o null
   const hasValidValues = Object.values(dto).some(
     (value) => value !== undefined && value !== null,
   );
-  console.log(`[validateChanges] ¿Tiene valores válidos? ${hasValidValues}`);
 
   if (!hasValidValues) {
-    console.log(`[validateChanges] No hay valores válidos, retornando false`);
     return false;
   }
 
@@ -34,20 +25,15 @@ export function validateChanges<T extends object>(
     // Solo compara si el campo está presente en el DTO y no es undefined
     if (newValue !== undefined && key in currentData) {
       const currentValue = currentData[key];
-      console.log(
-        `[validateChanges] Comparando campo '${key}': nuevo valor = ${JSON.stringify(newValue)}, valor actual = ${JSON.stringify(currentValue)}`,
-      );
 
       // Compara los valores y marca si hay algún cambio
       if (newValue !== currentValue) {
-        console.log(`[validateChanges] Cambio detectado en campo '${key}'`);
         hasChanges = true;
         break;
       }
     }
   }
 
-  console.log(`[validateChanges] Resultado final: ${hasChanges}`);
   return hasChanges;
 }
 
