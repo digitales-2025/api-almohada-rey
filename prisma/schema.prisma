@@ -126,7 +126,6 @@ model ImageRoomType {
 enum RoomStatus {
   AVAILABLE
   OCCUPIED
-  RESERVED
   CLEANING
 }
 
