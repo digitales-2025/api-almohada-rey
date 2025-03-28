@@ -91,7 +91,7 @@ enum CustomerMaritalStatus {
 }
 
 enum FloorTypes {
-  LIMINATING
+  LAMINATING
   CARPETING
 }
 
@@ -152,20 +152,20 @@ model Room {
 }
 
 model CleaningChecklist {
-  id           String   @id @default(uuid())
+  id           String  @id @default(uuid())
   date         String
   roomId       String // ID of room (Habitación)
-  Room         Room     @relation(fields: [roomId], references: [id])
+  Room         Room    @relation(fields: [roomId], references: [id])
   staffName    String // ID of cleaning staff (Personal)
   userCheckId  String // ID of user who verifies (UserCheck)
   observations String? // Observations or comments (Observaciones)
 
-  createdAt    DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
 }
 
 enum ReservationStatus {
-  PENDING
+  PENDING //CONFIRMED
   CHECKED_IN
   CHECKED_OUT
   CANCELED

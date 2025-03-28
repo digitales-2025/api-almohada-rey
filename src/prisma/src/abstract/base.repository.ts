@@ -141,6 +141,71 @@ export abstract class BaseRepository<T extends BaseEntity> {
   }
 
   /**
+   * Busca entidades en la base de datos donde el campo especificado coincida parcialmente con el valor proporcionado.
+   *
+   * @template V - Tipo de retorno, por defecto es el mismo tipo del repositorio (T)
+   * @param {string} field - Nombre del campo por el cual buscar coincidencias
+   * @param {string} value - Valor a buscar en el campo especificado
+   * @param {boolean} [onlyActive] - Si se especifica como true, solo buscará entre entidades activas
+   * @param {QueryParams} [params] - Parámetros adicionales para la consulta
+   * @returns {Promise<V[]>} - Promesa que resuelve a un array de entidades que coinciden con la búsqueda
+   *
+   * @example
+   * // Buscar usuarios por nombre que contengan "juan"
+   * const usuarios = await userRepository.searchByCoincidenceField('nombre', 'juan');
+   */
+  async searchByCoincidenceField<V = T>({
+    field,
+    value,
+    onlyActive,
+    params,
+  }: {
+    field: keyof V;
+    value: string;
+    onlyActive?: boolean;
+    params?: QueryParams;
+  }): Promise<V[]> {
+    const result = await this.prisma.measureQuery(
+      `searchBy${String(field)}`,
+      () =>
+        (this.prisma[this.modelName] as any).findMany({
+          ...params,
+          where: {
+            [field]: {
+              contains: value,
+              mode: 'insensitive',
+            },
+            isActive: onlyActive ? true : undefined,
+          },
+          select: {
+            id: true,
+            [field]: true,
+          },
+          take: 10,
+        }),
+    );
+    return result as unknown as V[];
+  }
+
+  /**
+   * Encuentra los últimos 10 registros creados en la base de datos para el modelo actual.
+   *
+   * @template V - Tipo de retorno opcional, por defecto es el tipo genérico del repositorio (T)
+   * @returns Promesa que resuelve a una lista de los últimos 10 registros creados ordenados por fecha de creación descendente, o null si no hay registros
+   */
+  async findLastCreated<V = T>(): Promise<V[] | null> {
+    const result = await this.prisma.measureQuery(
+      `findLastCreated${String(this.modelName)}`,
+      () =>
+        (this.prisma[this.modelName] as any).findMany({
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        }),
+    );
+    return result as unknown as V[] | null;
+  }
+
+  /**
    * Busca múltiples registros activos en la base de datos.
    * @template V - Tipo opcional para el retorno, por defecto es T
    * @param {QueryParams} [params] - Parámetros opcionales para la consulta.
