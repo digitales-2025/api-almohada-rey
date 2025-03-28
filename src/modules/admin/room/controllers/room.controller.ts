@@ -19,9 +19,9 @@ import {
   ApiOkResponse,
   ApiNotFoundResponse,
 } from '@nestjs/swagger';
-import { UserData } from 'src/interfaces';
+import { UserData, UserPayload } from 'src/interfaces';
 import { CreateRoomDto, UpdateRoomDto, DeleteRoomDto } from '../dto';
-import { Room } from '../entities/room.entity';
+import { FindAllRoom, Room } from '../entities/room.entity';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { Auth, GetUser } from '../../auth/decorators';
 import { StatusRoomDto } from '../dto/status.dto';
@@ -73,8 +73,8 @@ export class RoomController {
     description: 'Lista de todas las habitaciones',
     type: [Room],
   })
-  findAll(): Promise<Room[]> {
-    return this.roomService.findAll();
+  findAll(@GetUser() user: UserPayload): Promise<FindAllRoom[]> {
+    return this.roomService.findAll(user);
   }
 
   /**

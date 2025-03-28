@@ -1,8 +1,8 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { RoomRepository } from '../repositories/room.repository';
-import { Room } from '../entities/room.entity';
+import { FindAllRoom, Room } from '../entities/room.entity';
 import { CreateRoomDto, UpdateRoomDto, DeleteRoomDto } from '../dto';
-import { UserData } from 'src/interfaces';
+import { UserData, UserPayload } from 'src/interfaces';
 import { validateArray, validateChanges } from 'src/prisma/src/utils';
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
 import { roomErrorMessages } from '../errors/errors-room';
@@ -134,9 +134,75 @@ export class RoomService {
   /**
    * Obtiene todas las habitaciones
    */
-  async findAll(): Promise<Room[]> {
+  /**
+   * Obtiene todas las habitaciones con información detallada
+   * @param user Datos del usuario que realiza la solicitud
+   */
+  async findAll(user: UserPayload): Promise<FindAllRoom[]> {
     try {
-      return this.roomRepository.findMany();
+      // Definir filtro según el rol del usuario
+      const filter = user.isSuperAdmin ? {} : { isActive: true };
+
+      // Realizar consulta con relaciones y filtros
+      const rooms = await this.roomRepository.findMany<FindAllRoom>({
+        where: filter,
+        include: {
+          RoomTypes: {
+            include: {
+              ImageRoomType: {
+                select: {
+                  id: true,
+                  imageUrl: true,
+                  isMain: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+      });
+
+      // Mapear los resultados y obtener solo la imagen principal como objeto único
+      return rooms.map((room) => {
+        // Valor por defecto para la imagen principal
+        let mainImage = { id: '', imageUrl: '', isMain: false };
+
+        // Verificar si ImageRoomType es un array antes de usar find()
+        if (Array.isArray(room.RoomTypes.ImageRoomType)) {
+          const foundImage = room.RoomTypes.ImageRoomType.find(
+            (img) => img.isMain === true,
+          );
+          if (foundImage) {
+            // Solo extraer los campos necesarios
+            mainImage = {
+              id: foundImage.id,
+              imageUrl: foundImage.imageUrl,
+              isMain: foundImage.isMain,
+            };
+          }
+        }
+
+        return {
+          id: room.id,
+          number: room.number,
+          status: room.status,
+          isActive: room.isActive,
+          RoomTypes: {
+            id: room.RoomTypes.id,
+            name: room.RoomTypes.name,
+            ImageRoomType: mainImage, // Ahora es un objeto único con solo los campos necesarios
+          },
+          // Incluir las propiedades de limpieza
+          trashBin: room.trashBin,
+          towel: room.towel,
+          toiletPaper: room.toiletPaper,
+          showerSoap: room.showerSoap,
+          handSoap: room.handSoap,
+          lamp: room.lamp,
+        };
+      });
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
       throw error;

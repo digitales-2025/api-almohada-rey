@@ -82,3 +82,31 @@ export class Room extends BaseEntity {
     Object.assign(this, partial);
   }
 }
+
+/**
+ * Tipo para la estructura de datos que devuelve Prisma en la consulta findAllRooms
+ */
+export type FindAllRoom = {
+  id: string;
+  number: number;
+  status: RoomStatusPrisma;
+  isActive: boolean;
+
+  RoomTypes: {
+    id: string;
+    name: string;
+    ImageRoomType: {
+      id: string;
+      imageUrl: string;
+      isMain: boolean;
+    };
+  };
+
+  // Propiedades de limpieza de habitación
+  trashBin: boolean;
+  towel: boolean;
+  toiletPaper: boolean;
+  showerSoap: boolean;
+  handSoap: boolean;
+  lamp: boolean;
+};
