@@ -56,7 +56,7 @@ export class UpdateRoomTypeDto {
   @ApiProperty({
     description: 'Tipo de piso',
     enum: FloorTypes,
-    example: 'LIMINATING',
+    example: 'LAMINATING',
     required: false,
   })
   @IsEnum(FloorTypes)
