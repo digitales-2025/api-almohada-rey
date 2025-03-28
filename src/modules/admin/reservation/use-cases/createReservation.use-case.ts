@@ -57,7 +57,8 @@ export class CreateReservationUseCase {
               customerId: createOrderDto.customerId,
               roomId: createOrderDto.roomId,
               userId: user.id,
-              reservationDate: new Date(),
+              reservationDate:
+                createOrderDto.reservationDate ?? new Date().toISOString(),
               checkInDate: createOrderDto.checkInDate,
               checkOutDate: createOrderDto.checkOutDate,
               status: createOrderDto.status,

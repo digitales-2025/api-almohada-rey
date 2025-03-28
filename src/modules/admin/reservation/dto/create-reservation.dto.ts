@@ -2,12 +2,12 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsNotEmpty,
   IsUUID,
-  IsDate,
   IsEnum,
   IsOptional,
   IsString,
   IsArray,
   ValidateNested,
+  IsDateString,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ReservationStatus as ReservationStatusPrisma } from '@prisma/client';
@@ -41,25 +41,31 @@ export class CreateReservationDto {
   userId: string;
 
   @ApiProperty({
-    description: 'Date when the reservation was made',
+    description: 'Fecha y hora de fin de check-out',
     type: Date,
+    example: '2024-12-25T15:00:00Z',
   })
+  @IsDateString()
   @IsNotEmpty()
-  @IsDate()
-  @Type(() => Date)
-  reservationDate: Date;
+  reservationDate: string;
 
-  @ApiProperty({ description: 'Check-in date', type: Date })
+  @ApiProperty({
+    description: 'Fecha y hora de fin de check-in',
+    type: Date,
+    example: '2024-12-25T15:00:00Z',
+  })
+  @IsDateString()
   @IsNotEmpty()
-  @IsDate()
-  @Type(() => Date)
-  checkInDate: Date;
+  checkInDate: string;
 
-  @ApiProperty({ description: 'Check-out date', type: Date })
+  @ApiProperty({
+    description: 'Fecha y hora de fin de check-out',
+    type: Date,
+    example: '2024-12-25T15:00:00Z',
+  })
+  @IsDateString()
   @IsNotEmpty()
-  @IsDate()
-  @Type(() => Date)
-  checkOutDate: Date;
+  checkOutDate: string;
 
   @ApiProperty({ description: 'Reservation status', enum: ReservationStatus })
   @IsNotEmpty()

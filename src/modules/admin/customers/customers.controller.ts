@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
@@ -27,6 +28,7 @@ import {
   UserPayload,
 } from 'src/interfaces';
 import { DeleteCustomerDto } from './dto/delete-customer.dto';
+import { Customer } from './entity/customer.entity';
 
 @ApiTags('Admin Customers')
 @ApiUnauthorizedResponse({ description: 'Unauthorized' })
@@ -55,6 +57,23 @@ export class CustomersController {
   @Get()
   findAll(@GetUser() user: UserPayload): Promise<CustomerData[]> {
     return this.customersService.findAll(user);
+  }
+
+  @Get('searchByDocNumber')
+  @ApiOkResponse({
+    description: 'Customers found successfully',
+    type: [Customer],
+  })
+  @ApiOperation({
+    summary:
+      'Busqueda rápida de cliente por su número de documento de identidad, siempre se tiene que enviar un string o "None" al query param docNumber',
+  })
+  searchByDocNumber(
+    @Query('docNumber') docNumber: string,
+  ): Promise<Customer[]> {
+    return this.customersService.searchCustomerByDocumentIdCoincidence(
+      docNumber,
+    );
   }
 
   @ApiOkResponse({ description: 'Customer found successfully' })

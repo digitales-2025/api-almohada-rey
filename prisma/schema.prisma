@@ -165,7 +165,7 @@ model CleaningChecklist {
 }
 
 enum ReservationStatus {
-  PENDING
+  PENDING //CONFIRMED
   CHECKED_IN
   CHECKED_OUT
   CANCELED

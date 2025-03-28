@@ -3,6 +3,9 @@ import { ReservationStatus } from './reservation-status.enum';
 import { ReservationStatus as ReservationStatusPrisma } from '@prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
 import { Room } from 'src/modules/admin/room/entities/room.entity';
+import { Customer } from '../../customers/entity/customer.entity';
+import { User } from '../../users/entity/user.entity.';
+import { IsDateString, IsNotEmpty } from 'class-validator';
 // import { Customer } from '../../customer/entities/customer.entity';
 // import { Room } from '../../room/entities/room.entity';
 // import { User } from '../../user/entities/user.entity';
@@ -22,17 +25,44 @@ export class Reservation extends BaseEntity {
   })
   userId: string;
 
+  // @ApiProperty({
+  //   description: 'Date when the reservation was made',
+  //   type: Date,
+  // })
+  // reservationDate: Date;
+
+  // @ApiProperty({ description: 'Check-in date for the reservation', type: Date })
+  // checkInDate: Date;
+
+  // @ApiProperty({ description: 'Check-out date for the reservation' })
+  // checkOutDate: Date;
+
   @ApiProperty({
-    description: 'Date when the reservation was made',
+    description: 'Fecha y hora de fin de check-out',
     type: Date,
+    example: '2024-12-25T15:00:00Z',
   })
-  reservationDate: Date;
+  @IsDateString()
+  @IsNotEmpty()
+  reservationDate: string;
 
-  @ApiProperty({ description: 'Check-in date for the reservation', type: Date })
-  checkInDate: Date;
+  @ApiProperty({
+    description: 'Fecha y hora de fin de check-in',
+    type: Date,
+    example: '2024-12-25T15:00:00Z',
+  })
+  @IsDateString()
+  @IsNotEmpty()
+  checkInDate: string;
 
-  @ApiProperty({ description: 'Check-out date for the reservation' })
-  checkOutDate: Date;
+  @ApiProperty({
+    description: 'Fecha y hora de fin de check-out',
+    type: Date,
+    example: '2024-12-25T15:00:00Z',
+  })
+  @IsDateString()
+  @IsNotEmpty()
+  checkOutDate: string;
 
   @ApiProperty({
     description: 'Current status of the reservation',
@@ -98,8 +128,18 @@ export class Reservation extends BaseEntity {
 }
 
 export class DetailedReservation extends Reservation {
-  // customer: Customer;
-  // user: User;
+  @ApiProperty({
+    description: 'Customer associated with the reservation',
+    type: Customer,
+  })
+  customer: Customer;
+
+  @ApiProperty({
+    description: 'User associated with the reservation',
+    type: User,
+  })
+  user: User;
+
   @ApiProperty({
     description: 'Room associated with the reservation',
     type: Room,
