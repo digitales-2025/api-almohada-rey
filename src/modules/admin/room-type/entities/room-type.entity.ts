@@ -31,7 +31,7 @@ export class RoomType extends BaseEntity {
   @ApiProperty({
     enum: FloorTypes,
     description: 'Tipo de piso',
-    example: FloorTypes.LIMINATING,
+    example: FloorTypes.LAMINATING,
   })
   floorType: FloorTypesPrisma;
 

@@ -10,7 +10,7 @@ import {
 import { Transform } from 'class-transformer';
 
 export enum FloorTypes {
-  LIMINATING = 'LIMINATING',
+  LAMINATING = 'LAMINATING',
   CARPETING = 'CARPETING',
 }
 
@@ -58,7 +58,7 @@ export class CreateRoomTypeDto {
   @ApiProperty({
     description: 'Tipo de piso',
     enum: FloorTypes,
-    example: 'LIMINATING',
+    example: 'LAMINATING',
     required: true,
   })
   @IsEnum(FloorTypes)
