@@ -177,10 +177,10 @@ export abstract class BaseRepository<T extends BaseEntity> {
             },
             isActive: onlyActive ? true : undefined,
           },
-          select: {
-            id: true,
-            [field]: true,
-          },
+          // select: {
+          //   id: true,
+          //   [field]: true,
+          // },
           take: 10,
         }),
     );
