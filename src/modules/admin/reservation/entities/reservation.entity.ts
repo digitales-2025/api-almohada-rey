@@ -6,9 +6,6 @@ import { Room } from 'src/modules/admin/room/entities/room.entity';
 import { Customer } from '../../customers/entity/customer.entity';
 import { User } from '../../users/entity/user.entity.';
 import { IsDateString, IsNotEmpty } from 'class-validator';
-// import { Customer } from '../../customer/entities/customer.entity';
-// import { Room } from '../../room/entities/room.entity';
-// import { User } from '../../user/entities/user.entity';
 
 export class Reservation extends BaseEntity {
   @ApiProperty({ description: 'Unique identifier for the reservation' })
