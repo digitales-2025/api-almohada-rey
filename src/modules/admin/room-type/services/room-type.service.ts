@@ -519,4 +519,52 @@ export class RoomTypeService {
       throw error;
     }
   }
+
+  /**
+   * Actualiza la imagen principal de un tipo de habitación
+   */
+  async updateMainImage(
+    roomTypeId: string,
+    imageUpdate: { id: string; url: string; isMain: boolean },
+    /* user: UserData, */
+  ): Promise<BaseApiResponse<RoomType>> {
+    try {
+      // Verificar que el tipo de habitación existe
+      /* const roomType = await this.findById(roomTypeId); */
+
+      // Verificar que la imagen pertenece a este tipo de habitación
+      const existingImages =
+        await this.roomTypeRepository.findImagesByRoomTypeId(roomTypeId);
+      const imageExists = existingImages.some(
+        (img) => img.id === imageUpdate.id,
+      );
+
+      if (!imageExists) {
+        throw new BadRequestException(
+          `La imagen con ID ${imageUpdate.id} no pertenece al tipo de habitación con ID ${roomTypeId}`,
+        );
+      }
+
+      // Validar que isMain sea true (como medida de seguridad)
+      if (!imageUpdate.isMain) {
+        throw new BadRequestException(
+          'Para establecer como imagen principal, isMain debe ser true',
+        );
+      }
+
+      // Usar el método del repositorio para establecer la imagen principal
+      await this.roomTypeRepository.setMainImage(imageUpdate.id, roomTypeId);
+
+      // Obtener los datos actualizados incluyendo todas las imágenes
+      const updatedRoomType = await this.findOneWithImages(roomTypeId);
+
+      return {
+        success: true,
+        message: 'Imagen principal actualizada exitosamente',
+        data: updatedRoomType,
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
 }
