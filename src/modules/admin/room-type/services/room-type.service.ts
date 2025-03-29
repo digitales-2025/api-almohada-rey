@@ -27,6 +27,8 @@ import { CreateImageRoomTypeData } from '../repositories/room-type.repository';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
 import { validateArray, validateChanges } from 'src/prisma/src/utils';
+import { AuditService } from '../../audit/audit.service';
+import { AuditActionType } from '@prisma/client';
 
 @Injectable()
 export class RoomTypeService {
@@ -40,6 +42,7 @@ export class RoomTypeService {
     private readonly deleteRoomTypesUseCase: DeleteRoomTypesUseCase,
     private readonly reactivateRoomTypeUseCase: ReactivateRoomTypeUseCase,
     private readonly cloudflareService: CloudflareService,
+    private readonly auditService: AuditService,
   ) {
     this.errorHandler = new BaseErrorHandler(
       this.logger,
@@ -526,12 +529,9 @@ export class RoomTypeService {
   async updateMainImage(
     roomTypeId: string,
     imageUpdate: { id: string; url: string; isMain: boolean },
-    /* user: UserData, */
+    user: UserData, // Descomentamos el parámetro de usuario
   ): Promise<BaseApiResponse<RoomType>> {
     try {
-      // Verificar que el tipo de habitación existe
-      /* const roomType = await this.findById(roomTypeId); */
-
       // Verificar que la imagen pertenece a este tipo de habitación
       const existingImages =
         await this.roomTypeRepository.findImagesByRoomTypeId(roomTypeId);
@@ -541,19 +541,21 @@ export class RoomTypeService {
 
       if (!imageExists) {
         throw new BadRequestException(
-          `La imagen con ID ${imageUpdate.id} no pertenece al tipo de habitación con ID ${roomTypeId}`,
-        );
-      }
-
-      // Validar que isMain sea true (como medida de seguridad)
-      if (!imageUpdate.isMain) {
-        throw new BadRequestException(
-          'Para establecer como imagen principal, isMain debe ser true',
+          `La imagen no pertenece al tipo de habitación`,
         );
       }
 
       // Usar el método del repositorio para establecer la imagen principal
       await this.roomTypeRepository.setMainImage(imageUpdate.id, roomTypeId);
+
+      // Registrar auditoría
+      await this.auditService.create({
+        entityId: roomTypeId,
+        entityType: 'roomType',
+        action: AuditActionType.UPDATE,
+        performedById: user.id,
+        createdAt: new Date(),
+      });
 
       // Obtener los datos actualizados incluyendo todas las imágenes
       const updatedRoomType = await this.findOneWithImages(roomTypeId);

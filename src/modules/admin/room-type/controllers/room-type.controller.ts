@@ -244,7 +244,7 @@ export class RoomTypeController {
   async updateMainImage(
     @Param('id') roomTypeId: string,
     @Body() data: { imageUpdate: { id: string; url: string; isMain: boolean } },
-    /* @GetUser() user: UserData, */
+    @GetUser() user: UserData,
   ): Promise<BaseApiResponse<RoomType>> {
     if (!data.imageUpdate || !data.imageUpdate.id) {
       throw new BadRequestException('Se requiere un objeto imageUpdate válido');
@@ -260,7 +260,7 @@ export class RoomTypeController {
     return this.roomTypeService.updateMainImage(
       roomTypeId,
       data.imageUpdate,
-      /*      user, */
+      user,
     );
   }
 
