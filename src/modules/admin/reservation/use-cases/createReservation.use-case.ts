@@ -44,12 +44,12 @@ export class CreateReservationUseCase {
               .build();
           });
 
-          // 2. Actualizar estado de la habitación
+          /*           // 2. Actualizar estado de la habitación
           await this.roomRepository.updateWithTx(
             createOrderDto.roomId,
             { status: 'RESERVED' },
             tx,
-          );
+          ); */
 
           // 3. Crear reserva
           const reservation = await this.reservationRepository.createWithTx(

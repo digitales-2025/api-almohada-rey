@@ -126,44 +126,4 @@ export class CleaningChecklistController {
 
   /**
    * Actualiza un registro de limpieza existente   */
-  A;
-
-  /**
-   * Desactiva múltiples registros de limpieza
-   */
-  /*  @Delete('remove/all')
-  @ApiOperation({ summary: 'Desactivar múltiples registros de limpieza' })
-  @ApiResponse({
-    status: 200,
-    description: 'Registros de limpieza desactivados exitosamente',
-    type: BaseApiResponse,
-  })
-  @ApiBadRequestResponse({
-    description: 'IDs inválidos o registros no existen',
-  })
-  deleteMany(
-    @Body() deleteCleaningDto: DeleteCleaningChecklistDto,
-    @GetUser() user: UserData,
-  ): Promise<BaseApiResponse<CleaningChecklist[]>> {
-    return this.cleaningService.deleteMany(deleteCleaningDto, user);
-  } */
-
-  /**
-   * Reactiva múltiples registros de limpieza
-   */
-  /*   @Patch('reactivate/all')
-  @ApiOperation({ summary: 'Reactivar múltiples registros de limpieza' })
-  @ApiOkResponse({
-    description: 'Registros de limpieza reactivados exitosamente',
-    type: BaseApiResponse,
-  })
-  @ApiBadRequestResponse({
-    description: 'IDs inválidos o registros no existen',
-  })
-  reactivateAll(
-    @Body() deleteCleaningDto: DeleteCleaningChecklistDto,
-    @GetUser() user: UserData,
-  ): Promise<BaseApiResponse<CleaningChecklist[]>> {
-    return this.cleaningService.reactivateMany(deleteCleaningDto.ids, user);
-  } */
 }

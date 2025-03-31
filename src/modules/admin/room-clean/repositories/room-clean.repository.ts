@@ -18,7 +18,6 @@ export class CleaningChecklistRepository extends BaseRepository<CleaningChecklis
     return this.findMany({
       where: {
         roomId,
-        isActive: true,
       },
       orderBy: {
         date: 'desc', // Registros más recientes primero
@@ -35,7 +34,6 @@ export class CleaningChecklistRepository extends BaseRepository<CleaningChecklis
     return this.findMany({
       where: {
         date,
-        isActive: true,
       },
       orderBy: {
         createdAt: 'desc',
@@ -57,7 +55,6 @@ export class CleaningChecklistRepository extends BaseRepository<CleaningChecklis
       where: {
         roomId,
         date,
-        isActive: true,
       },
     });
   }
@@ -95,7 +92,6 @@ export class CleaningChecklistRepository extends BaseRepository<CleaningChecklis
           gte: startDate,
           lte: endDate,
         },
-        isActive: true,
       },
     });
 
@@ -111,7 +107,6 @@ export class CleaningChecklistRepository extends BaseRepository<CleaningChecklis
     return this.prisma.room.findUnique({
       where: {
         id: roomId,
-        isActive: true,
       },
     });
   }
