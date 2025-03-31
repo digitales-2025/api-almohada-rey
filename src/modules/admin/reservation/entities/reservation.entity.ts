@@ -2,7 +2,7 @@ import { BaseEntity } from 'src/prisma/src/abstract/base.entity';
 import { ReservationStatus } from './reservation-status.enum';
 import { ReservationStatus as ReservationStatusPrisma } from '@prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
-import { Room } from 'src/modules/admin/room/entities/room.entity';
+import { DetailedRoom } from 'src/modules/admin/room/entities/room.entity';
 import { Customer } from '../../customers/entity/customer.entity';
 import { User } from '../../users/entity/user.entity.';
 import { IsDateString, IsNotEmpty } from 'class-validator';
@@ -66,6 +66,17 @@ export class Reservation extends BaseEntity {
     enum: ReservationStatus,
   })
   status: ReservationStatusPrisma;
+
+  @ApiProperty({
+    description: 'Origin place from the customer',
+  })
+  origin: string;
+
+  @ApiProperty({
+    description: 'Reason for reservation',
+    type: String,
+  })
+  reason: string;
 
   @ApiProperty({
     description: 'JSON list of companions/guests',
@@ -139,9 +150,9 @@ export class DetailedReservation extends Reservation {
 
   @ApiProperty({
     description: 'Room associated with the reservation',
-    type: Room,
+    type: DetailedRoom,
   })
-  room: Room;
+  room: DetailedRoom;
 
   constructor(partial: Partial<DetailedReservation>) {
     super(partial);

@@ -183,6 +183,8 @@ model Reservation {
   checkInDate     DateTime          @db.Date
   checkOutDate    DateTime          @db.Date
   status          ReservationStatus
+  origin        String // Origin place from the customer
+  reason        String // Reason for reservation
   guests          Json? // List of companions
   observations    String? // Additional notes
 

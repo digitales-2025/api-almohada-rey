@@ -17,7 +17,7 @@ export abstract class BaseEntity {
   @ApiProperty({
     description: 'Unique identifier for the entity',
     example: '123e4567-e89b-12d3-a456-426614174000',
-    required: false,
+    // required: false, --No es necesario indicar eso aqui, por que del front se va aconsumir siempre un ID existente
   })
   id?: string;
 
@@ -27,7 +27,6 @@ export abstract class BaseEntity {
   @ApiProperty({
     description: 'Indicates whether the entity is active or not',
     example: true,
-    required: false,
   })
   isActive?: boolean;
 
@@ -37,7 +36,6 @@ export abstract class BaseEntity {
   @ApiProperty({
     description: 'Timestamp when the entity was created',
     example: new Date().toISOString(),
-    required: false,
   })
   readonly createdAt?: Date;
 
@@ -47,7 +45,6 @@ export abstract class BaseEntity {
   @ApiProperty({
     description: 'Timestamp when the entity was last updated',
     example: new Date().toISOString(),
-    required: false,
   })
   updatedAt?: Date;
 
