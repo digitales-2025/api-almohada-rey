@@ -27,6 +27,8 @@ import { CreateImageRoomTypeData } from '../repositories/room-type.repository';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
 import { validateArray, validateChanges } from 'src/prisma/src/utils';
+import { AuditService } from '../../audit/audit.service';
+import { AuditActionType } from '@prisma/client';
 
 @Injectable()
 export class RoomTypeService {
@@ -40,6 +42,7 @@ export class RoomTypeService {
     private readonly deleteRoomTypesUseCase: DeleteRoomTypesUseCase,
     private readonly reactivateRoomTypeUseCase: ReactivateRoomTypeUseCase,
     private readonly cloudflareService: CloudflareService,
+    private readonly auditService: AuditService,
   ) {
     this.errorHandler = new BaseErrorHandler(
       this.logger,
@@ -539,6 +542,53 @@ export class RoomTypeService {
     } catch (error) {
       this.logger.error(`Error en findOneWithImages: ${error.message}`);
       this.errorHandler.handleError(error, 'getting');
+      throw error;
+    }
+  }
+
+  /**
+   * Actualiza la imagen principal de un tipo de habitación
+   */
+  async updateMainImage(
+    roomTypeId: string,
+    imageUpdate: { id: string; url: string; isMain: boolean },
+    user: UserData, // Descomentamos el parámetro de usuario
+  ): Promise<BaseApiResponse<RoomType>> {
+    try {
+      // Verificar que la imagen pertenece a este tipo de habitación
+      const existingImages =
+        await this.roomTypeRepository.findImagesByRoomTypeId(roomTypeId);
+      const imageExists = existingImages.some(
+        (img) => img.id === imageUpdate.id,
+      );
+
+      if (!imageExists) {
+        throw new BadRequestException(
+          `La imagen no pertenece al tipo de habitación`,
+        );
+      }
+
+      // Usar el método del repositorio para establecer la imagen principal
+      await this.roomTypeRepository.setMainImage(imageUpdate.id, roomTypeId);
+
+      // Registrar auditoría
+      await this.auditService.create({
+        entityId: roomTypeId,
+        entityType: 'roomType',
+        action: AuditActionType.UPDATE,
+        performedById: user.id,
+        createdAt: new Date(),
+      });
+
+      // Obtener los datos actualizados incluyendo todas las imágenes
+      const updatedRoomType = await this.findOneWithImages(roomTypeId);
+
+      return {
+        success: true,
+        message: 'Imagen principal actualizada exitosamente',
+        data: updatedRoomType,
+      };
+    } catch (error) {
       throw error;
     }
   }

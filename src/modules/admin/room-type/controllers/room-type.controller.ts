@@ -224,6 +224,60 @@ export class RoomTypeController {
   }
 
   /**
+   * Actualiza una imagen como principal para un tipo de habitación
+   */
+  @Patch(':id/update-main-image')
+  @ApiOperation({
+    summary: 'Establecer una imagen como principal para un tipo de habitación',
+    description:
+      'Actualiza cuál imagen es la principal para un tipo de habitación específico',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        imageUpdate: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'ID de la imagen' },
+            url: { type: 'string', description: 'URL de la imagen' },
+            isMain: {
+              type: 'boolean',
+              description: 'Debe ser true para establecer como principal',
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Imagen principal actualizada correctamente',
+  })
+  async updateMainImage(
+    @Param('id') roomTypeId: string,
+    @Body() data: { imageUpdate: { id: string; url: string; isMain: boolean } },
+    @GetUser() user: UserData,
+  ): Promise<BaseApiResponse<RoomType>> {
+    if (!data.imageUpdate || !data.imageUpdate.id) {
+      throw new BadRequestException('Se requiere un objeto imageUpdate válido');
+    }
+
+    // Asegurarse de que isMain sea true
+    if (!data.imageUpdate.isMain) {
+      throw new BadRequestException(
+        'Para establecer como principal, isMain debe ser true',
+      );
+    }
+
+    return this.roomTypeService.updateMainImage(
+      roomTypeId,
+      data.imageUpdate,
+      user,
+    );
+  }
+
+  /**
    * Desactiva múltiples tipos de habitaciones
    */
   @Delete('remove/all')
