@@ -22,7 +22,7 @@ export class CreateCleaningChecklistUseCase {
       date: createCleaningDto.date,
       roomId: createCleaningDto.roomId,
       staffName: createCleaningDto.staffName,
-      userCheckId: createCleaningDto.userCheckId,
+      userCheckId: user.id,
       observations: createCleaningDto.observations || null,
     });
 

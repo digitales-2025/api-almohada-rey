@@ -6,8 +6,6 @@ import { CleaningChecklistService } from './services/room-clean.service';
 import {
   CreateCleaningChecklistUseCase,
   UpdateCleaningChecklistUseCase,
-  DeleteCleaningChecklistUseCase,
-  ReactivateCleaningChecklistUseCase,
 } from './use-cases';
 import { CleaningChecklistRepository } from './repositories/room-clean.repository';
 import { RoomModule } from '../room/room.module';
@@ -25,8 +23,6 @@ import { RoomModule } from '../room/room.module';
     // Casos de uso
     CreateCleaningChecklistUseCase,
     UpdateCleaningChecklistUseCase,
-    DeleteCleaningChecklistUseCase,
-    ReactivateCleaningChecklistUseCase,
   ],
   exports: [CleaningChecklistService, CleaningChecklistRepository],
 })

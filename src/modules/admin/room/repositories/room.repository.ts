@@ -69,7 +69,6 @@ export class RoomRepository extends BaseRepository<Room> {
       where: { id },
       data: {
         status,
-        updatedAt: new Date(),
       },
     });
   }

@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { RoomTypeRepository } from '../repositories/room-type.repository';
-import { RoomType } from '../entities/room-type.entity';
+import { RoomType, SummaryRoomTypeData } from '../entities/room-type.entity';
 import { HttpResponse, UserData, UserPayload } from 'src/interfaces';
 
 import { roomTypeErrorMessages } from '../errors/errors-room-type';
@@ -150,6 +150,29 @@ export class RoomTypeService {
       );
 
       return roomTypesWithImages;
+    } catch (error) {
+      this.errorHandler.handleError(error, 'getting');
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene un resumen de los tipos de habitaciones activas (solo id, name e isActive)
+   */
+  async findAllActive(): Promise<SummaryRoomTypeData[]> {
+    try {
+      // Filtrar solo por habitaciones activas
+      const activeRoomTypes = await this.roomTypeRepository.findMany({
+        where: { isActive: true },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      // Mapear solo los campos necesarios según el tipo SummaryRoomTypeData
+      return activeRoomTypes.map((roomType) => ({
+        id: roomType.id,
+        name: roomType.name,
+        isActive: roomType.isActive,
+      }));
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
       throw error;

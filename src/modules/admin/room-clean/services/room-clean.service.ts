@@ -1,20 +1,14 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { CleaningChecklistRepository } from '../repositories/room-clean.repository';
 import { CleaningChecklist } from '../entities/room-clean.entity';
-import {
-  CreateCleaningChecklistDto,
-  UpdateCleaningChecklistDto,
-  DeleteCleaningChecklistDto,
-} from '../dto';
+import { CreateCleaningChecklistDto, UpdateCleaningChecklistDto } from '../dto';
 import { UserData } from 'src/interfaces';
-import { validateArray, validateChanges } from 'src/prisma/src/utils';
+import { validateChanges } from 'src/prisma/src/utils';
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
 import { roomCleanErrorMessages } from '../errors/errors-room-clean';
 import {
   CreateCleaningChecklistUseCase,
   UpdateCleaningChecklistUseCase,
-  DeleteCleaningChecklistUseCase,
-  ReactivateCleaningChecklistUseCase,
 } from '../use-cases';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { RoomService } from '../../room/services/room.service';
@@ -30,8 +24,6 @@ export class CleaningChecklistService {
     private readonly cleaningRepository: CleaningChecklistRepository,
     private readonly createCleaningUseCase: CreateCleaningChecklistUseCase,
     private readonly updateCleaningUseCase: UpdateCleaningChecklistUseCase,
-    private readonly deleteCleaningUseCase: DeleteCleaningChecklistUseCase,
-    private readonly reactivateCleaningUseCase: ReactivateCleaningChecklistUseCase,
     private readonly roomService: RoomService,
     private readonly prisma: PrismaService, // Añadir PrismaService
   ) {
@@ -274,37 +266,5 @@ export class CleaningChecklistService {
       throw new BadRequestException(roomCleanErrorMessages.notFound);
     }
     return cleaning;
-  }
-
-  /**
-   * Desactiva múltiples registros de limpieza
-   */
-  async deleteMany(
-    deleteCleaningDto: DeleteCleaningChecklistDto,
-    user: UserData,
-  ): Promise<BaseApiResponse<CleaningChecklist[]>> {
-    try {
-      validateArray(deleteCleaningDto.ids, 'IDs de registros de limpieza');
-      return await this.deleteCleaningUseCase.execute(deleteCleaningDto, user);
-    } catch (error) {
-      this.errorHandler.handleError(error, 'deactivating');
-      throw error;
-    }
-  }
-
-  /**
-   * Reactiva múltiples registros de limpieza
-   */
-  async reactivateMany(
-    ids: string[],
-    user: UserData,
-  ): Promise<BaseApiResponse<CleaningChecklist[]>> {
-    try {
-      validateArray(ids, 'IDs de registros de limpieza');
-      return await this.reactivateCleaningUseCase.execute(ids, user);
-    } catch (error) {
-      this.errorHandler.handleError(error, 'reactivating');
-      throw error;
-    }
   }
 }

@@ -16,7 +16,7 @@ import {
 import { handleException } from 'src/utils';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { AuditActionType } from '@prisma/client';
+import { AuditActionType, ProductType } from '@prisma/client';
 import {
   createDynamicUpdateObject,
   hasNoChanges,
@@ -30,6 +30,39 @@ export class ProductService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
   ) {}
+
+  private async generateCodeProduct(type: ProductType): Promise<string> {
+    // Definir prefijo según el tipo de producto
+    let prefix: string;
+
+    switch (type) {
+      case 'COMMERCIAL':
+        prefix = 'PRD-COM';
+        break;
+      case 'INTERNAL_USE':
+        prefix = 'PRD-INT';
+        break;
+      default:
+        prefix = 'PRD-GEN'; // Prefijo genérico para otros tipos
+    }
+
+    // Buscar el último producto del tipo específico
+    const lastProduct = await this.prisma.product.findFirst({
+      where: {
+        code: { startsWith: `${prefix}-` },
+        type,
+      },
+      orderBy: { code: 'desc' },
+    });
+
+    // Extraer el número secuencial
+    const lastIncrement = lastProduct
+      ? parseInt(lastProduct.code.split('-')[2], 10)
+      : 0;
+
+    // Generar el nuevo código con formato PRD-TYPE-000
+    return `${prefix}-${String(lastIncrement + 1).padStart(3, '0')}`;
+  }
 
   /**
    * Crear un nuevo producto
@@ -48,6 +81,8 @@ export class ProductService {
       // Crear el producto y registrar la auditoría
       await this.findByName(name);
 
+      const codeProduct = await this.generateCodeProduct(type);
+
       newProduct = await this.prisma.$transaction(async () => {
         // Crear el nuevo producto
         const product = await this.prisma.product.create({
@@ -55,9 +90,11 @@ export class ProductService {
             name,
             type,
             unitCost,
+            code: codeProduct,
           },
           select: {
             id: true,
+            code: true,
             name: true,
             type: true,
             unitCost: true,
@@ -82,6 +119,7 @@ export class ProductService {
         message: 'Product created successfully',
         data: {
           id: newProduct.id,
+          code: newProduct.code,
           name: newProduct.name,
           type: newProduct.type,
           unitCost: newProduct.unitCost,
@@ -123,6 +161,7 @@ export class ProductService {
         },
         select: {
           id: true,
+          code: true,
           name: true,
           type: true,
           unitCost: true,
@@ -136,6 +175,7 @@ export class ProductService {
       // Mapea los resultados al tipo ProductData
       return products.map((product) => ({
         id: product.id,
+        code: product.code,
         name: product.name,
         type: product.type,
         unitCost: product.unitCost,
@@ -174,6 +214,7 @@ export class ProductService {
       where: { id },
       select: {
         id: true,
+        code: true,
         name: true,
         type: true,
         unitCost: true,
@@ -257,6 +298,7 @@ export class ProductService {
           data: updateData,
           select: {
             id: true,
+            code: true,
             name: true,
             type: true,
             unitCost: true,

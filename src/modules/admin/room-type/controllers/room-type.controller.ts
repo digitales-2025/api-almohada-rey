@@ -31,7 +31,7 @@ import {
   UpdateRoomTypeWithImageDto,
   CreateRoomTypeWithImagesDto,
 } from '../dto';
-import { RoomType } from '../entities/room-type.entity';
+import { RoomType, SummaryRoomTypeData } from '../entities/room-type.entity';
 
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { FormatDataInterceptor } from './format-data-update.interceptor';
@@ -75,6 +75,19 @@ export class RoomTypeController {
     Array<RoomType & { imagesRoomType: Array<{ id: string; url: string }> }>
   > {
     return this.roomTypeService.findAll(user);
+  }
+
+  @Get('summary/active')
+  @ApiOperation({
+    summary: 'Obtener resumen de todos los tipos de habitaciones activas',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Lista resumida de los tipos de habitaciones activas (solo id, name e isActive)',
+  })
+  findAllActive(): Promise<SummaryRoomTypeData[]> {
+    return this.roomTypeService.findAllActive();
   }
 
   /**

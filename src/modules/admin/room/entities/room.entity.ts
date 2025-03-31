@@ -6,15 +6,10 @@ import { RoomType } from '../../room-type/entities/room-type.entity';
 export enum RoomStatus {
   AVAILABLE = 'AVAILABLE',
   OCCUPIED = 'OCCUPIED',
-  RESERVED = 'RESERVED',
   CLEANING = 'CLEANING',
 }
 
-export type RoomStatusAcceptedValues =
-  | 'AVAILABLE'
-  | 'OCCUPIED'
-  | 'RESERVED'
-  | 'CLEANING';
+export type RoomStatusAcceptedValues = 'AVAILABLE' | 'OCCUPIED' | 'CLEANING';
 
 export class Room extends BaseEntity {
   @ApiProperty({
@@ -91,3 +86,31 @@ export class DetailedRoom extends Room {
   })
   RoomTypes: RoomType;
 }
+
+/**
+ * Tipo para la estructura de datos que devuelve Prisma en la consulta findAllRooms
+ */
+export type FindAllRoom = {
+  id: string;
+  number: number;
+  status: RoomStatusPrisma;
+  isActive: boolean;
+
+  RoomTypes: {
+    id: string;
+    name: string;
+    ImageRoomType: {
+      id: string;
+      imageUrl: string;
+      isMain: boolean;
+    };
+  };
+
+  // Propiedades de limpieza de habitación
+  trashBin: boolean;
+  towel: boolean;
+  toiletPaper: boolean;
+  showerSoap: boolean;
+  handSoap: boolean;
+  lamp: boolean;
+};

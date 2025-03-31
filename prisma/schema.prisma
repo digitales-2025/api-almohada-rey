@@ -25,6 +25,9 @@ model User {
   // Relación con auditorías (acciones realizadas por este usuario)
   auditsPerformed Audit[] @relation("AuditPerformedBy")
 
+  // Relación con checklists de limpieza (personal que supervisa la limpieza)
+  cleaningChecklists CleaningChecklist[] @relation("CleaningChecklistUser")
+
   reservations Reservation[]
 
   @@unique([email, isActive])
@@ -126,7 +129,6 @@ model ImageRoomType {
 enum RoomStatus {
   AVAILABLE
   OCCUPIED
-  RESERVED
   CLEANING
 }
 
@@ -156,8 +158,9 @@ model CleaningChecklist {
   date         String
   roomId       String // ID of room (Habitación)
   Room         Room    @relation(fields: [roomId], references: [id])
-  staffName    String // ID of cleaning staff (Personal)
-  userCheckId  String // ID of user who verifies (UserCheck)
+  staffName    String // Name of staff (Nombre del personal)
+  userCheck    User    @relation("CleaningChecklistUser", fields: [userCheckId], references: [id])
+  userCheckId  String
   observations String? // Observations or comments (Observaciones)
 
   createdAt DateTime @default(now()) @db.Timestamptz(6)
@@ -263,6 +266,7 @@ model PaymentDetail {
 
 model Product {
   id       String      @id @default(uuid())
+  code     String      @unique
   name     String      @unique
   unitCost Float
   type     ProductType
