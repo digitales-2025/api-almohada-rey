@@ -282,3 +282,13 @@ enum ProductType {
   COMMERCIAL
   INTERNAL_USE
 }
+
+model Service {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  description String
+  code      String   @unique
+  price     Float
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+}
