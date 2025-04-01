@@ -24,6 +24,12 @@ export class PaymentsService {
     private readonly roomService: RoomService,
   ) {}
 
+  /**
+   * Crea un nuevo pago en la base de datos.
+   * @param createPaymentDto Datos del pago a crear
+   * @param user Usuario que realiza la acción
+   * @returns Pago creado
+   */
   async create(
     createPaymentDto: CreatePaymentDto,
     user: UserData,
