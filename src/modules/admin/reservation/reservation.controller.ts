@@ -37,6 +37,7 @@ import {
   CheckAvailabilityDto,
   RoomAvailabilityDto,
 } from './dto/room-availability.dto';
+import { DetailedRoom } from '../room/entities/room.entity';
 
 @ApiTags('Reservations')
 @ApiBadRequestResponse({
@@ -150,36 +151,79 @@ export class ReservationController {
     });
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get a reservation by ID' })
-  @ApiParam({ name: 'id', description: 'Reservation ID' })
-  @ApiOkResponse({
-    type: DetailedReservation,
-    description: 'The found reservation',
+  @Get('available-rooms')
+  @ApiOperation({ summary: 'Obtener habitaciones disponibles' })
+  @ApiQuery({
+    name: 'checkInDate',
+    description: 'Fecha de check-in en formato ISO',
+    type: String,
+    required: true,
+    example: '2025-04-01T14:00:00.000Z',
   })
-  findOne(@Param('id') id: string) {
-    return this.reservationService.findOne(+id);
+  @ApiQuery({
+    name: 'checkOutDate',
+    description: 'Fecha de check-out en formato ISO',
+    type: String,
+    required: true,
+    example: '2025-04-05T12:00:00.000Z',
+  })
+  @ApiOkResponse({
+    type: [DetailedRoom],
+    description: 'Lista de habitaciones disponibles',
+  })
+  async getAvailableRooms(
+    @Query('checkInDate') checkInDate: string,
+    @Query('checkOutDate') checkOutDate: string,
+  ): Promise<DetailedRoom[]> {
+    // const checkAvailabilityDto: CheckAvailabilityDto = {
+    //   roomId: '',
+    //   checkInDate,
+    //   checkOutDate,
+    // };
+
+    return this.reservationService.getAllAvailableRooms(
+      checkInDate,
+      checkOutDate,
+    );
   }
 
-  // @Patch(':id')
-  // @ApiOperation({ summary: 'Update a reservation' })
-  // @ApiParam({ name: 'id', description: 'Reservation ID' })
-  // @ApiOkResponse({ type: Reservation, description: 'The updated reservation' })
-  // update(
-  //   @Param('id') id: string,
-  //   @Body() updateReservationDto: UpdateReservationDto,
-  // ) {
-  //   return this.reservationService.update(id, updateReservationDto);
-  // }
-
-  @Delete(':id')
-  @ApiOperation({ summary: 'Delete a reservation' })
-  @ApiParam({ name: 'id', description: 'Reservation ID' })
-  @ApiOkResponse({
-    description: 'The reservation has been successfully deleted',
+  @Get('reservations-in-interval')
+  @ApiOperation({
+    summary:
+      'Obtener todas las reservaciones disponibles en un intervalo de tiempo',
   })
-  remove(@Param('id') id: string) {
-    return this.reservationService.remove(+id);
+  @ApiQuery({
+    name: 'checkInDate',
+    description: 'Fecha de check-in en formato ISO',
+    type: String,
+    required: true,
+    example: '2025-04-01T14:00:00.000Z',
+  })
+  @ApiQuery({
+    name: 'checkOutDate',
+    description: 'Fecha de check-out en formato ISO',
+    type: String,
+    required: true,
+    example: '2025-04-05T12:00:00.000Z',
+  })
+  @ApiOkResponse({
+    type: [DetailedReservation],
+    description: 'Lista de reservaciones disponibles en un inetravlo de tiempo',
+  })
+  async getReservationInInterval(
+    @Query('checkInDate') checkInDate: string,
+    @Query('checkOutDate') checkOutDate: string,
+  ): Promise<DetailedReservation[]> {
+    // const checkAvailabilityDto: CheckAvailabilityDto = {
+    //   roomId: '',
+    //   checkInDate,
+    //   checkOutDate,
+    // };
+
+    return this.reservationService.getAllReservationsInTimeInterval(
+      checkInDate,
+      checkOutDate,
+    );
   }
 
   @Get('check-availability')
@@ -220,5 +264,37 @@ export class ReservationController {
     };
 
     return this.reservationService.checkAvailability(checkAvailabilityDto);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a reservation by ID' })
+  @ApiParam({ name: 'id', description: 'Reservation ID' })
+  @ApiOkResponse({
+    type: DetailedReservation,
+    description: 'The found reservation',
+  })
+  findOne(@Param('id') id: string) {
+    return this.reservationService.findOne(+id);
+  }
+
+  // @Patch(':id')
+  // @ApiOperation({ summary: 'Update a reservation' })
+  // @ApiParam({ name: 'id', description: 'Reservation ID' })
+  // @ApiOkResponse({ type: Reservation, description: 'The updated reservation' })
+  // update(
+  //   @Param('id') id: string,
+  //   @Body() updateReservationDto: UpdateReservationDto,
+  // ) {
+  //   return this.reservationService.update(id, updateReservationDto);
+  // }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a reservation' })
+  @ApiParam({ name: 'id', description: 'Reservation ID' })
+  @ApiOkResponse({
+    description: 'The reservation has been successfully deleted',
+  })
+  remove(@Param('id') id: string) {
+    return this.reservationService.remove(+id);
   }
 }

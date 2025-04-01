@@ -1,12 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import {
-  IsNotEmpty,
-  IsString,
-  IsOptional,
-  IsDate,
-  IsObject,
-} from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsDate } from 'class-validator';
 import {
   DocumentType,
   DocumentTypeAccepetedValues,
@@ -53,6 +47,6 @@ export class GuestDto {
 
   @ApiPropertyOptional({ description: 'Additional guest information' })
   @IsOptional()
-  @IsObject()
+  @IsString()
   additionalInfo?: string;
 }

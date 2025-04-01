@@ -72,6 +72,21 @@ export class CreateReservationDto {
   @IsEnum(ReservationStatus)
   status: ReservationStatusPrisma;
 
+  @ApiProperty({
+    description: 'Origin place from the customer',
+  })
+  @IsNotEmpty()
+  @IsString()
+  origin: string;
+
+  @ApiProperty({
+    description: 'Reason for reservation',
+    type: String,
+  })
+  @IsNotEmpty()
+  @IsString()
+  reason: string;
+
   @ApiPropertyOptional({
     description: 'Guest companions information',
     type: [GuestDto],

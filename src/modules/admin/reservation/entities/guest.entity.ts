@@ -43,7 +43,6 @@ export class Guest {
   @ApiProperty({
     description: 'Additional information about the guest',
     required: false,
-    type: Object,
   })
   additionalInfo?: string;
 
