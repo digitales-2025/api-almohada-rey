@@ -60,6 +60,8 @@ async function bootstrap() {
     { name: 'Admin Rooms', description: 'Gestión de habitaciones' },
 
     { name: 'Room Cleaning', description: 'Gestión de limpiezas' },
+
+    { name: 'Admin Services', description: 'Gestión de servicios' },
     { name: 'Admin Payments', description: 'Gestión de pagos' },
   ];
 
