@@ -9,6 +9,16 @@ import { superAdminSeed } from './data/superadmin.seed';
 import { handleException } from 'src/utils';
 import * as bcrypt from 'bcrypt';
 import { HttpResponse, UserData } from 'src/interfaces';
+import {
+  service,
+  serviceSeedComercial,
+  /*   serviceSeedInternal, */
+} from './data/services.seed';
+
+export interface InitResult {
+  admin?: UserData;
+  services?: service[];
+}
 
 @Injectable()
 export class SeedsService {
@@ -17,10 +27,44 @@ export class SeedsService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Generar el usuario super admin con su rol
+   * Función principal que inicializa todos los datos semilla
+   * @returns Resultado de la inicialización
+   */
+  async generateInit(): Promise<HttpResponse<InitResult>> {
+    try {
+      const initResults: InitResult = {};
+
+      // Generar usuario administrador
+      const adminResult = await this.generateUserAdmin();
+      if (adminResult) {
+        initResults.admin = adminResult.data;
+      }
+
+      // Generar servicios iniciales
+      const servicesResult = await this.generateServices();
+      if (servicesResult) {
+        initResults.services = servicesResult.data;
+      }
+
+      return {
+        message: 'System initialized successfully',
+        statusCode: HttpStatus.CREATED,
+        data: initResults,
+      };
+    } catch (error) {
+      this.logger.error('Error initializing system data', error.stack);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      handleException(error, 'Error initializing system data');
+    }
+  }
+
+  /**
+   * Genera el usuario super admin con su rol
    * @returns Super admin creado
    */
-  async generateInit(): Promise<HttpResponse<UserData>> {
+  async generateUserAdmin(): Promise<HttpResponse<UserData>> {
     try {
       // Iniciar una transacción
       const result = await this.prisma.$transaction(async (prisma) => {
@@ -62,5 +106,100 @@ export class SeedsService {
       }
       handleException(error, 'Error generating super admin');
     }
+  }
+
+  /**
+   * Genera servicios iniciales del sistema
+   * @returns Servicios creados
+   */
+  async generateServices(): Promise<HttpResponse<service[]>> {
+    try {
+      // Iniciar una transacción
+      const result = await this.prisma.$transaction(async (prisma) => {
+        const createdServices: service[] = [];
+
+        // Crear servicio comercial
+        const commercialCode = await this.generateCodeForService('COMMERCIAL');
+        const commercialService = await prisma.service.upsert({
+          where: {
+            name: serviceSeedComercial.name,
+          },
+          update: {},
+          create: {
+            ...serviceSeedComercial,
+            code: commercialCode,
+          },
+        });
+        createdServices.push(commercialService as service);
+
+        //Temporalmente comentado: Servicio interno
+        // Crear servicio interno
+        /*    const internalCode = await this.generateCodeForService('INTERNAL');
+        const internalService = await prisma.service.upsert({
+          where: {
+            name: serviceSeedInternal.name,
+          },
+          update: {},
+          create: {
+            ...serviceSeedInternal,
+            code: internalCode,
+          },
+        });
+        createdServices.push(internalService as service); */
+        //fin
+        return {
+          message: 'Services created successfully',
+          statusCode: HttpStatus.CREATED,
+          data: createdServices,
+        };
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error('Error generating services', error.stack);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      handleException(error, 'Error generating services');
+    }
+  }
+
+  /**
+   * Genera un código único para servicios según su tipo
+   * @param type Tipo de servicio (COMMERCIAL o INTERNAL)
+   * @returns Código único generado
+   */
+  private async generateCodeForService(
+    type: string = 'COMMERCIAL',
+  ): Promise<string> {
+    // Definir prefijo según el tipo de servicio
+    let prefix: string;
+
+    switch (type) {
+      case 'COMMERCIAL':
+        prefix = 'SRV-DYN';
+        break;
+      case 'INTERNAL':
+        prefix = 'SRV-INT';
+        break;
+      default:
+        prefix = 'SRV-GEN'; // Prefijo genérico para otros tipos
+    }
+
+    // Buscar el último servicio del tipo específico
+    const lastService = await this.prisma.service.findFirst({
+      where: {
+        code: { startsWith: `${prefix}-` },
+      },
+      orderBy: { code: 'desc' },
+    });
+
+    // Extraer el número secuencial
+    const lastIncrement = lastService
+      ? parseInt(lastService.code.split('-')[2], 10)
+      : 0;
+
+    // Generar el nuevo código con formato SRV-TYPE-000
+    return `${prefix}-${String(lastIncrement + 1).padStart(3, '0')}`;
   }
 }
