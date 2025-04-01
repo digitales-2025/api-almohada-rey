@@ -90,7 +90,11 @@ export class ReservationService {
         pagination,
         {
           include: {
-            room: true,
+            room: {
+              include: {
+                RoomTypes: true,
+              },
+            },
             user: true,
             customer: true,
           },
@@ -186,4 +190,177 @@ export class ReservationService {
       this.errorHandler.handleError(error, 'getting');
     }
   }
+
+  /**
+   * Obtiene todas las reservas que se solapan con un rango de fechas específico
+   * @param checkInDate - Fecha de inicio en formato ISO
+   * @param checkOutDate - Fecha de fin en formato ISO
+   * @returns Lista de reservas en el intervalo de tiempo
+   */
+  async getAllReservationsInTimeInterval(
+    checkInDate: string,
+    checkOutDate: string,
+  ): Promise<DetailedReservation[]> {
+    try {
+      // Parse string dates to Date objects
+      const parsedCheckInDate = new Date(checkInDate);
+      const parsedCheckOutDate = new Date(checkOutDate);
+
+      // Validate date format
+      if (
+        isNaN(parsedCheckInDate.getTime()) ||
+        isNaN(parsedCheckOutDate.getTime())
+      ) {
+        throw new BadRequestException('Invalid date format');
+      }
+
+      // Validate that check-in is before check-out
+      if (parsedCheckInDate >= parsedCheckOutDate) {
+        throw new BadRequestException(
+          'La fecha de check-in debe ser anterior a la fecha de check-out',
+        );
+      }
+
+      const reservations =
+        await this.reservationRepository.findMany<DetailedReservation>({
+          where: {
+            OR: [
+              // Reservas que comienzan durante el período solicitado
+              {
+                checkInDate: {
+                  gte: parsedCheckInDate,
+                  lt: parsedCheckOutDate,
+                },
+              },
+              // Reservas que terminan durante el período solicitado
+              {
+                checkOutDate: {
+                  gt: parsedCheckInDate,
+                  lte: parsedCheckOutDate,
+                },
+              },
+              // Reservas que abarcan todo el período solicitado
+              {
+                AND: [
+                  { checkInDate: { lte: parsedCheckInDate } },
+                  { checkOutDate: { gte: parsedCheckOutDate } },
+                ],
+              },
+            ],
+          },
+          include: {
+            room: {
+              include: {
+                RoomTypes: true,
+              },
+            },
+            customer: true,
+            user: true,
+          },
+        });
+      return reservations;
+    } catch (error) {
+      this.errorHandler.handleError(error, 'getting');
+    }
+  }
+
+  /**
+   * Obtiene todas las habitaciones disponibles para un rango de fechas específico
+   * @param checkInDate - Fecha de check-in en formato ISO
+   * @param checkOutDate - Fecha de check-out en formato ISO
+   * @returns Lista de habitaciones disponibles
+   */
+  async getAllAvailableRooms(
+    checkInDate: string,
+    checkOutDate: string,
+  ): Promise<DetailedRoom[]> {
+    try {
+      // Parse string dates to Date objects
+      const parsedCheckInDate = new Date(checkInDate);
+      const parsedCheckOutDate = new Date(checkOutDate);
+
+      // Validate date format
+      if (
+        isNaN(parsedCheckInDate.getTime()) ||
+        isNaN(parsedCheckOutDate.getTime())
+      ) {
+        throw new BadRequestException('Invalid date format');
+      }
+
+      // Validate that check-in is before check-out
+      if (parsedCheckInDate >= parsedCheckOutDate) {
+        throw new BadRequestException(
+          'La fecha de check-in debe ser anterior a la fecha de check-out',
+        );
+      }
+
+      // Get all reserved room IDs for the given date range
+      const reservedRoomIds =
+        await this.reservationRepository.getReservedRoomsIds(
+          parsedCheckInDate,
+          parsedCheckOutDate,
+        );
+
+      // Find all available rooms (those not in the reserved list)
+      const availableRooms = await this.roomRepository.findMany<DetailedRoom>({
+        where: {
+          id: {
+            notIn: reservedRoomIds,
+          },
+        },
+        include: { RoomTypes: true },
+      });
+
+      return availableRooms;
+    } catch (error) {
+      this.errorHandler.handleError(error, 'getting');
+    }
+  }
+
+  //   /**
+  //    * Obtiene todas las habitaciones disponibles para un rango de fechas específico
+  //    * @param checkInDate - Fecha de check-in en formato ISO
+  //    * @param checkOutDate - Fecha de check-out en formato ISO
+  //    * @returns Lista de habitaciones disponibles
+  //    */
+  //   async getAllAvailableRooms(
+  //     checkInDate: string,
+  //     checkOutDate: string,
+  //   ): Promise<DetailedRoom[]> {
+  //     try {
+  //       // Parse string dates to Date objects
+  //       const parsedCheckInDate = new Date(checkInDate);
+  //       const parsedCheckOutDate = new Date(checkOutDate);
+
+  //       // Validate date format
+  //       if (
+  //         isNaN(parsedCheckInDate.getTime()) ||
+  //         isNaN(parsedCheckOutDate.getTime())
+  //       ) {
+  //         throw new BadRequestException('Invalid date format');
+  //       }
+
+  //       // Validate that check-in is before check-out
+  //       if (parsedCheckInDate >= parsedCheckOutDate) {
+  //         throw new BadRequestException(
+  //           'La fecha de check-in debe ser anterior a la fecha de check-out',
+  //         );
+  //       }
+
+  //       const availableRooms = await this.roomRepository.findMany({
+  //         where: {
+  //           id: {
+  //             notIn: await this.reservationRepository.getReservedRoomIds(
+  //               parsedCheckInDate,
+  //               parsedCheckOutDate,
+  //             ),
+  //           },
+  //         },
+  //         include: { RoomTypes: true },
+  //       });
+
+  //       return availableRooms;
+  //     } catch (error) {
+  //       this.errorHandler.handleError(error, 'getting');
+  //     }
 }
