@@ -7,6 +7,7 @@ import { AuditModule } from './audit/audit.module';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { ProductModule } from './product/product.module';
 import { ReservationModule } from './reservation/reservation.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ReservationModule } from './reservation/reservation.module';
     AuditModule,
     ProductModule,
     ReservationModule,
+    PaymentsModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],

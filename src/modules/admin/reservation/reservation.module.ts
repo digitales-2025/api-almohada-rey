@@ -14,5 +14,6 @@ import { RoomModule } from '../room/room.module';
     ReservationRepository,
     CreateReservationUseCase,
   ],
+  exports: [ReservationService],
 })
 export class ReservationModule {}
