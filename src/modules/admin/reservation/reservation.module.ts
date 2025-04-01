@@ -5,6 +5,7 @@ import { ReservationRepository } from './repository/reservation.repository';
 import { CreateReservationUseCase } from './use-cases/createReservation.use-case';
 import { AuditModule } from '../audit/audit.module';
 import { RoomModule } from '../room/room.module';
+import { UpdateReservationUseCase } from './use-cases/updateReservation.use-case';
 
 @Module({
   imports: [AuditModule, RoomModule],
@@ -13,6 +14,7 @@ import { RoomModule } from '../room/room.module';
     ReservationService,
     ReservationRepository,
     CreateReservationUseCase,
+    UpdateReservationUseCase,
   ],
 })
 export class ReservationModule {}

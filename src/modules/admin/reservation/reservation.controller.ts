@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   Query,
+  Patch,
 } from '@nestjs/common';
 import { ReservationService } from './reservation.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
@@ -38,6 +39,7 @@ import {
   RoomAvailabilityDto,
 } from './dto/room-availability.dto';
 import { DetailedRoom } from '../room/entities/room.entity';
+import { UpdateReservationDto } from './dto/update-reservation.dto';
 
 @ApiTags('Reservations')
 @ApiBadRequestResponse({
@@ -66,6 +68,24 @@ export class ReservationController {
     @GetUser() user: UserData,
   ) {
     return this.reservationService.create(createReservationDto, user);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update a reservation' })
+  @ApiParam({ name: 'id', description: 'Reservation ID' })
+  @ApiOkResponse({
+    type: Reservation,
+    description: 'The updated reservation',
+  })
+  @ApiBadRequestResponse({
+    description: 'Bad Request - Error en la validación de datos',
+  })
+  update(
+    @Param('id') id: string,
+    @Body() updateReservationDto: UpdateReservationDto,
+    @GetUser() user: UserData,
+  ) {
+    return this.reservationService.update(id, updateReservationDto, user);
   }
 
   @Get()
@@ -270,11 +290,11 @@ export class ReservationController {
   @ApiOperation({ summary: 'Get a reservation by ID' })
   @ApiParam({ name: 'id', description: 'Reservation ID' })
   @ApiOkResponse({
-    type: DetailedReservation,
+    type: Reservation,
     description: 'The found reservation',
   })
   findOne(@Param('id') id: string) {
-    return this.reservationService.findOne(+id);
+    return this.reservationService.findOne(id);
   }
 
   // @Patch(':id')

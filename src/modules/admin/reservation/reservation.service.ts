@@ -19,6 +19,9 @@ import {
   RoomAvailabilityDto,
 } from './dto/room-availability.dto';
 import { DetailedRoom } from '../room/entities/room.entity';
+import { hasNoChanges } from 'src/utils/update-validations.util';
+import { UpdateReservationUseCase } from './use-cases/updateReservation.use-case';
+import { UpdateReservationDto } from './dto/update-reservation.dto';
 
 @Injectable()
 export class ReservationService {
@@ -28,6 +31,7 @@ export class ReservationService {
   constructor(
     private readonly reservationRepository: ReservationRepository,
     private readonly createReservationUseCase: CreateReservationUseCase,
+    private readonly updateReservationUseCase: UpdateReservationUseCase,
     private readonly roomRepository: RoomRepository,
   ) {
     this.errorHandler = new BaseErrorHandler(
@@ -72,6 +76,81 @@ export class ReservationService {
     }
   }
 
+  async update(
+    id: string,
+    updateReservationDto: UpdateReservationDto,
+    userData: UserData,
+  ): Promise<BaseApiResponse<Reservation>> {
+    try {
+      // const roomAvailability = await this.checkAvailability({
+      //   roomId: createReservationDto.roomId,
+      //   checkInDate: createReservationDto.checkInDate,
+      //   checkOutDate: createReservationDto.checkOutDate,
+      // });
+      // if (!roomAvailability.isAvailable) {
+      //   throw new BadRequestException('Habitación no disponible');
+      // }
+      // return this.reservationRepository.up(ids, updateReservationDto);
+
+      const originalReservation = await this.findOne(id);
+
+      if (!originalReservation) {
+        throw new BadRequestException(`No se encontró la reserva con ID ${id}`);
+      }
+
+      const updatedReservation: Reservation = {
+        customerId: updateReservationDto.customerId,
+        roomId: updateReservationDto.roomId,
+        userId: updateReservationDto.userId,
+        reservationDate: updateReservationDto.reservationDate,
+        checkInDate: updateReservationDto.checkInDate,
+        checkOutDate: updateReservationDto.checkOutDate,
+        origin: updateReservationDto.origin,
+        reason: updateReservationDto.reason,
+        status: updateReservationDto.status,
+        guests: JSON.stringify(updateReservationDto.guests),
+        observations: updateReservationDto.observations,
+      };
+
+      const dtoHasNoChanges = hasNoChanges(
+        updatedReservation,
+        originalReservation,
+      );
+
+      if (dtoHasNoChanges) {
+        return {
+          data: originalReservation,
+          message: 'No se realizaron cambios en la reserva',
+          success: true,
+        };
+      }
+
+      //check chekin-out collisions
+      const checkInDate = new Date(updatedReservation.checkInDate);
+      const checkOutDate = new Date(updatedReservation.checkOutDate);
+      const reservations = await this.getAllReservationsInTimeInterval(
+        checkInDate.toISOString(),
+        checkOutDate.toISOString(),
+      );
+
+      if (reservations.some((reservation) => reservation.id !== id)) {
+        throw new BadRequestException(
+          'La habitación no está disponible en las fechas seleccionadas',
+        );
+      }
+
+      const reservation = await this.updateReservationUseCase.execute(
+        id,
+        updatedReservation,
+        userData,
+      );
+
+      return reservation;
+    } catch (error) {
+      this.errorHandler.handleError(error, 'updating');
+    }
+  }
+
   findAll() {
     try {
       return this.reservationRepository.findMany();
@@ -105,15 +184,39 @@ export class ReservationService {
     }
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} reservation`;
+  findOne(id: string) {
+    try {
+      return this.reservationRepository.findOne<Reservation>({
+        where: {
+          id,
+          isActive: true,
+        },
+      });
+    } catch (error) {
+      this.errorHandler.handleError(error, 'getting');
+    }
   }
 
-  update(
-    id: number,
-    // updateReservationDto: UpdateReservationDto
-  ) {
-    return `This action updates a #${id} reservation`;
+  findOneDetailed(id: string) {
+    try {
+      return this.reservationRepository.findOne<DetailedReservation>({
+        where: {
+          id,
+          isActive: true,
+        },
+        include: {
+          room: {
+            include: {
+              RoomTypes: true,
+            },
+          },
+          user: true,
+          customer: true,
+        },
+      });
+    } catch (error) {
+      this.errorHandler.handleError(error, 'getting');
+    }
   }
 
   remove(id: number) {
@@ -153,7 +256,10 @@ export class ReservationService {
 
       // Verificar si la habitación existe
       const room = await this.roomRepository.findOne<DetailedRoom>({
-        where: { id: roomId },
+        where: {
+          id: roomId,
+          isActive: true,
+        },
         include: { RoomTypes: true },
       });
       if (!room) {
@@ -224,6 +330,7 @@ export class ReservationService {
       const reservations =
         await this.reservationRepository.findMany<DetailedReservation>({
           where: {
+            isActive: true,
             OR: [
               // Reservas que comienzan durante el período solicitado
               {
@@ -304,6 +411,7 @@ export class ReservationService {
       // Find all available rooms (those not in the reserved list)
       const availableRooms = await this.roomRepository.findMany<DetailedRoom>({
         where: {
+          isActive: true,
           id: {
             notIn: reservedRoomIds,
           },

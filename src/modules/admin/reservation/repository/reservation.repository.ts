@@ -32,7 +32,8 @@ export class ReservationRepository extends BaseRepository<Reservation> {
         status: {
           in: [
             ReservationStatus.CHECKED_IN, // Reservaciones Activas, el cliente ya está en la habitación
-            ReservationStatus.PENDING, //This is same as saying CONFIRMED
+            ReservationStatus.PENDING, //This is when was reserved, but not payed yet
+            ReservationStatus.CONFIRMED, // Reservaciones Confirmadas
           ],
         },
         // Verificar superposición de fechas
@@ -79,7 +80,8 @@ export class ReservationRepository extends BaseRepository<Reservation> {
         status: {
           in: [
             ReservationStatus.CHECKED_IN, // Reservaciones Activas, el cliente ya está en la habitación
-            ReservationStatus.PENDING, //This is same as saying CONFIRMED
+            ReservationStatus.PENDING, //This is when was reserved, but not payed yet
+            ReservationStatus.CONFIRMED, // Reservaciones Confirmadas
           ],
         },
         OR: [
