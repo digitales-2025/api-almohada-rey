@@ -12,7 +12,7 @@ import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { GuestBuilder, Guests } from '../entities/guest.entity';
 import { Reservation } from '../entities/reservation.entity';
 import { AuditRepository } from 'src/modules/admin/audit/audit.repository';
-import { RoomRepository } from 'src/modules/admin/room/repositories/room.repository';
+// import { RoomRepository } from 'src/modules/admin/room/repositories/room.repository';
 
 @Injectable()
 export class CreateReservationUseCase {
@@ -20,7 +20,7 @@ export class CreateReservationUseCase {
   constructor(
     private readonly reservationRepository: ReservationRepository,
     private readonly auditRepository: AuditRepository,
-    private readonly roomRepository: RoomRepository,
+    // private readonly roomRepository: RoomRepository,
   ) {}
 
   async execute(
