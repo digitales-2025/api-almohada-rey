@@ -5,8 +5,11 @@ import {
   IsPositive,
   IsOptional,
   IsBoolean,
+  IsEnum,
+  IsNumber,
 } from 'class-validator';
-
+import { Transform } from 'class-transformer';
+import { FloorTypes } from './create-room.dto';
 export class UpdateRoomDto {
   @ApiProperty({
     description: 'ID del tipo de habitación',
@@ -80,4 +83,34 @@ export class UpdateRoomDto {
   @IsBoolean()
   @IsOptional()
   lamp?: boolean;
+
+  @ApiProperty({
+    description: 'Descripción de la televisión',
+    example: 'Smart TV 42 pulgadas',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  @Transform(({ value }) => value?.trim())
+  tv?: string;
+
+  @ApiProperty({
+    description: 'Área en metros cuadrados',
+    example: 25.5,
+    required: false,
+  })
+  @IsNumber()
+  @IsPositive()
+  @IsOptional()
+  area?: number;
+
+  @ApiProperty({
+    description: 'Tipo de piso',
+    enum: FloorTypes,
+    example: 'LAMINATING',
+    required: false,
+  })
+  @IsEnum(FloorTypes)
+  @IsOptional()
+  floorType?: FloorTypes;
 }
