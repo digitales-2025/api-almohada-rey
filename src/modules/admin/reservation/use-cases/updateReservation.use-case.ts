@@ -63,19 +63,53 @@ export class UpdateReservationUseCase {
 
           const updateReservationStatus = possibleUpdatedReservation.status;
           if (updateReservationStatus) {
-            if (updateReservationStatus === 'CANCELED') {
+            if (
+              existingReservation.status === 'CANCELED' &&
+              updateReservationStatus !== 'CANCELED'
+            ) {
               throw new BadRequestException(
-                `Reservation with ID ${id} cannot be updated because it is already cancelled`,
+                `Reservación con el ID ${id} no puede ser actualizada porque ya fue cancelada`,
               );
             }
-            if (updateReservationStatus === 'CHECKED_IN') {
+            if (
+              existingReservation.status === 'CHECKED_IN' &&
+              updateReservationStatus === 'CANCELED'
+            ) {
+              throw new BadRequestException(
+                `Reservación con el ID ${id} no puede ser CANCELADA porque ya está ACTIVA`,
+              );
+            }
+            if (
+              existingReservation.status === 'CHECKED_IN' &&
+              (updateReservationStatus == 'PENDING' ||
+                updateReservationStatus == 'CONFIRMED')
+            ) {
+              throw new BadRequestException(
+                `Reservación con el ID ${id} no puede ser actualizada porque ya está CHECKED_IN`,
+              );
+            }
+            if (
+              existingReservation.status === 'CHECKED_OUT' &&
+              updateReservationStatus !== 'CHECKED_OUT'
+            ) {
+              throw new BadRequestException(
+                `Reservación con el ID ${id} no puede ser actualizada porque ya fue consumada`,
+              );
+            }
+            if (
+              updateReservationStatus === 'CHECKED_IN' &&
+              existingReservation.status == 'CONFIRMED'
+            ) {
               await this.roomRepository.updateWithTx(
                 possibleUpdatedReservation.roomId,
                 { status: 'OCCUPIED' },
                 tx,
               );
             }
-            if (updateReservationStatus === 'CHECKED_OUT') {
+            if (
+              updateReservationStatus === 'CHECKED_OUT' &&
+              existingReservation.status == 'CHECKED_IN'
+            ) {
               await this.roomRepository.updateWithTx(
                 possibleUpdatedReservation.roomId,
                 { status: 'CLEANING' },
