@@ -1,0 +1,6 @@
+-- AlterEnum
+ALTER TYPE "ReservationStatus" ADD VALUE 'CONFIRMED';
+
+-- AlterTable
+ALTER TABLE "Reservation" ALTER COLUMN "checkInDate" SET DATA TYPE TIMESTAMPTZ(6),
+ALTER COLUMN "checkOutDate" SET DATA TYPE TIMESTAMPTZ(6);
