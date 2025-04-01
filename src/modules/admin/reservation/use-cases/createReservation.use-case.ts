@@ -24,14 +24,14 @@ export class CreateReservationUseCase {
   ) {}
 
   async execute(
-    createOrderDto: CreateReservationDto,
+    createReservationDto: CreateReservationDto,
     user: UserData,
   ): Promise<BaseApiResponse<Reservation>> {
     try {
       const newReservation = await this.reservationRepository.transaction(
         async (tx) => {
           // 1. Construir los objetos huéspedes
-          const guests = createOrderDto.guests.map((guest) => {
+          const guests = createReservationDto.guests.map((guest) => {
             return new GuestBuilder()
               .withName(guest.name)
               .withAge(guest?.age)
@@ -44,31 +44,39 @@ export class CreateReservationUseCase {
               .build();
           });
 
-          // 2. Actualizar estado de la habitación
-          await this.roomRepository.updateWithTx(
-            createOrderDto.roomId,
-            { status: 'RESERVED' },
-            tx,
-          );
+          // // 2. Actualizar estado de la habitación
+          // await this.roomRepository.updateWithTx(
+          //   createReservationDto.roomId,
+          //   { status: 'RESERVED' },
+          //   tx,
+          // );
+
+          // Logger.log('Ckeckin date ' + createReservationDto.checkInDate);
+          // Logger.log('Checkout date ' + createReservationDto.checkOutDate);
 
           // 3. Crear reserva
           const reservation = await this.reservationRepository.createWithTx(
             {
-              customerId: createOrderDto.customerId,
-              roomId: createOrderDto.roomId,
+              customerId: createReservationDto.customerId,
+              roomId: createReservationDto.roomId,
               userId: user.id,
               reservationDate:
-                createOrderDto.reservationDate ?? new Date().toISOString(),
-              checkInDate: createOrderDto.checkInDate,
-              checkOutDate: createOrderDto.checkOutDate,
-              origin: createOrderDto.origin,
-              reason: createOrderDto.reason,
-              status: createOrderDto.status,
-              ...(createOrderDto.guests && {
+                createReservationDto.reservationDate ??
+                new Date().toISOString(),
+              checkInDate: new Date(
+                createReservationDto.checkInDate,
+              ).toISOString(),
+              checkOutDate: new Date(
+                createReservationDto.checkOutDate,
+              ).toISOString(),
+              origin: createReservationDto.origin,
+              reason: createReservationDto.reason,
+              status: createReservationDto.status,
+              ...(createReservationDto.guests && {
                 guests: new Guests(guests).stringify(),
               }),
-              ...(createOrderDto.observations && {
-                observations: createOrderDto.observations,
+              ...(createReservationDto.observations && {
+                observations: createReservationDto.observations,
               }),
             },
             tx,
@@ -98,7 +106,7 @@ export class CreateReservationUseCase {
       // Manejo centralizado de errores
       this.logger.error(`Error al crear reservación: ${error.message}`, {
         error,
-        dto: createOrderDto,
+        dto: createReservationDto,
         userId: user.id,
       });
 
