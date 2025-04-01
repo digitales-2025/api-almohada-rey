@@ -30,6 +30,9 @@ export class UpdateRoomUseCase {
         showerSoap: updateRoomDto.showerSoap,
         handSoap: updateRoomDto.handSoap,
         lamp: updateRoomDto.lamp,
+        tv: updateRoomDto.tv,
+        floorType: updateRoomDto.floorType,
+        area: updateRoomDto.area,
       });
 
       // Registrar auditoría

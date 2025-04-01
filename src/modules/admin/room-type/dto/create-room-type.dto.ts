@@ -4,15 +4,9 @@ import {
   IsNotEmpty,
   IsInt,
   IsNumber,
-  IsEnum,
   IsPositive,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-
-export enum FloorTypes {
-  LAMINATING = 'LAMINATING',
-  CARPETING = 'CARPETING',
-}
 
 export class CreateRoomTypeDto {
   @ApiProperty({
@@ -46,26 +40,6 @@ export class CreateRoomTypeDto {
   price: number;
 
   @ApiProperty({
-    description: 'Descripción de la televisión',
-    example: 'Smart TV 42 pulgadas',
-    required: true,
-  })
-  @IsString()
-  @IsNotEmpty()
-  @Transform(({ value }) => value?.trim())
-  tv: string;
-
-  @ApiProperty({
-    description: 'Tipo de piso',
-    enum: FloorTypes,
-    example: 'LAMINATING',
-    required: true,
-  })
-  @IsEnum(FloorTypes)
-  @IsNotEmpty()
-  floorType: FloorTypes;
-
-  @ApiProperty({
     description: 'Descripción del tipo de habitación',
     example: 'Habitación con balcón privado',
     required: true,
@@ -74,16 +48,6 @@ export class CreateRoomTypeDto {
   @IsNotEmpty()
   @Transform(({ value }) => value?.trim())
   description: string;
-
-  @ApiProperty({
-    description: 'Área en metros cuadrados',
-    example: 25.5,
-    required: true,
-  })
-  @IsNumber()
-  @IsPositive()
-  @IsNotEmpty()
-  area: number;
 
   @ApiProperty({
     description: 'Descripción de la cama',
