@@ -30,6 +30,9 @@ export class CreateRoomUseCase {
         showerSoap: true,
         handSoap: true,
         lamp: true,
+        tv: createRoomDto.tv,
+        floorType: createRoomDto.floorType,
+        area: createRoomDto.area,
       });
 
       // Registrar auditoría
