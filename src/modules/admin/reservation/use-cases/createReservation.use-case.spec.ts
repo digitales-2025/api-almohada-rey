@@ -101,7 +101,7 @@ describe('CreateReservationUseCase', () => {
           return {
             updateWithTx: jest
               .fn()
-              .mockResolvedValue({ id: 'room-id-1', status: 'RESERVED' }),
+              .mockResolvedValue({ id: 'room-id-1', status: 'OCCUPIED' }),
           };
         }
         if (typeof token === 'function') {
@@ -141,7 +141,7 @@ describe('CreateReservationUseCase', () => {
       expect(reservationRepository.transaction).toHaveBeenCalled();
       expect(roomsRepository.updateWithTx).toHaveBeenCalledWith(
         mockCreateReservationDto.roomId,
-        { status: 'RESERVED' },
+        { status: 'OCCUPIED' },
         expect.anything(),
       );
       expect(reservationRepository.createWithTx).toHaveBeenCalledWith(

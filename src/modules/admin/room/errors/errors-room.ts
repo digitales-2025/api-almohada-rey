@@ -14,7 +14,6 @@ export const roomErrorMessages: ErrorMessages = {
   invalidStatus: 'Estado de habitación inválido',
   unavailable: 'La habitación no está disponible actualmente',
   occupied: 'La habitación está ocupada',
-  reserved: 'La habitación está reservada',
   cleaning: 'La habitación está en limpieza',
 
   // Errores de relación

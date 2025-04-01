@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { FloorTypes as FloorTypesPrisma } from '@prisma/client';
 import { BaseEntity } from 'src/prisma/src/abstract/base.entity';
 import { FloorTypes } from '../dto';
+import { RoomTypes } from '@prisma/client';
 
 export class RoomType extends BaseEntity {
   @ApiProperty({
@@ -64,3 +65,5 @@ export class RoomType extends BaseEntity {
     Object.assign(this, partial);
   }
 }
+
+export type SummaryRoomTypeData = Pick<RoomTypes, 'id' | 'name' | 'isActive'>;
