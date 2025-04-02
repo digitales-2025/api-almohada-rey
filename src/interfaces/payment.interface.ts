@@ -29,6 +29,10 @@ export type PaymentDetailData = Pick<
     id: string;
     name: string;
   };
+  service?: {
+    id: string;
+    name: string;
+  };
   days?: number;
   room?: {
     id: string;
