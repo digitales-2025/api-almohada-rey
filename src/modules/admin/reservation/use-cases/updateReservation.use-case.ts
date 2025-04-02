@@ -61,6 +61,8 @@ export class UpdateReservationUseCase {
             guestsData = JSON.stringify(guests);
           }
 
+          let isActive = true;
+
           const updateReservationStatus = possibleUpdatedReservation.status;
           if (updateReservationStatus) {
             if (
@@ -116,6 +118,20 @@ export class UpdateReservationUseCase {
                 tx,
               );
             }
+
+            //if canceled and confirmed
+            if (
+              updateReservationStatus === 'CANCELED' &&
+              existingReservation.status == 'CONFIRMED'
+            ) {
+              //Add more actions when cancel reservation
+              isActive = false;
+              // await this.roomRepository.updateWithTx(
+              //   possibleUpdatedReservation.roomId,
+              //   { status: 'AVAILABLE' },
+              //   tx,
+              // );
+            }
           }
 
           const reservation = await this.reservationRepository.updateWithTx(
@@ -149,6 +165,7 @@ export class UpdateReservationUseCase {
               ...(possibleUpdatedReservation.observations && {
                 observations: possibleUpdatedReservation.observations,
               }),
+              isActive,
               updatedAt: new Date(),
             },
             tx,

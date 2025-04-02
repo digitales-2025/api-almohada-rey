@@ -194,6 +194,8 @@ export class ReservationController {
   async getAvailableRooms(
     @Query('checkInDate') checkInDate: string,
     @Query('checkOutDate') checkOutDate: string,
+    @Query('forUpdate') forUpdate: boolean = false,
+    @Query('reservationId') reservationId?: string,
   ): Promise<DetailedRoom[]> {
     // const checkAvailabilityDto: CheckAvailabilityDto = {
     //   roomId: '',
@@ -204,6 +206,8 @@ export class ReservationController {
     return this.reservationService.getAllAvailableRooms(
       checkInDate,
       checkOutDate,
+      forUpdate,
+      reservationId,
     );
   }
 
@@ -233,6 +237,8 @@ export class ReservationController {
   async getReservationInInterval(
     @Query('checkInDate') checkInDate: string,
     @Query('checkOutDate') checkOutDate: string,
+    @Query('forUpdate') forUpdate: boolean = false,
+    @Query('reservationId') reservationId?: string,
   ): Promise<DetailedReservation[]> {
     // const checkAvailabilityDto: CheckAvailabilityDto = {
     //   roomId: '',
@@ -243,6 +249,8 @@ export class ReservationController {
     return this.reservationService.getAllReservationsInTimeInterval(
       checkInDate,
       checkOutDate,
+      forUpdate,
+      reservationId,
     );
   }
 
@@ -276,6 +284,8 @@ export class ReservationController {
     @Query('roomId') roomId: string,
     @Query('checkInDate') checkInDate: string,
     @Query('checkOutDate') checkOutDate: string,
+    @Query('forUpdate') forUpdate: boolean = false,
+    @Query('reservationId') reservationId?: string,
   ): Promise<RoomAvailabilityDto> {
     const checkAvailabilityDto: CheckAvailabilityDto = {
       roomId,
@@ -283,7 +293,11 @@ export class ReservationController {
       checkOutDate,
     };
 
-    return this.reservationService.checkAvailability(checkAvailabilityDto);
+    return this.reservationService.checkAvailability(
+      checkAvailabilityDto,
+      forUpdate,
+      reservationId,
+    );
   }
 
   @Get(':id')

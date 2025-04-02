@@ -230,8 +230,15 @@ export class ReservationService {
    */
   async checkAvailability(
     checkAvailabilityDto: CheckAvailabilityDto,
+    forUpdate: boolean = false,
+    reservationId?: string,
   ): Promise<RoomAvailabilityDto> {
     try {
+      if (forUpdate && !reservationId) {
+        throw new BadRequestException(
+          'Para actualizar una reserva, se requiere el ID de la reserva que esta actualizando',
+        );
+      }
       const { roomId, checkInDate, checkOutDate } = checkAvailabilityDto;
 
       // Validar que las fechas son correctas
@@ -248,10 +255,35 @@ export class ReservationService {
       // Look Out this
       // Validar que no estamos en el pasado
       const now = new Date();
+      // if (parsedCheckInDate < now) {
+      //   throw new BadRequestException(
+      //     'La fecha de check-in no puede estar en el pasado',
+      //   );
+      // }
+
+      // For updates, validate only new check-in dates to allow historical data updates
       if (parsedCheckInDate < now) {
-        throw new BadRequestException(
-          'La fecha de check-in no puede estar en el pasado',
-        );
+        // If it's an update, only validate if the date is being changed
+        if (forUpdate && reservationId) {
+          const originalReservation = await this.reservationRepository.findOne({
+            where: { id: reservationId, isActive: true },
+          });
+
+          // Only validate if check-in date is being changed to a new date
+          if (
+            originalReservation &&
+            originalReservation.checkInDate !== checkInDate
+          ) {
+            throw new BadRequestException(
+              'La fecha de check-in nueva no puede estar en el pasado',
+            );
+          }
+        } else {
+          // For new reservations, always validate
+          throw new BadRequestException(
+            'La fecha de check-in no puede estar en el pasado',
+          );
+        }
       }
 
       // Verificar si la habitación existe
@@ -274,6 +306,8 @@ export class ReservationService {
           roomId,
           parsedCheckInDate,
           parsedCheckOutDate,
+          forUpdate,
+          reservationId,
         );
 
       // Crear la respuesta
@@ -306,8 +340,15 @@ export class ReservationService {
   async getAllReservationsInTimeInterval(
     checkInDate: string,
     checkOutDate: string,
+    forUpdate: boolean = false,
+    reservationId?: string,
   ): Promise<DetailedReservation[]> {
     try {
+      if (forUpdate && !reservationId) {
+        throw new BadRequestException(
+          'Para actualizar una reserva, se requiere el ID de la reserva que esta actualizando',
+        );
+      }
       // Parse string dates to Date objects
       const parsedCheckInDate = new Date(checkInDate);
       const parsedCheckOutDate = new Date(checkOutDate);
@@ -327,34 +368,61 @@ export class ReservationService {
         );
       }
 
-      const reservations =
-        await this.reservationRepository.findMany<DetailedReservation>({
-          where: {
-            isActive: true,
-            OR: [
-              // Reservas que comienzan durante el período solicitado
-              {
-                checkInDate: {
-                  gte: parsedCheckInDate,
-                  lt: parsedCheckOutDate,
-                },
-              },
-              // Reservas que terminan durante el período solicitado
-              {
-                checkOutDate: {
-                  gt: parsedCheckInDate,
-                  lte: parsedCheckOutDate,
-                },
-              },
-              // Reservas que abarcan todo el período solicitado
-              {
-                AND: [
-                  { checkInDate: { lte: parsedCheckInDate } },
-                  { checkOutDate: { gte: parsedCheckOutDate } },
-                ],
-              },
+      let originalReservation: DetailedReservation | undefined;
+
+      // If we're doing an update, we'll need to exclude the current reservation
+      // from the collision check, as it should be allowed to occupy its own time slot
+      const where: any = {
+        isActive: true,
+        OR: [
+          // Reservations that start during the requested period
+          {
+            checkInDate: {
+              gte: parsedCheckInDate,
+              lt: parsedCheckOutDate,
+            },
+          },
+          // Reservations that end during the requested period
+          {
+            checkOutDate: {
+              gt: parsedCheckInDate,
+              lte: parsedCheckOutDate,
+            },
+          },
+          // Reservations that span the entire requested period
+          {
+            AND: [
+              { checkInDate: { lte: parsedCheckInDate } },
+              { checkOutDate: { gte: parsedCheckOutDate } },
             ],
           },
+        ],
+      };
+
+      // For updates, exclude the reservation being updated from the collision check
+      if (forUpdate && reservationId) {
+        where.id = { not: reservationId };
+        originalReservation =
+          await this.reservationRepository.findOne<DetailedReservation>({
+            where: {
+              id: reservationId,
+              isActive: true,
+            },
+            include: {
+              room: {
+                include: {
+                  RoomTypes: true,
+                },
+              },
+              customer: true,
+              user: true,
+            },
+          });
+      }
+
+      const reservations =
+        await this.reservationRepository.findMany<DetailedReservation>({
+          where: where,
           include: {
             room: {
               include: {
@@ -365,6 +433,11 @@ export class ReservationService {
             user: true,
           },
         });
+
+      if (forUpdate && reservationId && originalReservation) {
+        reservations.push(originalReservation);
+      }
+
       return reservations;
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
@@ -380,8 +453,15 @@ export class ReservationService {
   async getAllAvailableRooms(
     checkInDate: string,
     checkOutDate: string,
+    forUpdate: boolean = false,
+    reservationId?: string,
   ): Promise<DetailedRoom[]> {
     try {
+      if (forUpdate && !reservationId) {
+        throw new BadRequestException(
+          'Para actualizar una reserva, se requiere el ID de la reserva que esta actualizando',
+        );
+      }
       // Parse string dates to Date objects
       const parsedCheckInDate = new Date(checkInDate);
       const parsedCheckOutDate = new Date(checkOutDate);
@@ -402,11 +482,30 @@ export class ReservationService {
       }
 
       // Get all reserved room IDs for the given date range
-      const reservedRoomIds =
+      let reservedRoomIds =
         await this.reservationRepository.getReservedRoomsIds(
           parsedCheckInDate,
           parsedCheckOutDate,
         );
+
+      if (forUpdate && reservationId) {
+        Logger.log('Entrando a las ras reservaciones para update REservation');
+        // If we're updating a reservation, we need to exclude the current reservation
+        // from the list of reserved room IDs
+        const originalReservation =
+          await this.reservationRepository.findOne<Reservation>({
+            where: {
+              id: reservationId,
+              isActive: true,
+            },
+          });
+
+        if (originalReservation) {
+          reservedRoomIds = reservedRoomIds.filter(
+            (id) => id !== originalReservation.roomId,
+          );
+        }
+      }
 
       // Find all available rooms (those not in the reserved list)
       const availableRooms = await this.roomRepository.findMany<DetailedRoom>({
