@@ -187,8 +187,8 @@ model Reservation {
   checkInDate     DateTime          @db.Timestamptz(6)
   checkOutDate    DateTime          @db.Timestamptz(6)
   status          ReservationStatus
-  origin        String // Origin place from the customer
-  reason        String // Reason for reservation
+  origin          String // Origin place from the customer
+  reason          String // Reason for reservation
   guests          Json? // List of companions
   observations    String? // Additional notes
 
@@ -250,6 +250,9 @@ model PaymentDetail {
   // Si es que el payment detail es para compra de productos
   product   Product? @relation("PaymentDetailProduct", fields: [productId], references: [id])
   productId String?
+  // Si el payment es del tipo servicio extra
+  service   Service? @relation("PaymentDetailService", fields: [serviceId], references: [id])
+  serviceId String?
   quantity  Int?
 
   // Si el payment es del tipo reserva de la habitación
@@ -287,11 +290,13 @@ enum ProductType {
 }
 
 model Service {
-  id        String   @id @default(uuid())
-  name      String   @unique
+  id          String   @id @default(uuid())
+  name        String   @unique
   description String
-  code      String   @unique
-  price     Float
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt
+  code        String   @unique
+  price       Float
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt
+
+  paymentDetail PaymentDetail[] @relation("PaymentDetailService")
 }
