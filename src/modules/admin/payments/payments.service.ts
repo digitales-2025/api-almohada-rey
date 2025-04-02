@@ -11,8 +11,9 @@ import { HttpResponse, PaymentData, UserData } from 'src/interfaces';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { RoomService } from '../room/services/room.service';
-import { AuditActionType } from '@prisma/client';
+import { AuditActionType, ReservationStatus } from '@prisma/client';
 import { handleException } from 'src/utils';
+import { ServiceService } from '../service/services/service.service';
 
 @Injectable()
 export class PaymentsService {
@@ -22,6 +23,7 @@ export class PaymentsService {
     private readonly audit: AuditService,
     /*     private readonly reservationService: ReservationService, */
     private readonly roomService: RoomService,
+    private readonly serviceService: ServiceService,
   ) {}
 
   /**
@@ -53,7 +55,12 @@ export class PaymentsService {
         throw new BadRequestException('Reservation doesnt exist');
       }
 
-      // Verificar que la habitación existe
+      // Verificar que hay detalles de pago
+      if (!paymentDetail || paymentDetail.length === 0) {
+        throw new BadRequestException('El pago debe tener al menos un detalle');
+      }
+
+      // Verificar que las habitaciones existen
       if (paymentDetail && paymentDetail.length > 0) {
         for (const detail of paymentDetail) {
           if (detail.roomId) {
@@ -62,9 +69,13 @@ export class PaymentsService {
         }
       }
 
-      // Verificar que hay detalles de pago
-      if (!paymentDetail || paymentDetail.length === 0) {
-        throw new BadRequestException('El pago debe tener al menos un detalle');
+      // Verificar que los servicios existen
+      if (paymentDetail && paymentDetail.length > 0) {
+        for (const detail of paymentDetail) {
+          if (detail.serviceId) {
+            await this.serviceService.findById(detail.serviceId);
+          }
+        }
       }
 
       // Obtener la fecha de pago del primer detalle para usarla como fecha de pago general
@@ -112,7 +123,25 @@ export class PaymentsService {
             ...(detail.productId && { productId: detail.productId }),
             ...(detail.roomId && { roomId: detail.roomId }),
             ...(detail.days && { days: detail.days }),
+            ...(detail.serviceId && { serviceId: detail.serviceId }),
           };
+
+          // Validación específica según el tipo de detalle
+          if (detail.type === 'ROOM_RESERVATION' && !detail.roomId) {
+            throw new BadRequestException(
+              'Para reservas de habitación, debe especificar la habitación',
+            );
+          }
+
+          if (
+            detail.type === 'EXTRA_SERVICE' &&
+            !detail.serviceId &&
+            !detail.productId
+          ) {
+            throw new BadRequestException(
+              'Para servicios extras, debe especificar el servicio',
+            );
+          }
 
           const createdDetail = await prisma.paymentDetail.create({
             data: paymentDetailData,
@@ -133,6 +162,12 @@ export class PaymentsService {
                       name: true,
                     },
                   },
+                },
+              },
+              service: {
+                select: {
+                  id: true,
+                  name: true,
                 },
               },
             },
@@ -179,6 +214,14 @@ export class PaymentsService {
         }
       }
 
+      // Validación con logger que se creo correctamente el pago
+      if (newPayment) {
+        await this.prisma.reservation.update({
+          where: { id: reservationId },
+          data: { status: ReservationStatus.CONFIRMED },
+        });
+      }
+
       return {
         statusCode: HttpStatus.CREATED,
         message: 'Payment created successfully',
@@ -205,6 +248,7 @@ export class PaymentsService {
             ...(detail.product && { product: detail.product }),
             ...(detail.days && { days: detail.days }),
             ...(detail.room && { room: detail.room }),
+            ...(detail.service && { service: detail.service }),
           })),
         },
       };

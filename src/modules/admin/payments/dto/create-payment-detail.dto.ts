@@ -14,16 +14,6 @@ import {
 // DTO para la creacion de un Payment
 export class CreatePaymentDetailDto {
   @ApiProperty({
-    name: 'paymentId',
-    description: 'Payment ID',
-    example: 'Id del pago',
-  })
-  @IsString()
-  @IsUUID()
-  @IsNotEmpty()
-  paymentId: string;
-
-  @ApiProperty({
     name: 'paymentDate',
     description: 'Date of the payment',
     example: '2021-09-21',
@@ -32,6 +22,13 @@ export class CreatePaymentDetailDto {
   @IsNotEmpty()
   paymentDate: string;
 
+  @ApiProperty({
+    name: 'description',
+    description: 'Descripción del detalle de pago',
+    example: 'Descripción del detalle de pago',
+  })
+  @IsString()
+  @IsNotEmpty()
   description: string;
 
   @ApiProperty({
@@ -85,6 +82,17 @@ export class CreatePaymentDetailDto {
   @IsUUID()
   @IsOptional()
   productId?: string;
+
+  @ApiProperty({
+    name: 'serviceId',
+    description: 'ID del servicio',
+    example: 'ID del servicio',
+    required: false,
+  })
+  @IsString()
+  @IsUUID()
+  @IsOptional()
+  serviceId?: string;
 
   @ApiProperty({
     name: 'quantity',
