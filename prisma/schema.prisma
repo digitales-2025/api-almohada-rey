@@ -252,6 +252,9 @@ model PaymentDetail {
   // Si es que el payment detail es para compra de productos
   product   Product? @relation("PaymentDetailProduct", fields: [productId], references: [id])
   productId String?
+  // Si el payment es del tipo servicio extra
+  service   Service? @relation("PaymentDetailService", fields: [serviceId], references: [id])
+  serviceId String?
   quantity  Int?
 
   // Si el payment es del tipo reserva de la habitación
@@ -296,4 +299,6 @@ model Service {
   price       Float
   createdAt   DateTime @default(now()) @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt
+
+  paymentDetail PaymentDetail[] @relation("PaymentDetailService")
 }

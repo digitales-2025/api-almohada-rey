@@ -114,6 +114,9 @@ export class DetailedRoom extends Room {
 export type FindAllRoom = {
   id: string;
   number: number;
+  tv: string;
+  area: number;
+  floorType: FloorTypesPrisma;
   status: RoomStatusPrisma;
   isActive: boolean;
 

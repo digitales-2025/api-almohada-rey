@@ -16,7 +16,7 @@ import {
   UserPayload,
 } from 'src/interfaces';
 import { handleException } from 'src/utils';
-import { AuditActionType } from '@prisma/client';
+import { AuditActionType, ReservationStatus } from '@prisma/client';
 import {
   createDynamicUpdateObject,
   hasNoChanges,
@@ -25,6 +25,7 @@ import { DeleteCustomerDto } from './dto/delete-customer.dto';
 import { Customer } from './entity/customer.entity';
 import { CustomerRepository } from './repository/customer.repository';
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
+import { HistoryCustomerData } from 'src/interfaces/customer.interface';
 
 @Injectable()
 export class CustomersService {
@@ -448,6 +449,174 @@ export class CustomersService {
     }
 
     return customerDb;
+  }
+
+  async findCustomerHistoryById(
+    id: string,
+    year?: number,
+    reservationStatus?: ReservationStatus,
+  ): Promise<HistoryCustomerData> {
+    try {
+      const customerDb = await this.prisma.customer.findFirst({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          isActive: true,
+          reservations: {
+            where: {
+              ...(year && {
+                OR: [
+                  {
+                    reservationDate: {
+                      gte: new Date(`${year}-01-01`),
+                      lte: new Date(`${year}-12-31`),
+                    },
+                  },
+                  {
+                    checkInDate: {
+                      gte: new Date(`${year}-01-01`),
+                      lte: new Date(`${year}-12-31`),
+                    },
+                  },
+                  {
+                    checkOutDate: {
+                      gte: new Date(`${year}-01-01`),
+                      lte: new Date(`${year}-12-31`),
+                    },
+                  },
+                ],
+              }),
+              // Usar la condición separada para status para evitar el error de tipado
+              ...(reservationStatus && {
+                status: {
+                  equals: reservationStatus,
+                },
+              }),
+            },
+            select: {
+              id: true,
+              reservationDate: true,
+              checkInDate: true,
+              checkOutDate: true,
+              guests: true,
+              reason: true,
+              observations: true,
+              status: true,
+              room: {
+                select: {
+                  id: true,
+                  number: true,
+                  RoomTypes: {
+                    select: {
+                      id: true,
+                      name: true,
+                      price: true,
+                    },
+                  },
+                },
+              },
+              payment: {
+                select: {
+                  id: true,
+                  date: true,
+                  amount: true,
+                  amountPaid: true,
+                  paymentDetail: {
+                    select: {
+                      id: true,
+                      paymentDate: true,
+                      description: true,
+                      type: true,
+                      method: true,
+                      status: true,
+                      unitPrice: true,
+                      subtotal: true,
+                      quantity: true,
+                      service: {
+                        select: {
+                          id: true,
+                          name: true,
+                        },
+                      },
+                      days: true,
+                      room: {
+                        select: {
+                          id: true,
+                          number: true,
+                          RoomTypes: {
+                            select: {
+                              id: true,
+                              name: true,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!customerDb) {
+        throw new BadRequestException('This customer doesnt exist');
+      }
+
+      if (!!customerDb && !customerDb.isActive) {
+        throw new BadRequestException('This customer exist, but is inactive');
+      }
+
+      // Transformar el resultado para que coincida con la interfaz HistoryCustomerData
+      const transformedCustomer: HistoryCustomerData = {
+        ...customerDb,
+        reservations: customerDb.reservations.map((reservation) => {
+          // Calcular numberGuests con manejo adecuado para JSON en formato string
+          let guestsCount = 1; // Por defecto contamos al cliente principal
+
+          try {
+            if (reservation.guests) {
+              // Si es string, intentar parsearlo como JSON
+              if (typeof reservation.guests === 'string') {
+                const parsedGuests = JSON.parse(reservation.guests);
+                if (Array.isArray(parsedGuests)) {
+                  guestsCount += parsedGuests.length;
+                }
+              }
+              // Si ya es array (por si acaso)
+              else if (Array.isArray(reservation.guests)) {
+                guestsCount += reservation.guests.length;
+              }
+            }
+          } catch (error) {
+            // Si hay error al parsear, usar solo el cliente principal
+            this.logger.warn(`Error parsing guests JSON: ${error.message}`);
+          }
+
+          return {
+            ...reservation,
+            numberGuests: guestsCount,
+            room: {
+              ...reservation.room,
+              number: Number(reservation.room.number),
+            },
+            payment: Array.isArray(reservation.payment)
+              ? reservation.payment[0]
+              : reservation.payment,
+          };
+        }),
+      };
+
+      return transformedCustomer;
+    } catch (error) {
+      this.logger.error('Error get customer');
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      handleException(error, 'Error get customer');
+    }
   }
 
   async searchCustomerByDocumentIdCoincidence(
