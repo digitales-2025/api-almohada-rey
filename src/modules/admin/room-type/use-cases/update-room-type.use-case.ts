@@ -25,10 +25,7 @@ export class UpdateRoomTypeUseCase {
         const roomType = await this.roomTypeRepository.update(id, {
           guests: updateRoomTypeDto.guests,
           price: updateRoomTypeDto.price,
-          tv: updateRoomTypeDto.tv,
-          floorType: updateRoomTypeDto.floorType,
           description: updateRoomTypeDto.description,
-          area: updateRoomTypeDto.area,
           bed: updateRoomTypeDto.bed,
           name: updateRoomTypeDto.name,
         });
