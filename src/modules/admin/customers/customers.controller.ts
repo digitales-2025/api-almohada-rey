@@ -18,6 +18,7 @@ import {
   ApiInternalServerErrorResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -29,6 +30,8 @@ import {
 } from 'src/interfaces';
 import { DeleteCustomerDto } from './dto/delete-customer.dto';
 import { Customer } from './entity/customer.entity';
+import { HistoryCustomerData } from 'src/interfaces/customer.interface';
+import { ReservationStatus } from '@prisma/client';
 
 @ApiTags('Admin Customers')
 @ApiUnauthorizedResponse({ description: 'Unauthorized' })
@@ -79,8 +82,37 @@ export class CustomersController {
   @ApiOkResponse({ description: 'Customer found successfully' })
   @ApiOperation({ summary: 'Get a customer by id' })
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id') id: string): Promise<CustomerData> {
     return this.customersService.findOne(id);
+  }
+
+  @ApiOkResponse({ description: 'History Customer found successfully' })
+  @ApiOperation({
+    summary: 'Get a history customer by id with optional filters',
+  })
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    type: Number,
+    description: 'Filter reservations by year',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ReservationStatus,
+    description: 'Filter reservations by status',
+  })
+  @Get('history/booking/:id')
+  findCustomerHistoryById(
+    @Param('id') id: string,
+    @Query('year') year?: number,
+    @Query('status') reservationStatus?: ReservationStatus,
+  ): Promise<HistoryCustomerData> {
+    return this.customersService.findCustomerHistoryById(
+      id,
+      year,
+      reservationStatus,
+    );
   }
 
   @ApiOkResponse({ description: 'Customer found successfully' })
@@ -97,7 +129,7 @@ export class CustomersController {
     @Param('id') id: string,
     @Body() updateCustomerDto: UpdateCustomerDto,
     @GetUser() user: UserData,
-  ) {
+  ): Promise<HttpResponse<CustomerData>> {
     return this.customersService.update(id, updateCustomerDto, user);
   }
 

@@ -62,6 +62,7 @@ async function bootstrap() {
     { name: 'Room Cleaning', description: 'Gestión de limpiezas' },
 
     { name: 'Admin Services', description: 'Gestión de servicios' },
+    { name: 'Admin Payments', description: 'Gestión de pagos' },
   ];
 
   SwaggerModule.setup('api', app, document);

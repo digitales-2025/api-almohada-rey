@@ -16,5 +16,6 @@ import { UpdateReservationUseCase } from './use-cases/updateReservation.use-case
     CreateReservationUseCase,
     UpdateReservationUseCase,
   ],
+  exports: [ReservationService],
 })
 export class ReservationModule {}

@@ -188,6 +188,9 @@ export class RoomService {
           id: room.id,
           number: room.number,
           status: room.status,
+          tv: room.tv,
+          area: room.area,
+          floorType: room.floorType,
           isActive: room.isActive,
           RoomTypes: {
             id: room.RoomTypes.id,
