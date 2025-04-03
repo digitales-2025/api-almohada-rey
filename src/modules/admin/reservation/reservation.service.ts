@@ -125,9 +125,16 @@ export class ReservationService {
         };
       }
 
+      // Logger.log(`Updated Reservation: ${JSON.stringify(updatedReservation)}`);
+
       //check chekin-out collisions
       const checkInDate = new Date(updatedReservation.checkInDate);
       const checkOutDate = new Date(updatedReservation.checkOutDate);
+
+      // Logger.log(
+      //   `CheckIn: ${checkInDate.toISOString()} - CheckOut: ${checkOutDate.toISOString()}`,
+      // );
+
       const reservations = await this.getAllReservationsInTimeInterval(
         checkInDate.toISOString(),
         checkOutDate.toISOString(),
