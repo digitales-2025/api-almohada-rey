@@ -38,6 +38,8 @@ export class ReservationRepository extends BaseRepository<Reservation> {
             ReservationStatus.CONFIRMED, // Reservaciones Confirmadas
           ],
         },
+        // Excluye la reserva actual si forUpdate es true
+        ...(forUpdate && reservationId ? { id: { not: reservationId } } : {}),
         // Verificar superposición de fechas
         OR: [
           // Caso 1: La fecha de check-in solicitada está dentro de una reserva existente
@@ -59,24 +61,24 @@ export class ReservationRepository extends BaseRepository<Reservation> {
       },
     });
 
-    if (forUpdate && reservationId) {
-      // Si estamos actualizando una reservación, excluimos esa reservación de la verificación
-      const reservation = await this.prisma.reservation.findUnique({
-        where: { id: reservationId },
-        select: { roomId: true },
-      });
+    // if (forUpdate && reservationId) {
+    //   // Si estamos actualizando una reservación, excluimos esa reservación de la verificación
+    //   const reservation = await this.prisma.reservation.findUnique({
+    //     where: { id: reservationId },
+    //     select: { roomId: true },
+    //   });
 
-      if (reservation && reservation.roomId === roomId) {
-        // Logger.log(
-        //   `Reservation room ID: ${reservation.roomId} - Room ID: ${roomId} - Overlapping Reservations: ${overlappingReservations}`,
-        //   'ReservationRepository',
-        // );
-        // Logger.log(
-        //   'Validation overlapping' + `${overlappingReservations === 0}`,
-        // );
-        return overlappingReservations === 1;
-      }
-    }
+    //   if (reservation && reservation.roomId === roomId) {
+    //     // Logger.log(
+    //     //   `Reservation room ID: ${reservation.roomId} - Room ID: ${roomId} - Overlapping Reservations: ${overlappingReservations}`,
+    //     //   'ReservationRepository',
+    //     // );
+    //     // Logger.log(
+    //     //   'Validation overlapping' + `${overlappingReservations === 0}`,
+    //     // );
+    //     return overlappingReservations === 1;
+    //   }
+    // }
 
     // Si no hay reservaciones superpuestas, la habitación está disponible
     return overlappingReservations === 0;

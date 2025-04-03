@@ -131,6 +131,8 @@ export class ReservationService {
       const reservations = await this.getAllReservationsInTimeInterval(
         checkInDate.toISOString(),
         checkOutDate.toISOString(),
+        true,
+        id,
       );
 
       if (reservations.some((reservation) => reservation.id !== id)) {
@@ -368,7 +370,7 @@ export class ReservationService {
         );
       }
 
-      let originalReservation: DetailedReservation | undefined;
+      // let originalReservation: DetailedReservation | undefined;
 
       // If we're doing an update, we'll need to exclude the current reservation
       // from the collision check, as it should be allowed to occupy its own time slot
@@ -402,22 +404,22 @@ export class ReservationService {
       // For updates, exclude the reservation being updated from the collision check
       if (forUpdate && reservationId) {
         where.id = { not: reservationId };
-        originalReservation =
-          await this.reservationRepository.findOne<DetailedReservation>({
-            where: {
-              id: reservationId,
-              isActive: true,
-            },
-            include: {
-              room: {
-                include: {
-                  RoomTypes: true,
-                },
-              },
-              customer: true,
-              user: true,
-            },
-          });
+        // originalReservation =
+        //   await this.reservationRepository.findOne<DetailedReservation>({
+        //     where: {
+        //       id: reservationId,
+        //       isActive: true,
+        //     },
+        //     include: {
+        //       room: {
+        //         include: {
+        //           RoomTypes: true,
+        //         },
+        //       },
+        //       customer: true,
+        //       user: true,
+        //     },
+        //   });
       }
 
       const reservations =
@@ -434,9 +436,9 @@ export class ReservationService {
           },
         });
 
-      if (forUpdate && reservationId && originalReservation) {
-        reservations.push(originalReservation);
-      }
+      // if (forUpdate && reservationId && originalReservation) {
+      //   reservations.push(originalReservation);
+      // }
 
       return reservations;
     } catch (error) {
