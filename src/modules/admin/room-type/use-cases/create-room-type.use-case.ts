@@ -24,10 +24,7 @@ export class CreateRoomTypeUseCase {
         name: createRoomTypeDto.name,
         guests: createRoomTypeDto.guests,
         price: createRoomTypeDto.price,
-        tv: createRoomTypeDto.tv,
-        floorType: createRoomTypeDto.floorType,
         description: createRoomTypeDto.description,
-        area: createRoomTypeDto.area,
         bed: createRoomTypeDto.bed,
       });
 

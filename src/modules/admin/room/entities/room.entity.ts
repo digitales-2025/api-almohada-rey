@@ -2,6 +2,8 @@ import { ApiProperty } from '@nestjs/swagger';
 import { RoomStatus as RoomStatusPrisma } from '@prisma/client';
 import { BaseEntity } from 'src/prisma/src/abstract/base.entity';
 import { RoomType } from '../../room-type/entities/room-type.entity';
+import { FloorTypes } from '../dto';
+import { FloorTypes as FloorTypesPrisma } from '@prisma/client';
 
 export enum RoomStatus {
   AVAILABLE = 'AVAILABLE',
@@ -72,6 +74,25 @@ export class Room extends BaseEntity {
     example: RoomStatus.AVAILABLE,
   })
   status: RoomStatusPrisma;
+
+  @ApiProperty({
+    description: 'Descripción de la televisión',
+    example: 'Smart TV 42 pulgadas',
+  })
+  tv: string;
+
+  @ApiProperty({
+    description: 'Área en metros cuadrados',
+    example: 25.5,
+  })
+  area: number;
+
+  @ApiProperty({
+    enum: FloorTypes,
+    description: 'Tipo de piso',
+    example: FloorTypes.LAMINATING,
+  })
+  floorType: FloorTypesPrisma;
 
   constructor(partial: Partial<Room> = {}) {
     super(partial);

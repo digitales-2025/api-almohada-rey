@@ -99,14 +99,13 @@ enum FloorTypes {
 }
 
 model RoomTypes {
-  id            String          @id @default(uuid())
-  name          String
-  guests        Int
-  price         Float
-  tv            String
-  floorType     FloorTypes
-  description   String
-  area          Float
+  id     String @id @default(uuid())
+  name   String
+  guests Int
+  price  Float
+
+  description String
+
   bed           String
   isActive      Boolean         @default(true)
   createdAt     DateTime        @default(now()) @db.Timestamptz(6)
@@ -144,6 +143,9 @@ model Room {
   handSoap          Boolean             @default(true) // Hand soap (Jabón de lavado)
   lamp              Boolean             @default(true) // Lamp (Lámpara)
   status            RoomStatus
+  tv                String //trasferencia
+  area              Float //trasferencia
+  floorType         FloorTypes //trasferencia
   isActive          Boolean             @default(true)
   createdAt         DateTime            @default(now()) @db.Timestamptz(6)
   updatedAt         DateTime            @updatedAt
