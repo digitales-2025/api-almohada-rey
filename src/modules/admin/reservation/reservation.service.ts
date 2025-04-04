@@ -142,7 +142,13 @@ export class ReservationService {
         id,
       );
 
-      if (reservations.some((reservation) => reservation.id !== id)) {
+      if (
+        reservations.some(
+          (reservation) =>
+            reservation.id !== id &&
+            reservation.roomId === updatedReservation.roomId,
+        )
+      ) {
         throw new BadRequestException(
           'La habitación no está disponible en las fechas seleccionadas',
         );
@@ -446,7 +452,6 @@ export class ReservationService {
       // if (forUpdate && reservationId && originalReservation) {
       //   reservations.push(originalReservation);
       // }
-
       return reservations;
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
