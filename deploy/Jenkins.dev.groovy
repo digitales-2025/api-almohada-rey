@@ -1,9 +1,5 @@
 pipeline {
-    agent {
-        node {
-            label "hetzner-helsinki-01"
-        }
-    }
+    agent any
     environment {
         // Credentials for jenkins to access private github repos
         GITHUB_CREDENTIALS = "8d51209e-434f-4761-bb3d-1f9e3974d0b1"
