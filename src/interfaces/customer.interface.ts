@@ -18,10 +18,11 @@ export type CustomerData = Pick<
   | 'occupation'
   | 'documentType'
   | 'documentNumber'
-  | 'email'
   | 'maritalStatus'
   | 'isActive'
 > & {
+  email?: string;
+  birthDate?: string;
   department?: string;
   province?: string;
   companyName?: string;
