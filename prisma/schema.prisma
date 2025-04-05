@@ -61,6 +61,7 @@ model Customer {
   name           String
   address        String
   birthPlace     String
+  birthDate      String?
   country        String
   department     String?
   province       String?
@@ -68,7 +69,7 @@ model Customer {
   occupation     String
   documentType   CustomerDocumentType
   documentNumber String                @unique
-  email          String                @unique
+  email          String?                @unique
   maritalStatus  CustomerMaritalStatus
   companyName    String?
   ruc            String?               @unique
