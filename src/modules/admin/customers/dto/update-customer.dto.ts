@@ -2,6 +2,8 @@ import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { CreateCustomerDto } from './create-customer.dto';
 import { Transform } from 'class-transformer';
 import {
+  IsBoolean,
+  IsDateString,
   IsEmail,
   IsIn,
   IsNotEmpty,
@@ -44,6 +46,17 @@ export class UpdateCustomerDto extends PartialType(CreateCustomerDto) {
   @IsNotEmpty()
   @IsOptional()
   birthPlace?: string;
+
+  @ApiProperty({
+    name: 'birthDate',
+    description: 'Date of birth of the customer',
+    example: '2021-12-31',
+    required: false,
+  })
+  @IsDateString()
+  @IsNotEmpty()
+  @IsOptional()
+  birthDate?: string;
 
   @ApiProperty({
     name: 'country',
@@ -151,6 +164,16 @@ export class UpdateCustomerDto extends PartialType(CreateCustomerDto) {
   @Transform(({ value }) => value.toUpperCase())
   @IsOptional()
   maritalStatus?: CustomerMaritalStatus;
+
+  @ApiProperty({
+    name: 'hasCompany',
+    description: 'Indica si el cliente tiene una empresa asociada',
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  @IsNotEmpty()
+  hasCompany?: boolean;
 
   @ApiProperty({
     name: 'companyName',
