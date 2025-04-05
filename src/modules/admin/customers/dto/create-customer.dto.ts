@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { CustomerDocumentType, CustomerMaritalStatus } from '@prisma/client';
 import { Transform } from 'class-transformer';
 import {
+  IsDateString,
   IsEmail,
   IsIn,
   IsNotEmpty,
@@ -37,6 +38,17 @@ export class CreateCustomerDto {
   @IsString()
   @IsNotEmpty()
   birthPlace: string;
+
+  @ApiProperty({
+    name: 'birthDate',
+    description: 'Date of birth of the customer',
+    example: '2021-12-31',
+    required: false,
+  })
+  @IsDateString()
+  @IsNotEmpty()
+  @IsOptional()
+  birthDate?: string;
 
   @ApiProperty({
     name: 'country',
@@ -111,11 +123,13 @@ export class CreateCustomerDto {
   @ApiProperty({
     name: 'email',
     description: 'Correo electrónico del cliente',
+    required: false,
   })
   @Transform(({ value }) => value.trim().toLowerCase())
   @IsEmail()
   @IsNotEmpty()
-  email: string;
+  @IsOptional()
+  email?: string;
 
   @ApiProperty({
     name: 'maritalStatus',
