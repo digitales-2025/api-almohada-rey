@@ -1,6 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { LandRoomTypeRepository } from '../repository/land-room-type.repository';
-import { LandRoomTypeMainImg } from '../entities/land-room-type.entity';
+import {
+  LandRoomTypeMainImg,
+  LandRoomTypeAllImg,
+} from '../entities/land-room-type.entity';
 
 @Injectable()
 export class LandRoomTypeService {
@@ -33,6 +36,29 @@ export class LandRoomTypeService {
         `Error obteniendo tipos de habitación para landing: ${error.message}`,
       );
       return [];
+    }
+  }
+
+  /**
+   * Obtiene un tipo de habitación por ID con todas sus imágenes
+   */
+  async findRoomTypeById(id: string): Promise<LandRoomTypeAllImg> {
+    try {
+      const roomTypeWithImages =
+        await this.landRoomTypeRepository.findActiveRoomTypeWithAllImages(id);
+
+      if (!roomTypeWithImages) {
+        throw new NotFoundException(
+          `No se encontró un tipo de habitación activo con este ID`,
+        );
+      }
+
+      return roomTypeWithImages;
+    } catch (error) {
+      this.logger.error(
+        `Error obteniendo tipo de habitación por ID para landing: ${error.message}`,
+      );
+      throw error;
     }
   }
 }

@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/src';
-import { LandRoomTypeMainImg } from '../entities/land-room-type.entity';
+import {
+  LandRoomTypeMainImg,
+  LandRoomTypeAllImg,
+} from '../entities/land-room-type.entity';
 
 @Injectable()
 export class LandRoomTypeRepository {
@@ -57,6 +60,71 @@ export class LandRoomTypeRepository {
         error,
       );
       return [];
+    }
+  }
+
+  /**
+   * Obtiene un tipo de habitación activo por ID con todas sus imágenes
+   */
+  async findActiveRoomTypeWithAllImages(
+    id: string,
+  ): Promise<LandRoomTypeAllImg> {
+    try {
+      // Buscar el tipo de habitación con el ID proporcionado y que esté activo
+      const roomType = await this.prisma.roomTypes.findFirst({
+        where: {
+          id: id,
+          isActive: true,
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          price: true,
+          guests: true,
+          bed: true,
+          // Obtener todas las imágenes activas
+          ImageRoomType: {
+            where: {
+              isActive: true,
+            },
+            select: {
+              id: true,
+              imageUrl: true,
+              isMain: true,
+            },
+            orderBy: {
+              isMain: 'desc', // Primero las imágenes principales
+            },
+          },
+        },
+      });
+
+      // Si no se encuentra el tipo de habitación, retornar null
+      if (!roomType) {
+        return null;
+      }
+
+      // Transformar los datos al formato requerido
+      return {
+        id: roomType.id,
+        name: roomType.name,
+        description: roomType.description,
+        price: roomType.price,
+        guests: roomType.guests,
+        bed: roomType.bed,
+        images: roomType.ImageRoomType.map((img) => ({
+          id: img.id,
+          url: img.imageUrl,
+          isMain: img.isMain,
+        })),
+      };
+    } catch (error) {
+      console.error(
+        'Error obteniendo tipo de habitación con imágenes por ID:',
+        error,
+      );
+      throw error;
     }
   }
 }
