@@ -1,14 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/src';
 import { LandRoomTypeMainImg } from '../entities/land-room-type.entity';
-/* interface RoomTypeWithMainImage {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  guests: number;
-  mainImageUrl: string | null;
-} */
 
 @Injectable()
 export class LandRoomTypeRepository {
