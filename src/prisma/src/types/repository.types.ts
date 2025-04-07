@@ -27,4 +27,4 @@ export type CreateDto<T> = Omit<T, 'id' | 'createdAt' | 'updatedAt'>;
  * Tipo de datos para actualizar una entidad
  * Hace todos los campos opcionales
  */
-export type UpdateDto<T> = Partial<CreateDto<T>>;
+export type UpdateDto<T> = Partial<CreateDto<T> & { updatedAt: Date }>;

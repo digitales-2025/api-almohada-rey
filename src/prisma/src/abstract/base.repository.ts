@@ -4,6 +4,12 @@ import { PrismaTransaction, QueryParams, CreateDto, UpdateDto } from '../types';
 import { BaseEntity } from './base.entity';
 import { PaginationParams } from 'src/utils/paginated-response/pagination.types';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
+
+// export type filterByFieldOptions<T> = {
+//   field: keyof T;
+//   value: string;
+// }[];
+
 /**
  * Clase base abstracta que implementa operaciones CRUD genéricas.
  * Proporciona una capa de abstracción sobre Prisma.
