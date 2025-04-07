@@ -7,13 +7,20 @@ import {
 } from '@nestjs/common';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
-import { HttpResponse, PaymentData, UserData } from 'src/interfaces';
+import {
+  HttpResponse,
+  PaymentData,
+  PaymentDetailData,
+  UserData,
+} from 'src/interfaces';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { RoomService } from '../room/services/room.service';
 import { AuditActionType, ReservationStatus } from '@prisma/client';
 import { handleException } from 'src/utils';
 import { ServiceService } from '../service/services/service.service';
+import { CreatePaymentDetailDto } from './dto/create-payment-detail.dto';
+import { SummaryPaymentData } from 'src/interfaces/payment.interface';
 
 @Injectable()
 export class PaymentsService {
@@ -277,12 +284,255 @@ export class PaymentsService {
     }
   }
 
-  findAll() {
-    return `This action returns all payments`;
+  async createPaymentDetail(
+    createPaymentDetailDto: CreatePaymentDetailDto,
+    user: UserData,
+  ): Promise<HttpResponse<PaymentDetailData>> {
+    const {
+      paymentId,
+      paymentDate,
+      description,
+      type,
+      method,
+      unitPrice,
+      subtotal,
+      quantity,
+      productId,
+      roomId,
+      days,
+      serviceId,
+    } = createPaymentDetailDto;
+
+    try {
+      // Verificar que el pago existe
+      const paymentDB = await this.prisma.payment.findUnique({
+        where: { id: paymentId },
+        select: {
+          id: true,
+          date: true,
+          amount: true,
+          amountPaid: true,
+          observations: true,
+          status: true,
+          reservation: {
+            select: {
+              id: true,
+              checkInDate: true,
+              checkOutDate: true,
+            },
+          },
+        },
+      });
+
+      if (!paymentDB) {
+        throw new BadRequestException('Payment doesnt exist');
+      }
+
+      // Crear el nuevo detalle de pago
+      const newPaymentDetail = await this.prisma.paymentDetail.create({
+        data: {
+          paymentId,
+          paymentDate,
+          description,
+          type,
+          method,
+          unitPrice,
+          subtotal,
+          ...(quantity && { quantity }),
+          ...(productId && { productId }),
+          ...(roomId && { roomId }),
+          ...(days && { days }),
+          ...(serviceId && { serviceId }),
+        },
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          room: {
+            select: {
+              id: true,
+              number: true,
+              RoomTypes: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+          service: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      // Registrar la auditoría
+      await this.audit.create({
+        entityId: newPaymentDetail.id,
+        entityType: 'paymentDetail',
+        action: AuditActionType.CREATE,
+        performedById: user.id, // ID del usuario que realiza la acción
+        createdAt: new Date(),
+      });
+
+      return {
+        statusCode: HttpStatus.CREATED,
+        message: 'Payment detail created successfully',
+        data: newPaymentDetail,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error creating payment detail for payment ${paymentId}: ${error.message}`,
+        error.stack,
+      );
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      handleException(error, 'Error creating a payment detail');
+    }
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} payment`;
+  /**
+   * Obtiene todos los pagos de la base de datos.
+   * @returns Lista de pagos
+   */
+  async findAll(): Promise<SummaryPaymentData[]> {
+    try {
+      const payments = await this.prisma.payment.findMany({
+        select: {
+          id: true,
+          amount: true,
+          amountPaid: true,
+          date: true,
+          status: true,
+          reservation: {
+            select: {
+              customer: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+      });
+
+      // Mapea los resultados al tipo SummaryPaymentData
+      return payments.map((payment) => ({
+        id: payment.id,
+        amount: payment.amount,
+        amountPaid: payment.amountPaid,
+        date: payment.date,
+        status: payment.status,
+        reservation: {
+          customer: {
+            id: payment.reservation.customer.id,
+            name: payment.reservation.customer.name,
+          },
+        },
+      })) as SummaryPaymentData[];
+    } catch (error) {
+      this.logger.error('Error getting all payments');
+      handleException(error, 'Error getting all payments');
+    }
+  }
+
+  /**
+   * Obtiene un pago por su ID.
+   * @param id ID del pago a buscar
+   * @returns Pago encontrado
+   */
+  async findOne(id: string): Promise<PaymentData> {
+    try {
+      return await this.findById(id);
+    } catch (error) {
+      this.logger.error('Error get customer');
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      handleException(error, 'Error get customer');
+    }
+  }
+
+  /**
+   * Obtiene un pago por su ID con un manejo de excepciones específico.
+   * @param id ID del pago a buscar
+   * @returns Pago encontrado
+   * @throws BadRequestException si el pago no existe
+   */
+  async findById(id: string): Promise<PaymentData> {
+    const paymentDb = await this.prisma.payment.findFirst({
+      where: { id },
+      select: {
+        id: true,
+        date: true,
+        amount: true,
+        amountPaid: true,
+        status: true,
+        observations: true,
+        reservation: {
+          select: {
+            id: true,
+            checkInDate: true,
+            checkOutDate: true,
+          },
+        },
+        paymentDetail: {
+          select: {
+            id: true,
+            paymentDate: true,
+            description: true,
+            type: true,
+            method: true,
+            status: true,
+            unitPrice: true,
+            subtotal: true,
+            quantity: true,
+            days: true,
+            product: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            service: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            room: {
+              select: {
+                id: true,
+                number: true,
+                RoomTypes: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!paymentDb) {
+      throw new BadRequestException('This payment doesnt exist');
+    }
+
+    return paymentDb;
   }
 
   update(id: number, updatePaymentDto: UpdatePaymentDto) {

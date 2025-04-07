@@ -15,11 +15,19 @@ import {
   ApiBadRequestResponse,
   ApiCreatedResponse,
   ApiInternalServerErrorResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { HttpResponse, PaymentData, UserData } from 'src/interfaces';
+import {
+  HttpResponse,
+  PaymentData,
+  PaymentDetailData,
+  UserData,
+} from 'src/interfaces';
+import { CreatePaymentDetailDto } from './dto/create-payment-detail.dto';
+import { SummaryPaymentData } from 'src/interfaces/payment.interface';
 
 @ApiTags('Admin Payments')
 @ApiUnauthorizedResponse({ description: 'Unauthorized' })
@@ -43,14 +51,31 @@ export class PaymentsController {
     return this.paymentsService.create(createPaymentDto, user);
   }
 
+  @ApiCreatedResponse({ description: 'Payment detail created successfully' })
+  @ApiOperation({ summary: 'Create a new payment detail' })
+  @Post('detail')
+  createPaymentDetail(
+    @Body() createPaymentDetailDto: CreatePaymentDetailDto,
+    @GetUser() user: UserData,
+  ): Promise<HttpResponse<PaymentDetailData>> {
+    return this.paymentsService.createPaymentDetail(
+      createPaymentDetailDto,
+      user,
+    );
+  }
+
+  @ApiOperation({ summary: 'Get all payments' })
+  @ApiOkResponse({ description: 'Payments retrieved successfully' })
   @Get()
-  findAll() {
+  findAll(): Promise<SummaryPaymentData[]> {
     return this.paymentsService.findAll();
   }
 
+  @ApiOperation({ summary: 'Get payment by ID' })
+  @ApiOkResponse({ description: 'Payment retrieved successfully' })
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.paymentsService.findOne(+id);
+  findOne(@Param('id') id: string): Promise<PaymentData> {
+    return this.paymentsService.findOne(id);
   }
 
   @Patch(':id')
