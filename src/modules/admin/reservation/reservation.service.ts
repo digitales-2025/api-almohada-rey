@@ -21,6 +21,7 @@ import { DetailedRoom } from '../room/entities/room.entity';
 import { hasNoChanges } from 'src/utils/update-validations.util';
 import { UpdateReservationUseCase } from './use-cases/updateReservation.use-case';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
+import { FilterQueryParamsByField } from 'src/utils/filter-params/flter-params';
 
 @Injectable()
 export class ReservationService {
@@ -157,10 +158,21 @@ export class ReservationService {
   findManyPaginated(
     user: UserPayload,
     pagination?: PaginationParams,
+    additionalParams?: FilterQueryParamsByField<Reservation>,
     // filter?: any,
   ): Promise<PaginatedResponse<DetailedReservation>> {
     try {
-      const filter = user.isSuperAdmin ? {} : { isActive: true };
+      let filter = {};
+      if (!user.isSuperAdmin) {
+        filter = { isActive: true };
+      }
+      if (additionalParams) {
+        filter = {
+          ...filter,
+          ...additionalParams,
+        };
+      }
+      //const filter = user.isSuperAdmin ? {} : { isActive: true };
       return this.reservationRepository.findManyPaginated<DetailedReservation>(
         pagination,
         {

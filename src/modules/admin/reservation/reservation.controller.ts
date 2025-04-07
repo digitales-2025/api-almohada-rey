@@ -161,15 +161,22 @@ export class ReservationController {
   findAllPaginated(
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
+    @Query('customerId') customerId: string,
     @GetUser() user: UserPayload,
   ): Promise<PaginatedResponse<DetailedReservation>> {
     const pageNumber = parseInt(page, 10) ?? 1;
     const pageSizeNumber = parseInt(pageSize, 10) ?? 10;
     // TODO: Update service to use pagination parameters
-    return this.reservationService.findManyPaginated(user, {
-      page: pageNumber,
-      pageSize: pageSizeNumber,
-    });
+    return this.reservationService.findManyPaginated(
+      user,
+      {
+        page: pageNumber,
+        pageSize: pageSizeNumber,
+      },
+      {
+        customerId,
+      },
+    );
   }
 
   @Get('available-rooms')
