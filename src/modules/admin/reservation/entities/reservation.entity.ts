@@ -8,9 +8,6 @@ import { User } from '../../users/entity/user.entity.';
 import { IsDateString, IsNotEmpty } from 'class-validator';
 
 export class Reservation extends BaseEntity {
-  @ApiProperty({ description: 'Unique identifier for the reservation' })
-  id: string;
-
   @ApiProperty({ description: 'Customer ID associated with the reservation' })
   customerId: string;
 

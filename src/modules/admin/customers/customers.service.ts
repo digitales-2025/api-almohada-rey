@@ -166,6 +166,7 @@ export class CustomersService {
       documentNumber,
       documentType,
       email,
+      birthDate,
       maritalStatus,
       occupation,
       phone,
@@ -180,7 +181,7 @@ export class CustomersService {
     try {
       // Crear el cliente y registrar la auditoría
       await this.findByDocumentNumber(documentNumber);
-      await this.findByEmail(email);
+      if (email) await this.findByEmail(email);
       if (ruc) await this.findByRuc(ruc);
 
       newCustomer = await this.prisma.$transaction(async () => {
@@ -193,10 +194,11 @@ export class CustomersService {
             country,
             documentNumber,
             documentType,
-            email,
             maritalStatus,
             occupation,
             phone,
+            ...(email && { email }),
+            ...(birthDate && { birthDate }),
             ...(ruc && { ruc, companyAddress, companyName }),
             ...(department && { department }),
             ...(province && { province }),
@@ -206,6 +208,7 @@ export class CustomersService {
             name: true,
             address: true,
             birthPlace: true,
+            birthDate: true,
             country: true,
             documentNumber: true,
             documentType: true,
@@ -250,7 +253,8 @@ export class CustomersService {
           }),
           documentNumber: newCustomer.documentNumber,
           documentType: newCustomer.documentType,
-          email: newCustomer.email,
+          ...(newCustomer.email && { email: newCustomer.email }),
+          ...(newCustomer.birthDate && { birthDate: newCustomer.birthDate }),
           maritalStatus: newCustomer.maritalStatus,
           occupation: newCustomer.occupation,
           phone: newCustomer.phone,
@@ -303,6 +307,7 @@ export class CustomersService {
           documentNumber: true,
           documentType: true,
           email: true,
+          birthDate: true,
           maritalStatus: true,
           occupation: true,
           phone: true,
@@ -332,7 +337,8 @@ export class CustomersService {
         }),
         documentNumber: customer.documentNumber,
         documentType: customer.documentType,
-        email: customer.email,
+        ...(customer.email && { email: customer.email }),
+        ...(customer.birthDate && { birthDate: customer.birthDate }),
         maritalStatus: customer.maritalStatus,
         occupation: customer.occupation,
         phone: customer.phone,
@@ -648,23 +654,32 @@ export class CustomersService {
     updateCustomerDto: UpdateCustomerDto,
     user: UserData,
   ): Promise<HttpResponse<CustomerData>> {
-    const { documentNumber, email, ruc, country } = updateCustomerDto;
+    // Extraemos hasCompany separadamente, dejando todos los demás campos en updateData
+    const { hasCompany, ...updateData } = updateCustomerDto;
 
     try {
       const customerDB = await this.findById(id);
 
-      if (ruc) await this.findByRuc(ruc, id);
-      if (email) await this.findByEmail(email, id);
-      if (documentNumber) await this.findByDocumentNumber(documentNumber, id);
+      if (updateData.ruc) await this.findByRuc(updateData.ruc, id);
+      if (updateData.email) await this.findByEmail(updateData.email, id);
+      if (updateData.documentNumber)
+        await this.findByDocumentNumber(updateData.documentNumber, id);
 
-      // Modificar updateCustomerDto si country es diferente de "Perú"
-      if (country && country !== 'Perú') {
-        updateCustomerDto.department = null;
-        updateCustomerDto.province = null;
+      // Modificar updateData si country es diferente de "Perú"
+      if (updateData.country && updateData.country !== 'Perú') {
+        updateData.department = null;
+        updateData.province = null;
+      }
+
+      // Si hasCompany es falso, limpiar los campos relacionados con la empresa
+      if (hasCompany === false) {
+        updateData.ruc = null;
+        updateData.companyAddress = null;
+        updateData.companyName = null;
       }
 
       // Validar si hay cambios
-      if (hasNoChanges(updateCustomerDto, customerDB)) {
+      if (hasNoChanges(updateData, customerDB)) {
         return {
           statusCode: HttpStatus.OK,
           message: 'Customer updated successfully',
@@ -682,16 +697,13 @@ export class CustomersService {
       }
 
       // Construir el objeto de actualización dinámicamente solo con los campos presentes
-      const updateData = createDynamicUpdateObject(
-        updateCustomerDto,
-        customerDB,
-      );
+      const finalUpdateData = createDynamicUpdateObject(updateData, customerDB);
 
       // Transacción para realizar la actualización
       const updatedCustomer = await this.prisma.$transaction(async (prisma) => {
         const customer = await prisma.customer.update({
           where: { id },
-          data: updateData,
+          data: finalUpdateData,
           select: {
             id: true,
             name: true,
@@ -734,6 +746,8 @@ export class CustomersService {
             companyAddress: updatedCustomer.companyAddress,
             companyName: updatedCustomer.companyName,
           }),
+          ...(updateData.email && { email: updateData.email }),
+          ...(updateData.birthDate && { birthDate: updateData.birthDate }),
           ...(updatedCustomer.department && {
             department: updatedCustomer.department,
           }),
