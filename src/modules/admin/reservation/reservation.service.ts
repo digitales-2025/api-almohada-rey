@@ -10,7 +10,7 @@ import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { reservationErrorMessages } from './errors/errors.reservation';
 import { ReservationRepository } from './repository/reservation.repository';
 import { CreateReservationUseCase } from './use-cases/createReservation.use-case';
-import { UserData } from 'src/interfaces';
+import { UserData, UserPayload } from 'src/interfaces';
 import { PaginationParams } from 'src/utils/paginated-response/pagination.types';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 import { RoomRepository } from '../room/repositories/room.repository';
@@ -176,13 +176,16 @@ export class ReservationService {
 
   //In the future some filters may be applied
   findManyPaginated(
+    user: UserPayload,
     pagination?: PaginationParams,
     // filter?: any,
   ): Promise<PaginatedResponse<DetailedReservation>> {
     try {
+      const filter = user.isSuperAdmin ? {} : { isActive: true };
       return this.reservationRepository.findManyPaginated<DetailedReservation>(
         pagination,
         {
+          where: filter,
           include: {
             room: {
               include: {
