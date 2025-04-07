@@ -43,3 +43,15 @@ export type PaymentDetailData = Pick<
     };
   };
 };
+
+export type SummaryPaymentData = Pick<
+  Payment,
+  'id' | 'date' | 'amount' | 'amountPaid' | 'status'
+> & {
+  reservation: {
+    customer: {
+      id: string;
+      name: string;
+    };
+  };
+};
