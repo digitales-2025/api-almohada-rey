@@ -13,7 +13,7 @@ import { ReservationService } from './reservation.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 // import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { Auth, GetUser } from '../auth/decorators';
-import { UserData } from 'src/interfaces';
+import { UserData, UserPayload } from 'src/interfaces';
 import {
   PaginatedResponse,
   PaginationMetadata,
@@ -161,11 +161,12 @@ export class ReservationController {
   findAllPaginated(
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
+    @GetUser() user: UserPayload,
   ): Promise<PaginatedResponse<DetailedReservation>> {
     const pageNumber = parseInt(page, 10) ?? 1;
     const pageSizeNumber = parseInt(pageSize, 10) ?? 10;
     // TODO: Update service to use pagination parameters
-    return this.reservationService.findManyPaginated({
+    return this.reservationService.findManyPaginated(user, {
       page: pageNumber,
       pageSize: pageSizeNumber,
     });
