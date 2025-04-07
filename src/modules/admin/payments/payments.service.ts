@@ -11,6 +11,7 @@ import {
   HttpResponse,
   PaymentData,
   PaymentDetailData,
+  SummaryPaymentData,
   UserData,
 } from 'src/interfaces';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -20,7 +21,6 @@ import { AuditActionType, ReservationStatus } from '@prisma/client';
 import { handleException } from 'src/utils';
 import { ServiceService } from '../service/services/service.service';
 import { CreatePaymentDetailDto } from './dto/create-payment-detail.dto';
-import { SummaryPaymentData } from 'src/interfaces/payment.interface';
 
 @Injectable()
 export class PaymentsService {

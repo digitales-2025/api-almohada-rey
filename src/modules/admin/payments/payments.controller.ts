@@ -24,10 +24,10 @@ import {
   HttpResponse,
   PaymentData,
   PaymentDetailData,
+  SummaryPaymentData,
   UserData,
 } from 'src/interfaces';
 import { CreatePaymentDetailDto } from './dto/create-payment-detail.dto';
-import { SummaryPaymentData } from 'src/interfaces/payment.interface';
 
 @ApiTags('Admin Payments')
 @ApiUnauthorizedResponse({ description: 'Unauthorized' })
