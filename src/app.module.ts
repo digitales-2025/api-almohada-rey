@@ -15,6 +15,7 @@ import { ReservationModule } from './modules/admin/reservation/reservation.modul
 import { RoomModule } from './modules/admin/room/room.module';
 import { RoomCleanModule } from './modules/admin/room-clean/room-clean.module';
 import { ServiceModule } from './modules/admin/service/service.module';
+import { LandRoomTypeModule } from './modules/landing/room-type/land-room-type.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { ServiceModule } from './modules/admin/service/service.module';
     RoomModule,
     RoomCleanModule,
     ServiceModule,
+    LandRoomTypeModule,
   ],
   controllers: [AppController],
   providers: [AppService],
