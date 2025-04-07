@@ -126,11 +126,6 @@ export class UpdateReservationUseCase {
             ) {
               //Add more actions when cancel reservation
               isActive = false;
-              // await this.roomRepository.updateWithTx(
-              //   possibleUpdatedReservation.roomId,
-              //   { status: 'AVAILABLE' },
-              //   tx,
-              // );
             }
           }
 

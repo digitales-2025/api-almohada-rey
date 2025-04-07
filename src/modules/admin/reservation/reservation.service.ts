@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { CreateReservationDto } from './dto/create-reservation.dto';
-// import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
 import {
   DetailedReservation,
@@ -46,21 +45,11 @@ export class ReservationService {
     userData: UserData,
   ): Promise<BaseApiResponse<Reservation>> {
     try {
-      // const room
-
-      // const room = await this.roomRepository.findByStatus({
-      //   status: RoomStatus.AVAILABLE,
-      //   id: createReservationDto.roomId,
-      // });
       const roomAvailability = await this.checkAvailability({
         roomId: createReservationDto.roomId,
         checkInDate: createReservationDto.checkInDate,
         checkOutDate: createReservationDto.checkOutDate,
       });
-
-      // if (room.length == 0) {
-      //   throw new BadRequestException('Habitación no disponible');
-      // }
 
       if (!roomAvailability.isAvailable) {
         throw new BadRequestException('Habitación no disponible');
@@ -82,16 +71,6 @@ export class ReservationService {
     userData: UserData,
   ): Promise<BaseApiResponse<Reservation>> {
     try {
-      // const roomAvailability = await this.checkAvailability({
-      //   roomId: createReservationDto.roomId,
-      //   checkInDate: createReservationDto.checkInDate,
-      //   checkOutDate: createReservationDto.checkOutDate,
-      // });
-      // if (!roomAvailability.isAvailable) {
-      //   throw new BadRequestException('Habitación no disponible');
-      // }
-      // return this.reservationRepository.up(ids, updateReservationDto);
-
       const originalReservation = await this.findOne(id);
 
       if (!originalReservation) {
@@ -273,11 +252,6 @@ export class ReservationService {
       // Look Out this
       // Validar que no estamos en el pasado
       const now = new Date();
-      // if (parsedCheckInDate < now) {
-      //   throw new BadRequestException(
-      //     'La fecha de check-in no puede estar en el pasado',
-      //   );
-      // }
 
       // For updates, validate only new check-in dates to allow historical data updates
       if (parsedCheckInDate < now) {
@@ -420,22 +394,6 @@ export class ReservationService {
       // For updates, exclude the reservation being updated from the collision check
       if (forUpdate && reservationId) {
         where.id = { not: reservationId };
-        // originalReservation =
-        //   await this.reservationRepository.findOne<DetailedReservation>({
-        //     where: {
-        //       id: reservationId,
-        //       isActive: true,
-        //     },
-        //     include: {
-        //       room: {
-        //         include: {
-        //           RoomTypes: true,
-        //         },
-        //       },
-        //       customer: true,
-        //       user: true,
-        //     },
-        //   });
       }
 
       const reservations =
@@ -540,51 +498,4 @@ export class ReservationService {
       this.errorHandler.handleError(error, 'getting');
     }
   }
-
-  //   /**
-  //    * Obtiene todas las habitaciones disponibles para un rango de fechas específico
-  //    * @param checkInDate - Fecha de check-in en formato ISO
-  //    * @param checkOutDate - Fecha de check-out en formato ISO
-  //    * @returns Lista de habitaciones disponibles
-  //    */
-  //   async getAllAvailableRooms(
-  //     checkInDate: string,
-  //     checkOutDate: string,
-  //   ): Promise<DetailedRoom[]> {
-  //     try {
-  //       // Parse string dates to Date objects
-  //       const parsedCheckInDate = new Date(checkInDate);
-  //       const parsedCheckOutDate = new Date(checkOutDate);
-
-  //       // Validate date format
-  //       if (
-  //         isNaN(parsedCheckInDate.getTime()) ||
-  //         isNaN(parsedCheckOutDate.getTime())
-  //       ) {
-  //         throw new BadRequestException('Invalid date format');
-  //       }
-
-  //       // Validate that check-in is before check-out
-  //       if (parsedCheckInDate >= parsedCheckOutDate) {
-  //         throw new BadRequestException(
-  //           'La fecha de check-in debe ser anterior a la fecha de check-out',
-  //         );
-  //       }
-
-  //       const availableRooms = await this.roomRepository.findMany({
-  //         where: {
-  //           id: {
-  //             notIn: await this.reservationRepository.getReservedRoomIds(
-  //               parsedCheckInDate,
-  //               parsedCheckOutDate,
-  //             ),
-  //           },
-  //         },
-  //         include: { RoomTypes: true },
-  //       });
-
-  //       return availableRooms;
-  //     } catch (error) {
-  //       this.errorHandler.handleError(error, 'getting');
-  //     }
 }
