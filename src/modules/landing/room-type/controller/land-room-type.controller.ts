@@ -1,4 +1,4 @@
-import { Controller, Get, Param, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Param } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
 import { LandRoomTypeService } from '../service/land-room-type.service';
 import {
@@ -48,15 +48,7 @@ export class LandRoomTypeController {
     description: 'Tipo de habitación encontrado con todas sus imágenes',
     type: LandRoomTypeAllImg,
   })
-  @ApiResponse({
-    status: 404,
-    description: 'Tipo de habitación no encontrado',
-  })
   async findRoomTypeById(@Param('id') id: string): Promise<LandRoomTypeAllImg> {
-    const roomType = await this.landRoomTypeService.findRoomTypeById(id);
-    if (!roomType) {
-      throw new NotFoundException('Tipo de habitación no encontrado');
-    }
-    return roomType;
+    return this.landRoomTypeService.findRoomTypeById(id);
   }
 }

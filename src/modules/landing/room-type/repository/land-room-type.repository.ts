@@ -82,6 +82,7 @@ export class LandRoomTypeRepository {
           description: true,
           price: true,
           guests: true,
+          bed: true,
           // Obtener todas las imágenes activas
           ImageRoomType: {
             where: {
@@ -111,6 +112,7 @@ export class LandRoomTypeRepository {
         description: roomType.description,
         price: roomType.price,
         guests: roomType.guests,
+        bed: roomType.bed,
         images: roomType.ImageRoomType.map((img) => ({
           id: img.id,
           url: img.imageUrl,

@@ -47,6 +47,9 @@ export class LandRoomTypeAllImg {
   @ApiProperty()
   guests: number;
 
+  @ApiProperty()
+  bed: string;
+
   @ApiProperty({ type: [LandImageRoomType] })
   images: LandImageRoomType[];
 }
