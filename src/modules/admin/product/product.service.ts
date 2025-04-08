@@ -188,6 +188,45 @@ export class ProductService {
   }
 
   /**
+   * Buscar todos los productos por tipo
+   * @param type Tipo de producto
+   * @returns Lista de productos del tipo especificado
+   */
+  async findAllByType(type: ProductType): Promise<ProductData[]> {
+    try {
+      const products = await this.prisma.product.findMany({
+        where: {
+          type,
+          isActive: true,
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          type: true,
+          unitCost: true,
+          isActive: true,
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+      });
+
+      return products.map((product) => ({
+        id: product.id,
+        code: product.code,
+        name: product.name,
+        type: product.type,
+        unitCost: product.unitCost,
+        isActive: product.isActive,
+      })) as ProductData[];
+    } catch (error) {
+      this.logger.error('Error getting all products by type');
+      handleException(error, 'Error getting all products by type');
+    }
+  }
+
+  /**
    * Buscar un producto por su id
    * @param id Id del producto
    * @returns Producto encontrado

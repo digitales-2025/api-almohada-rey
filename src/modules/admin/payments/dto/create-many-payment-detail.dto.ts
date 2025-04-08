@@ -3,7 +3,6 @@ import {
   ArrayNotEmpty,
   IsArray,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -13,46 +12,18 @@ import { CreatePaymentDetailDto } from './create-payment-detail.dto';
 import { Type } from 'class-transformer';
 
 // DTO para la creacion de un Payment
-export class CreatePaymentDto {
+export class CreateManyPaymentDetailDto {
   @ApiProperty({
-    name: 'amount',
-    description: 'Monto',
-    example: '37829.85',
-  })
-  @IsNumber()
-  @IsNotEmpty()
-  amount: number;
-
-  @ApiProperty({
-    name: 'amountPaid',
-    description: 'Monto pagado',
-    example: '38002.55',
+    name: 'paymentId',
+    description: 'ID del pago',
+    example: 'ID del pago',
     required: false,
-  })
-  @IsNumber()
-  @IsNotEmpty()
-  @IsOptional()
-  amountPaid?: number;
-
-  @ApiProperty({
-    name: 'reservationId',
-    description: 'ID de la reserva',
-    example: 'ID de la reserva',
   })
   @IsString()
   @IsUUID()
   @IsNotEmpty()
-  reservationId: string;
-
-  @ApiProperty({
-    name: 'observations',
-    description: 'Observaciones',
-    example: 'Observaciones',
-    required: false,
-  })
-  @IsString()
   @IsOptional()
-  observations?: string;
+  paymentId?: string;
 
   @ApiProperty({
     name: 'paymentDetail',

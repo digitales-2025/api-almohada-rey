@@ -11,7 +11,7 @@ import {
   IsUUID,
 } from 'class-validator';
 
-// DTO para la creacion de un Payment
+// DTO para la creacion de un Payment Detail
 export class CreatePaymentDetailDto {
   @ApiProperty({
     name: 'paymentDate',

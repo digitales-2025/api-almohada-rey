@@ -2,7 +2,7 @@ import { Payment, PaymentDetail } from '@prisma/client';
 
 export type PaymentData = Pick<
   Payment,
-  'id' | 'date' | 'amount' | 'amountPaid' | 'status'
+  'id' | 'code' | 'date' | 'amount' | 'amountPaid' | 'status'
 > & {
   observations?: string;
   reservation: {
@@ -38,6 +38,18 @@ export type PaymentDetailData = Pick<
     id: string;
     number: number;
     RoomTypes: {
+      id: string;
+      name: string;
+    };
+  };
+};
+
+export type SummaryPaymentData = Pick<
+  Payment,
+  'id' | 'code' | 'date' | 'amount' | 'amountPaid' | 'status'
+> & {
+  reservation: {
+    customer: {
       id: string;
       name: string;
     };
