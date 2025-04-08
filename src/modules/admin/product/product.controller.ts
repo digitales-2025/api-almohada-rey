@@ -17,6 +17,7 @@ import {
   ApiInternalServerErrorResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -27,6 +28,7 @@ import {
   UserPayload,
 } from 'src/interfaces';
 import { DeleteProductDto } from './dto/delete-product.dto';
+import { ProductType } from '@prisma/client';
 
 @ApiTags('Admin Products')
 @ApiUnauthorizedResponse({ description: 'Unauthorized' })
@@ -55,6 +57,19 @@ export class ProductController {
   @Get()
   findAll(@GetUser() user: UserPayload): Promise<ProductData[]> {
     return this.productService.findAll(user);
+  }
+
+  @ApiOkResponse({ description: 'Products found successfully' })
+  @ApiOperation({ summary: 'Get all products by type' })
+  @ApiParam({
+    name: 'type',
+    enum: ProductType,
+    enumName: 'ProductType',
+    description: 'Tipo de producto (COMMERCIAL o INTERNAL_USE)',
+  })
+  @Get('all/type/:type')
+  findAllByType(@Param('type') type: ProductType): Promise<ProductData[]> {
+    return this.productService.findAllByType(type);
   }
 
   @ApiOkResponse({ description: 'Product found successfully' })
