@@ -69,7 +69,7 @@ model Customer {
   occupation     String
   documentType   CustomerDocumentType
   documentNumber String                @unique
-  email          String?                @unique
+  email          String?               @unique
   maritalStatus  CustomerMaritalStatus
   companyName    String?
   ruc            String?               @unique
@@ -204,6 +204,7 @@ model Reservation {
 
 model Payment {
   id            String              @id @default(uuid())
+  code          String              @unique
   date          String?
   amount        Float
   status        PaymentDetailStatus @default(PENDING)
