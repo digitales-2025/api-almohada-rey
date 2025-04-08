@@ -6,6 +6,7 @@ import { AuditModule } from '../audit/audit.module';
 import { ReservationModule } from '../reservation/reservation.module';
 import { RoomModule } from '../room/room.module';
 import { ServiceModule } from '../service/service.module';
+import { ProductModule } from '../product/product.module';
 
 @Module({
   controllers: [PaymentsController],
@@ -16,6 +17,7 @@ import { ServiceModule } from '../service/service.module';
     ReservationModule,
     RoomModule,
     ServiceModule,
+    ProductModule,
   ],
 })
 export class PaymentsModule {}
