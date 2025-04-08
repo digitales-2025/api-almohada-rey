@@ -63,6 +63,12 @@ async function bootstrap() {
 
     { name: 'Admin Services', description: 'Gestión de servicios' },
     { name: 'Admin Payments', description: 'Gestión de pagos' },
+
+    {
+      name: 'Landing Room Types',
+      description:
+        'Devuelve tipos de habitaciones activas con imagen principal',
+    },
   ];
 
   SwaggerModule.setup('api', app, document);

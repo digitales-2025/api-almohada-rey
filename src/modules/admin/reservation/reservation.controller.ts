@@ -7,12 +7,13 @@ import {
   Param,
   Delete,
   Query,
+  Patch,
 } from '@nestjs/common';
 import { ReservationService } from './reservation.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 // import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { Auth, GetUser } from '../auth/decorators';
-import { UserData } from 'src/interfaces';
+import { UserData, UserPayload } from 'src/interfaces';
 import {
   PaginatedResponse,
   PaginationMetadata,
@@ -38,6 +39,7 @@ import {
   RoomAvailabilityDto,
 } from './dto/room-availability.dto';
 import { DetailedRoom } from '../room/entities/room.entity';
+import { UpdateReservationDto } from './dto/update-reservation.dto';
 
 @ApiTags('Reservations')
 @ApiBadRequestResponse({
@@ -66,6 +68,24 @@ export class ReservationController {
     @GetUser() user: UserData,
   ) {
     return this.reservationService.create(createReservationDto, user);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update a reservation' })
+  @ApiParam({ name: 'id', description: 'Reservation ID' })
+  @ApiOkResponse({
+    type: Reservation,
+    description: 'The updated reservation',
+  })
+  @ApiBadRequestResponse({
+    description: 'Bad Request - Error en la validación de datos',
+  })
+  update(
+    @Param('id') id: string,
+    @Body() updateReservationDto: UpdateReservationDto,
+    @GetUser() user: UserData,
+  ) {
+    return this.reservationService.update(id, updateReservationDto, user);
   }
 
   @Get()
@@ -139,16 +159,28 @@ export class ReservationController {
     description: 'Paginated list of detailed reservations',
   })
   findAllPaginated(
+    @GetUser() user: UserPayload,
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
+    @Query('customerId') customerId?: string,
+    @Query('checkInDate') checkInDate?: string,
+    @Query('checkOutDate') checkOutDate?: string,
   ): Promise<PaginatedResponse<DetailedReservation>> {
     const pageNumber = parseInt(page, 10) ?? 1;
     const pageSizeNumber = parseInt(pageSize, 10) ?? 10;
     // TODO: Update service to use pagination parameters
-    return this.reservationService.findManyPaginated({
-      page: pageNumber,
-      pageSize: pageSizeNumber,
-    });
+    return this.reservationService.findManyPaginated(
+      user,
+      {
+        page: pageNumber,
+        pageSize: pageSizeNumber,
+      },
+      {
+        customerId,
+        checkInDate,
+        checkOutDate,
+      },
+    );
   }
 
   @Get('available-rooms')
@@ -174,6 +206,8 @@ export class ReservationController {
   async getAvailableRooms(
     @Query('checkInDate') checkInDate: string,
     @Query('checkOutDate') checkOutDate: string,
+    @Query('forUpdate') forUpdate: boolean = false,
+    @Query('reservationId') reservationId?: string,
   ): Promise<DetailedRoom[]> {
     // const checkAvailabilityDto: CheckAvailabilityDto = {
     //   roomId: '',
@@ -184,6 +218,8 @@ export class ReservationController {
     return this.reservationService.getAllAvailableRooms(
       checkInDate,
       checkOutDate,
+      forUpdate,
+      reservationId,
     );
   }
 
@@ -213,6 +249,8 @@ export class ReservationController {
   async getReservationInInterval(
     @Query('checkInDate') checkInDate: string,
     @Query('checkOutDate') checkOutDate: string,
+    @Query('forUpdate') forUpdate: boolean = false,
+    @Query('reservationId') reservationId?: string,
   ): Promise<DetailedReservation[]> {
     // const checkAvailabilityDto: CheckAvailabilityDto = {
     //   roomId: '',
@@ -223,6 +261,8 @@ export class ReservationController {
     return this.reservationService.getAllReservationsInTimeInterval(
       checkInDate,
       checkOutDate,
+      forUpdate,
+      reservationId,
     );
   }
 
@@ -256,6 +296,8 @@ export class ReservationController {
     @Query('roomId') roomId: string,
     @Query('checkInDate') checkInDate: string,
     @Query('checkOutDate') checkOutDate: string,
+    @Query('forUpdate') forUpdate: boolean = false,
+    @Query('reservationId') reservationId?: string,
   ): Promise<RoomAvailabilityDto> {
     const checkAvailabilityDto: CheckAvailabilityDto = {
       roomId,
@@ -263,18 +305,22 @@ export class ReservationController {
       checkOutDate,
     };
 
-    return this.reservationService.checkAvailability(checkAvailabilityDto);
+    return this.reservationService.checkAvailability(
+      checkAvailabilityDto,
+      forUpdate,
+      reservationId,
+    );
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a reservation by ID' })
   @ApiParam({ name: 'id', description: 'Reservation ID' })
   @ApiOkResponse({
-    type: DetailedReservation,
+    type: Reservation,
     description: 'The found reservation',
   })
   findOne(@Param('id') id: string) {
-    return this.reservationService.findOne(+id);
+    return this.reservationService.findOne(id);
   }
 
   // @Patch(':id')

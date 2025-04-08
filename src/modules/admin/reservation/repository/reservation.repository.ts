@@ -21,6 +21,8 @@ export class ReservationRepository extends BaseRepository<Reservation> {
     roomId: string,
     checkInDate: Date,
     checkOutDate: Date,
+    forUpdate: boolean = false,
+    reservationId?: string,
   ): Promise<boolean> {
     // Buscamos reservaciones existentes que se superpongan con las fechas solicitadas
     // y que estén en estados que impliquen que la habitación está ocupada
@@ -32,9 +34,12 @@ export class ReservationRepository extends BaseRepository<Reservation> {
         status: {
           in: [
             ReservationStatus.CHECKED_IN, // Reservaciones Activas, el cliente ya está en la habitación
-            ReservationStatus.PENDING, //This is same as saying CONFIRMED
+            ReservationStatus.PENDING, //This is when was reserved, but not payed yet
+            ReservationStatus.CONFIRMED, // Reservaciones Confirmadas
           ],
         },
+        // Excluye la reserva actual si forUpdate es true
+        ...(forUpdate && reservationId ? { id: { not: reservationId } } : {}),
         // Verificar superposición de fechas
         OR: [
           // Caso 1: La fecha de check-in solicitada está dentro de una reserva existente
@@ -55,6 +60,25 @@ export class ReservationRepository extends BaseRepository<Reservation> {
         ],
       },
     });
+
+    // if (forUpdate && reservationId) {
+    //   // Si estamos actualizando una reservación, excluimos esa reservación de la verificación
+    //   const reservation = await this.prisma.reservation.findUnique({
+    //     where: { id: reservationId },
+    //     select: { roomId: true },
+    //   });
+
+    //   if (reservation && reservation.roomId === roomId) {
+    //     // Logger.log(
+    //     //   `Reservation room ID: ${reservation.roomId} - Room ID: ${roomId} - Overlapping Reservations: ${overlappingReservations}`,
+    //     //   'ReservationRepository',
+    //     // );
+    //     // Logger.log(
+    //     //   'Validation overlapping' + `${overlappingReservations === 0}`,
+    //     // );
+    //     return overlappingReservations === 1;
+    //   }
+    // }
 
     // Si no hay reservaciones superpuestas, la habitación está disponible
     return overlappingReservations === 0;
@@ -79,7 +103,8 @@ export class ReservationRepository extends BaseRepository<Reservation> {
         status: {
           in: [
             ReservationStatus.CHECKED_IN, // Reservaciones Activas, el cliente ya está en la habitación
-            ReservationStatus.PENDING, //This is same as saying CONFIRMED
+            ReservationStatus.PENDING, //This is when was reserved, but not payed yet
+            ReservationStatus.CONFIRMED, // Reservaciones Confirmadas
           ],
         },
         OR: [
