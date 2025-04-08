@@ -42,6 +42,7 @@ import { DetailedRoom } from '../room/entities/room.entity';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { ReservationStatusDto } from './dto/reservation-status.dto';
+import { ReservationStatusAvailableActions } from './entities/reservation.status-actions';
 
 @ApiTags('Reservations')
 @ApiBadRequestResponse({
@@ -85,7 +86,7 @@ export class ReservationController {
   @ApiBadRequestResponse({
     description: 'Bad Request - Error en la validación de datos',
   })
-  startCheckIn(
+  transitionStatus(
     @GetUser() user: UserData,
     @Param('id') id: string,
     @Body() body: ReservationStatusDto,
@@ -164,6 +165,21 @@ export class ReservationController {
   })
   findAll() {
     return this.reservationService.findAll();
+  }
+
+  @Get('available-actions/:id')
+  @ApiOperation({
+    summary: 'Get Available Actions for transition reservation status',
+  })
+  @ApiOkResponse({
+    type: ReservationStatusAvailableActions,
+    description: 'List of all reservations',
+  })
+  validateReservationStatusAvailableActions(
+    // @GetUser() user: UserData,
+    @Param('id') id: string,
+  ) {
+    return this.reservationService.validateStatusTransitionActions(id);
   }
 
   @Get('paginated')
