@@ -60,10 +60,24 @@ export class CreatePaymentDto {
     required: false,
     example: [
       {
-        quantity: 0,
-        partial: 0,
-        percentage: 0,
-        finishesWorkItemBudgetId: 'id de la partida',
+        paymentDate: '2023-08-15',
+        description: 'Pago de reserva de habitación',
+        type: 'ROOM_RESERVATION',
+        method: 'CREDIT_CARD',
+        roomId: '7a1b9c2d-3e4f-5a6b-7c8d-9e0f1a2b3c4d',
+        days: 3,
+        unitPrice: 150.0,
+        subtotal: 450.0,
+      },
+      {
+        paymentDate: '2023-08-15',
+        description: 'Servicio de desayuno',
+        type: 'EXTRA_SERVICE',
+        method: 'CASH',
+        serviceId: '123e4567-e89b-12d3-a456-426614174000',
+        quantity: 2,
+        unitPrice: 25.0,
+        subtotal: 50.0,
       },
     ],
   })
