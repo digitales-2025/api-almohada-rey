@@ -27,7 +27,7 @@ import {
   SummaryPaymentData,
   UserData,
 } from 'src/interfaces';
-import { CreatePaymentDetailDto } from './dto/create-payment-detail.dto';
+import { CreateManyPaymentDetailDto } from './dto/create-many-payment-detail.dto';
 
 @ApiTags('Admin Payments')
 @ApiUnauthorizedResponse({ description: 'Unauthorized' })
@@ -55,11 +55,11 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Create a new payment detail' })
   @Post('detail')
   createPaymentDetail(
-    @Body() createPaymentDetailDto: CreatePaymentDetailDto,
+    @Body() createManyPaymentDetailDto: CreateManyPaymentDetailDto,
     @GetUser() user: UserData,
-  ): Promise<HttpResponse<PaymentDetailData>> {
+  ): Promise<HttpResponse<PaymentDetailData[]>> {
     return this.paymentsService.createPaymentDetail(
-      createPaymentDetailDto,
+      createManyPaymentDetailDto,
       user,
     );
   }
