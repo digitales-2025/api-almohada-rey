@@ -6,6 +6,15 @@ import { CreateReservationUseCase } from './use-cases/createReservation.use-case
 import { AuditModule } from '../audit/audit.module';
 import { RoomModule } from '../room/room.module';
 import { UpdateReservationUseCase } from './use-cases/updateReservation.use-case';
+import {
+  CanceledReservationState,
+  CheckedInReservationState,
+  CheckedOutReservationState,
+  ConfirmedReservationState,
+  PendingReservationState,
+  ReservationStateFactory,
+} from './states';
+import { ChangeReservationStatusUseCase } from './use-cases/check-in-reservation.use.case';
 
 @Module({
   imports: [AuditModule, RoomModule],
@@ -15,6 +24,13 @@ import { UpdateReservationUseCase } from './use-cases/updateReservation.use-case
     ReservationRepository,
     CreateReservationUseCase,
     UpdateReservationUseCase,
+    CanceledReservationState,
+    CheckedOutReservationState,
+    CheckedInReservationState,
+    ConfirmedReservationState,
+    PendingReservationState,
+    ReservationStateFactory,
+    ChangeReservationStatusUseCase,
   ],
   exports: [ReservationService],
 })

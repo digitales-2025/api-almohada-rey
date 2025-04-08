@@ -22,6 +22,8 @@ import { hasNoChanges } from 'src/utils/update-validations.util';
 import { UpdateReservationUseCase } from './use-cases/updateReservation.use-case';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { FilterQueryParamsByField } from 'src/utils/filter-params/flter-params';
+import { ChangeReservationStatusUseCase } from './use-cases/check-in-reservation.use.case';
+import { ReservationStatus } from '@prisma/client';
 
 @Injectable()
 export class ReservationService {
@@ -33,6 +35,7 @@ export class ReservationService {
     private readonly createReservationUseCase: CreateReservationUseCase,
     private readonly updateReservationUseCase: UpdateReservationUseCase,
     private readonly roomRepository: RoomRepository,
+    private readonly changeReservationStatusUseCase: ChangeReservationStatusUseCase,
   ) {
     this.errorHandler = new BaseErrorHandler(
       this.logger,
@@ -140,6 +143,23 @@ export class ReservationService {
         userData,
       );
 
+      return reservation;
+    } catch (error) {
+      this.errorHandler.handleError(error, 'updating');
+    }
+  }
+
+  changeReservationStatus(
+    id: string,
+    newStatus: ReservationStatus,
+    userData: UserData,
+  ) {
+    try {
+      const reservation = this.changeReservationStatusUseCase.execute(
+        id,
+        newStatus,
+        userData,
+      );
       return reservation;
     } catch (error) {
       this.errorHandler.handleError(error, 'updating');
