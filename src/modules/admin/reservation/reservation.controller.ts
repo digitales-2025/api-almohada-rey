@@ -159,10 +159,12 @@ export class ReservationController {
     description: 'Paginated list of detailed reservations',
   })
   findAllPaginated(
+    @GetUser() user: UserPayload,
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
-    @Query('customerId') customerId: string,
-    @GetUser() user: UserPayload,
+    @Query('customerId') customerId?: string,
+    @Query('checkInDate') checkInDate?: string,
+    @Query('checkOutDate') checkOutDate?: string,
   ): Promise<PaginatedResponse<DetailedReservation>> {
     const pageNumber = parseInt(page, 10) ?? 1;
     const pageSizeNumber = parseInt(pageSize, 10) ?? 10;
@@ -175,6 +177,8 @@ export class ReservationController {
       },
       {
         customerId,
+        checkInDate,
+        checkOutDate,
       },
     );
   }

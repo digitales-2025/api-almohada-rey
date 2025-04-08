@@ -162,17 +162,82 @@ export class ReservationService {
     // filter?: any,
   ): Promise<PaginatedResponse<DetailedReservation>> {
     try {
-      let filter = {};
+      let filter: any = {};
       if (!user.isSuperAdmin) {
         filter = { isActive: true };
       }
+
+      // Extract date parameters if they exist
+      let checkInDate: Date | undefined;
+      let checkOutDate: Date | undefined;
+
+      if (additionalParams?.checkInDate) {
+        checkInDate = new Date(additionalParams.checkInDate as string);
+        delete additionalParams.checkInDate; // Remove from additionalParams to avoid conflicts
+      }
+
+      if (additionalParams?.checkOutDate) {
+        checkOutDate = new Date(additionalParams.checkOutDate as string);
+        delete additionalParams.checkOutDate; // Remove from additionalParams to avoid conflicts
+      }
+
+      // Validate that check-in is before check-out if both dates are provided
+      if (checkInDate && checkOutDate && checkInDate >= checkOutDate) {
+        throw new BadRequestException(
+          'La fecha de check-in debe ser anterior a la fecha de check-out',
+        );
+      }
+
       if (additionalParams) {
         filter = {
           ...filter,
           ...additionalParams,
         };
       }
-      //const filter = user.isSuperAdmin ? {} : { isActive: true };
+
+      // Si solo hay fecha de entrada
+      if (checkInDate && !checkOutDate) {
+        filter = {
+          ...filter,
+          checkInDate: { gte: checkInDate },
+        };
+      }
+
+      // Si solo hay fecha de salida
+      if (!checkInDate && checkOutDate) {
+        filter = {
+          ...filter,
+          checkOutDate: { lte: checkOutDate },
+        };
+      }
+
+      // Add date range filter if both dates are provided
+      if (checkInDate && checkOutDate) {
+        filter.OR = [
+          // Reservations that start during the requested period
+          {
+            checkInDate: {
+              gte: checkInDate,
+              lt: checkOutDate,
+            },
+          },
+          // Reservations that end during the requested period
+          {
+            checkOutDate: {
+              gt: checkInDate,
+              lte: checkOutDate,
+            },
+          },
+          // Reservations that span the entire requested period
+          {
+            AND: [
+              { checkInDate: { lte: checkInDate } },
+              { checkOutDate: { gte: checkOutDate } },
+            ],
+          },
+        ];
+      }
+
       return this.reservationRepository.findManyPaginated<DetailedReservation>(
         pagination,
         {
