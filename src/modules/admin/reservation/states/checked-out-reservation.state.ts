@@ -60,9 +60,9 @@ export class CheckedOutReservationState implements ReservationStateHandler {
     _targetStatus: ReservationStatus,
     tx: PrismaTransaction,
   ): Promise<void> {
-    this.roomRepository.updateWithTx(
+    await this.roomRepository.updateWithTx(
       reservation.roomId,
-      { status: 'CLEANING' },
+      { status: 'AVAILABLE' },
       tx,
     );
   }
