@@ -317,4 +317,34 @@ export class RoomService {
       throw error;
     }
   }
+
+  async updateStatusCleaning(id: string): Promise<BaseApiResponse<Room>> {
+    try {
+      // Verificar que la habitación existe
+      const room = await this.findById(id);
+
+      // Verificar si el estado es igual al actual
+      if (room.status === 'CLEANING') {
+        return {
+          success: true,
+          message: `La habitación ya se encuentra en estado CLEANING`,
+          data: room,
+        };
+      }
+
+      // Actualizar el estado usando el repositorio
+      const updatedRoom = await this.roomRepository.updateStatus(
+        id,
+        'CLEANING',
+      );
+
+      return {
+        success: true,
+        message: `Estado de habitación actualizado a CLEANING exitosamente`,
+        data: updatedRoom,
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
 }
