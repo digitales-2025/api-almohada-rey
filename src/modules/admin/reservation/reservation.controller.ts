@@ -74,7 +74,7 @@ export class ReservationController {
     return this.reservationService.create(createReservationDto, user);
   }
 
-  @Patch('/transition-status/:id')
+  @Patch('transition-status/:id')
   @ApiOperation({
     summary: 'Update reservation status after being, can support all states',
   })

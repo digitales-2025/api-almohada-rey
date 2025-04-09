@@ -158,6 +158,13 @@ export class ReservationService {
     userData: UserData,
   ) {
     try {
+      Logger.log(
+        'Rquest received to change reservation status' +
+          ' ' +
+          id +
+          ' ' +
+          newStatus,
+      );
       const reservation = this.changeReservationStatusUseCase.execute(
         id,
         newStatus,

@@ -32,6 +32,12 @@ export class ReservationStatusAvailableActions {
   canModify: boolean;
 
   @ApiProperty({
+    description: 'Whether the reservation can be deactivated',
+    example: false,
+  })
+  canDeactivate: boolean;
+
+  @ApiProperty({
     description: 'Whether the reservation can be reactivated',
     example: false,
   })

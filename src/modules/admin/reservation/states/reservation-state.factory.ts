@@ -46,6 +46,7 @@ export class ReservationStateFactory {
           canCheckOut: false,
           canCancel: true,
           canModify: true,
+          canDeactivate: false,
           canReactivate: false,
         };
       case 'CONFIRMED':
@@ -55,6 +56,7 @@ export class ReservationStateFactory {
           canCheckOut: false,
           canCancel: true,
           canModify: true,
+          canDeactivate: false,
           canReactivate: false,
         };
       case 'CHECKED_IN':
@@ -64,6 +66,7 @@ export class ReservationStateFactory {
           canCheckOut: true,
           canCancel: false,
           canModify: false,
+          canDeactivate: false,
           canReactivate: false,
         };
       case 'CHECKED_OUT':
@@ -73,6 +76,7 @@ export class ReservationStateFactory {
           canCheckOut: false,
           canCancel: false,
           canModify: false,
+          canDeactivate: true,
           canReactivate: false,
         };
       case 'CANCELED':
@@ -82,6 +86,7 @@ export class ReservationStateFactory {
           canCheckOut: false,
           canCancel: false,
           canModify: false,
+          canDeactivate: false,
           canReactivate: true,
         };
       default:
