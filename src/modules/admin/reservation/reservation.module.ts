@@ -14,7 +14,9 @@ import {
   PendingReservationState,
   ReservationStateFactory,
 } from './states';
-import { ChangeReservationStatusUseCase } from './use-cases/check-in-reservation.use.case';
+import { ChangeReservationStatusUseCase } from './use-cases/changeReservationStatus.use.case';
+import { DeactivateReservationsUseCase } from './use-cases/deactivateReservations.use-case';
+import { ReactivateReservationsUseCase } from './use-cases/reactivateReservations.use-case';
 
 @Module({
   imports: [AuditModule, RoomModule],
@@ -31,6 +33,8 @@ import { ChangeReservationStatusUseCase } from './use-cases/check-in-reservation
     PendingReservationState,
     ReservationStateFactory,
     ChangeReservationStatusUseCase,
+    DeactivateReservationsUseCase,
+    ReactivateReservationsUseCase,
   ],
   exports: [ReservationService],
 })

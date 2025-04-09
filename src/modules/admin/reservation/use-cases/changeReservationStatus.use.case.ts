@@ -74,7 +74,7 @@ export class ChangeReservationStatusUseCase {
             {
               entityId: reservation.id,
               entityType: 'reservation',
-              action: AuditActionType.UPDATE,
+              action: AuditActionType.UPDATE_STATUS,
               performedById: user.id,
             },
             tx,

@@ -127,4 +127,41 @@ export class ReservationRepository extends BaseRepository<Reservation> {
 
     return reservations.map((reservation) => reservation.roomId);
   }
+
+  async getReservedReservationsIds(
+    checkInDate: Date,
+    checkOutDate: Date,
+    roomId?: string,
+  ) {
+    const reservations = await this.prisma.reservation.findMany({
+      where: {
+        isActive: true,
+        ...(roomId ? { roomId } : {}),
+        status: {
+          in: [
+            ReservationStatus.CHECKED_IN, // Reservaciones Activas, el cliente ya está en la habitación
+            ReservationStatus.PENDING, //This is when was reserved, but not payed yet
+            ReservationStatus.CONFIRMED, // Reservaciones Confirmadas
+          ],
+        },
+        OR: [
+          {
+            checkInDate: { lte: checkInDate },
+            checkOutDate: { gt: checkInDate },
+          },
+          {
+            checkInDate: { lt: checkOutDate },
+            checkOutDate: { gte: checkOutDate },
+          },
+          {
+            checkInDate: { gte: checkInDate },
+            checkOutDate: { lte: checkOutDate },
+          },
+        ],
+      },
+      select: { id: true },
+    });
+
+    return reservations.map((reservation) => reservation.id);
+  }
 }

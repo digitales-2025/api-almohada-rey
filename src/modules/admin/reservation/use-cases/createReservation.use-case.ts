@@ -103,7 +103,7 @@ export class CreateReservationUseCase {
         data: newReservation,
       };
     } catch (error) {
-      // Manejo centralizado de errores
+      //Manejo centralizado de errores
       this.logger.error(`Error al crear reservación: ${error.message}`, {
         error,
         dto: createReservationDto,
