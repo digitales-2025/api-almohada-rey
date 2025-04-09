@@ -191,4 +191,23 @@ export class RoomController {
   ): Promise<BaseApiResponse<Room[]>> {
     return this.roomService.reactivateMany(deleteRoomDto.ids, user);
   }
+
+  /**
+   * Cambia el estado de una habitación a CLEANING
+   */
+  @Patch(':id/cleaning')
+  @ApiOperation({ summary: 'Cambiar estado de habitación a limpieza' })
+  @ApiParam({ name: 'id', description: 'ID de la habitación' })
+  @ApiOkResponse({
+    description: 'Estado de habitación cambiado a limpieza exitosamente',
+    type: BaseApiResponse,
+  })
+  @ApiNotFoundResponse({
+    description: 'Habitación no encontrada',
+  })
+  updateStatusToCleaning(
+    @Param('id') id: string,
+  ): Promise<BaseApiResponse<Room>> {
+    return this.roomService.updateStatusCleaning(id);
+  }
 }
