@@ -43,7 +43,7 @@ import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { ReservationStatusDto } from './dto/reservation-status.dto';
 import { ReservationStatusAvailableActions } from './entities/reservation.status-actions';
-import { UpdateManyDto } from './dto/update-many.dto';
+import { UpdateManyDto, UpdateManyResponseDto } from './dto/update-many.dto';
 
 @ApiTags('Reservations')
 @ApiBadRequestResponse({
@@ -104,7 +104,7 @@ export class ReservationController {
     summary: 'Update reservation logic deletion status to deactivate',
   })
   @ApiOkResponse({
-    type: Reservation,
+    type: UpdateManyResponseDto,
     description: 'The updated reservation',
   })
   @ApiBadRequestResponse({
@@ -122,7 +122,7 @@ export class ReservationController {
     summary: 'Update reservation logic deletion status to reactivate',
   })
   @ApiOkResponse({
-    type: Reservation,
+    type: UpdateManyResponseDto,
     description: 'The updated reservation',
   })
   @ApiBadRequestResponse({
