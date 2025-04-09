@@ -40,6 +40,9 @@ import {
 } from './dto/room-availability.dto';
 import { DetailedRoom } from '../room/entities/room.entity';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
+import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
+import { ReservationStatusDto } from './dto/reservation-status.dto';
+import { ReservationStatusAvailableActions } from './entities/reservation.status-actions';
 
 @ApiTags('Reservations')
 @ApiBadRequestResponse({
@@ -54,6 +57,7 @@ import { UpdateReservationDto } from './dto/update-reservation.dto';
   PaginationMetadata,
   DetailedReservation,
   Guest,
+  BaseApiResponse,
 )
 @Controller({ path: 'reservation', version: '1' })
 @Auth()
@@ -68,6 +72,30 @@ export class ReservationController {
     @GetUser() user: UserData,
   ) {
     return this.reservationService.create(createReservationDto, user);
+  }
+
+  @Patch('transition-status/:id')
+  @ApiOperation({
+    summary: 'Update reservation status after being, can support all states',
+  })
+  @ApiParam({ name: 'id', description: 'Reservation ID' })
+  @ApiOkResponse({
+    type: Reservation,
+    description: 'The updated reservation',
+  })
+  @ApiBadRequestResponse({
+    description: 'Bad Request - Error en la validación de datos',
+  })
+  transitionStatus(
+    @GetUser() user: UserData,
+    @Param('id') id: string,
+    @Body() body: ReservationStatusDto,
+  ) {
+    return this.reservationService.changeReservationStatus(
+      id,
+      body.status,
+      user,
+    );
   }
 
   @Patch(':id')
@@ -88,6 +116,47 @@ export class ReservationController {
     return this.reservationService.update(id, updateReservationDto, user);
   }
 
+  // @Patch('/check-out/:id')
+  // @ApiOperation({
+  //   summary: 'Update a reservation status after being checkedin',
+  // })
+  // @ApiParam({ name: 'id', description: 'Reservation ID' })
+  // @ApiOkResponse({
+  //   type: Reservation,
+  //   description: 'The updated reservation',
+  // })
+  // @ApiBadRequestResponse({
+  //   description: 'Bad Request - Error en la validación de datos',
+  // })
+  // closeCheckOut(
+  //   @Param('id') id: string,
+  //   @Body() updateReservationDto: UpdateReservationDto,
+  //   @GetUser() user: UserData,
+  // ) {
+  //   return this.reservationService.update(id, updateReservationDto, user);
+  // }
+
+  // @Patch('/cancel/:id')
+  // @ApiOperation({
+  //   summary:
+  //     'Update a reservation status after creating it, but before confirming it',
+  // })
+  // @ApiParam({ name: 'id', description: 'Reservation ID' })
+  // @ApiOkResponse({
+  //   type: Reservation,
+  //   description: 'The updated reservation',
+  // })
+  // @ApiBadRequestResponse({
+  //   description: 'Bad Request - Error en la validación de datos',
+  // })
+  // cancelReservation(
+  //   @Param('id') id: string,
+  //   @Body() updateReservationDto: UpdateReservationDto,
+  //   @GetUser() user: UserData,
+  // ) {
+  //   return this.reservationService.update(id, updateReservationDto, user);
+  // }
+
   @Get()
   @ApiOperation({ summary: 'Get all reservations' })
   @ApiOkResponse({
@@ -96,6 +165,21 @@ export class ReservationController {
   })
   findAll() {
     return this.reservationService.findAll();
+  }
+
+  @Get('available-actions/:id')
+  @ApiOperation({
+    summary: 'Get Available Actions for transition reservation status',
+  })
+  @ApiOkResponse({
+    type: ReservationStatusAvailableActions,
+    description: 'List of all reservations',
+  })
+  validateReservationStatusAvailableActions(
+    // @GetUser() user: UserData,
+    @Param('id') id: string,
+  ) {
+    return this.reservationService.validateStatusTransitionActions(id);
   }
 
   @Get('paginated')
@@ -114,36 +198,24 @@ export class ReservationController {
     example: 10,
     required: false,
   })
-  // export class PaginationMetadata {
-  //   @ApiProperty({ description: 'Total number of items', type: Number })
-  //   total: number;
-
-  //   @ApiProperty({ description: 'Current page number', type: Number })
-  //   page: number;
-
-  //   @ApiProperty({ description: 'Number of items per page', type: Number })
-  //   pageSize: number;
-
-  //   @ApiProperty({ description: 'Total number of pages', type: Number })
-  //   totalPages: number;
-
-  //   @ApiProperty({ description: 'Whether there is a next page', type: Boolean })
-  //   hasNext: boolean;
-
-  //   @ApiProperty({
-  //     description: 'Whether there is a previous page',
-  //     type: Boolean,
-  //   })
-  //   hasPrevious: boolean;
-  // }
-
-  // export class PaginatedResponse<T> implements PaginatedResult<T> {
-  //   @ApiProperty({ description: 'The paginated data', isArray: true })
-  //   data: T[];
-
-  //   @ApiProperty({ description: 'Pagination metadata', type: PaginationMetadata })
-  //   meta: PaginationMetadata;
-  // }
+  @ApiQuery({
+    name: 'customerId',
+    description: 'Customer ID to filter reservations',
+    type: String,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'checkInDate',
+    description: 'Check-in date to filter reservations',
+    type: String,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'checkOutDate',
+    description: 'Check-out date to filter reservations',
+    type: String,
+    required: false,
+  })
   @ApiOkResponse({
     schema: {
       title: 'DetailedReservationPaginatedResponse',

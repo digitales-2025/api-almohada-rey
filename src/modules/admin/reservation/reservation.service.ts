@@ -22,6 +22,10 @@ import { hasNoChanges } from 'src/utils/update-validations.util';
 import { UpdateReservationUseCase } from './use-cases/updateReservation.use-case';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { FilterQueryParamsByField } from 'src/utils/filter-params/flter-params';
+import { ChangeReservationStatusUseCase } from './use-cases/check-in-reservation.use.case';
+import { ReservationStatus } from '@prisma/client';
+import { ReservationStateFactory } from './states';
+import { ReservationStatusAvailableActions } from './entities/reservation.status-actions';
 
 @Injectable()
 export class ReservationService {
@@ -33,6 +37,8 @@ export class ReservationService {
     private readonly createReservationUseCase: CreateReservationUseCase,
     private readonly updateReservationUseCase: UpdateReservationUseCase,
     private readonly roomRepository: RoomRepository,
+    private readonly changeReservationStatusUseCase: ChangeReservationStatusUseCase,
+    private readonly reservationStateFactory: ReservationStateFactory,
   ) {
     this.errorHandler = new BaseErrorHandler(
       this.logger,
@@ -143,6 +149,46 @@ export class ReservationService {
       return reservation;
     } catch (error) {
       this.errorHandler.handleError(error, 'updating');
+    }
+  }
+
+  changeReservationStatus(
+    id: string,
+    newStatus: ReservationStatus,
+    userData: UserData,
+  ) {
+    try {
+      Logger.log(
+        'Rquest received to change reservation status' +
+          ' ' +
+          id +
+          ' ' +
+          newStatus,
+      );
+      const reservation = this.changeReservationStatusUseCase.execute(
+        id,
+        newStatus,
+        userData,
+      );
+      return reservation;
+    } catch (error) {
+      this.errorHandler.handleError(error, 'updating');
+    }
+  }
+
+  async validateStatusTransitionActions(
+    id: string,
+  ): Promise<ReservationStatusAvailableActions> {
+    try {
+      const reservation = await this.findOne(id);
+      if (!reservation) {
+        throw new BadRequestException(`No se encontró la reserva con ID ${id}`);
+      }
+      return this.reservationStateFactory.getAvailableActions(
+        reservation.status,
+      );
+    } catch (error) {
+      this.errorHandler.handleError(error, 'getting');
     }
   }
 
