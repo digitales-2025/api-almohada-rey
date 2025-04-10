@@ -3,7 +3,6 @@ import {
   Get,
   Post,
   Body,
-  // Patch,
   Param,
   Delete,
   Query,
@@ -75,31 +74,7 @@ export class ReservationController {
     return this.reservationService.create(createReservationDto, user);
   }
 
-  @Patch('transition-status/:id')
-  @ApiOperation({
-    summary: 'Update reservation status after being, can support all states',
-  })
-  @ApiParam({ name: 'id', description: 'Reservation ID' })
-  @ApiOkResponse({
-    type: Reservation,
-    description: 'The updated reservation',
-  })
-  @ApiBadRequestResponse({
-    description: 'Bad Request - Error en la validación de datos',
-  })
-  transitionStatus(
-    @GetUser() user: UserData,
-    @Param('id') id: string,
-    @Body() body: ReservationStatusDto,
-  ) {
-    return this.reservationService.changeReservationStatus(
-      id,
-      body.status,
-      user,
-    );
-  }
-
-  @Patch('deactivate')
+  @Delete('deactivate')
   @ApiOperation({
     summary: 'Update reservation logic deletion status to deactivate',
   })
@@ -133,6 +108,30 @@ export class ReservationController {
     @Body() body: UpdateManyDto,
   ) {
     return this.reservationService.reactivateReservations(body, user);
+  }
+
+  @Patch('transition-status/:id')
+  @ApiOperation({
+    summary: 'Update reservation status after being, can support all states',
+  })
+  @ApiParam({ name: 'id', description: 'Reservation ID' })
+  @ApiOkResponse({
+    type: Reservation,
+    description: 'The updated reservation',
+  })
+  @ApiBadRequestResponse({
+    description: 'Bad Request - Error en la validación de datos',
+  })
+  transitionStatus(
+    @GetUser() user: UserData,
+    @Param('id') id: string,
+    @Body() body: ReservationStatusDto,
+  ) {
+    return this.reservationService.changeReservationStatus(
+      id,
+      body.status,
+      user,
+    );
   }
 
   @Patch(':id')

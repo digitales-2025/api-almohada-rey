@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { IsArray, IsNotEmpty, IsUUID } from 'class-validator';
 
 export class UpdateManyDto {
   @ApiProperty({
@@ -7,6 +8,9 @@ export class UpdateManyDto {
     example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
     type: [String],
   })
+  @IsArray()
+  @IsNotEmpty()
+  @IsUUID(4, { each: true })
   ids: string[];
 }
 

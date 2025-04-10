@@ -46,8 +46,8 @@ export class ReservationStateFactory {
           canCheckOut: false,
           canCancel: true,
           canModify: true,
-          canDeactivate: false,
-          canReactivate: false,
+          canDeactivate: true,
+          canReactivate: true,
         };
       case 'CONFIRMED':
         return {
@@ -87,7 +87,7 @@ export class ReservationStateFactory {
           canCancel: false,
           canModify: false,
           canDeactivate: false,
-          canReactivate: true,
+          canReactivate: false, //OJO: Para mayor flexibilidad se puede refinar las consultas que verifican la disponibilidad de horarios para que tambien filtre por el estado de la reserva (no debe considerar CANCELED, y CHECKED_OUT)
         };
       default:
         throw new Error(`Estado de reserva desconocido: ${currentStatus}`);

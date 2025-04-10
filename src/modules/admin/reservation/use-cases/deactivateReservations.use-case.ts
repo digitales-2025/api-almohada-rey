@@ -88,6 +88,14 @@ export class DeactivateReservationsUseCase {
               continue;
             }
 
+            if (!reservation.isActive) {
+              results.failed.push({
+                id,
+                reason: 'La reservación ya se encuentra desactivada',
+              });
+              continue;
+            }
+
             // 4. Actualizar la reservación
             await this.reservationRepository.updateWithTx(
               id,

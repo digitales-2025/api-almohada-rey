@@ -119,6 +119,14 @@ export class ReactivateReservationsUseCase {
               continue;
             }
 
+            if (reservation.isActive === true) {
+              results.failed.push({
+                id,
+                reason: 'La reservación ya se encuentra activa',
+              });
+              continue;
+            }
+
             const checkInDateHasToCome =
               await this.checkCheckInDateItsNotInThePast(
                 reservation.checkInDate,
