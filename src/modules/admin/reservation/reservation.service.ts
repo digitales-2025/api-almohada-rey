@@ -1,3 +1,5 @@
+import { ReactivateReservationsUseCase } from './use-cases/reactivateReservations.use-case';
+import { DeactivateReservationsUseCase } from './use-cases/deactivateReservations.use-case';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
@@ -22,10 +24,11 @@ import { hasNoChanges } from 'src/utils/update-validations.util';
 import { UpdateReservationUseCase } from './use-cases/updateReservation.use-case';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { FilterQueryParamsByField } from 'src/utils/filter-params/flter-params';
-import { ChangeReservationStatusUseCase } from './use-cases/check-in-reservation.use.case';
+import { ChangeReservationStatusUseCase } from './use-cases/changeReservationStatus.use.case';
 import { ReservationStatus } from '@prisma/client';
 import { ReservationStateFactory } from './states';
 import { ReservationStatusAvailableActions } from './entities/reservation.status-actions';
+import { UpdateManyDto, UpdateManyResponseDto } from './dto/update-many.dto';
 
 @Injectable()
 export class ReservationService {
@@ -39,6 +42,8 @@ export class ReservationService {
     private readonly roomRepository: RoomRepository,
     private readonly changeReservationStatusUseCase: ChangeReservationStatusUseCase,
     private readonly reservationStateFactory: ReservationStateFactory,
+    private readonly deactivateReservationsUseCase: DeactivateReservationsUseCase,
+    private readonly reactivateReservationsUseCase: ReactivateReservationsUseCase,
   ) {
     this.errorHandler = new BaseErrorHandler(
       this.logger,
@@ -149,6 +154,28 @@ export class ReservationService {
       return reservation;
     } catch (error) {
       this.errorHandler.handleError(error, 'updating');
+    }
+  }
+
+  deactivateReservations(
+    dto: UpdateManyDto,
+    userData: UserData,
+  ): Promise<BaseApiResponse<UpdateManyResponseDto>> {
+    try {
+      return this.deactivateReservationsUseCase.execute(dto.ids, userData);
+    } catch (error) {
+      this.errorHandler.handleError(error, 'deactivating');
+    }
+  }
+
+  reactivateReservations(
+    dto: UpdateManyDto,
+    userData: UserData,
+  ): Promise<BaseApiResponse<UpdateManyResponseDto>> {
+    try {
+      return this.reactivateReservationsUseCase.execute(dto.ids, userData);
+    } catch (error) {
+      this.errorHandler.handleError(error, 'reactivating');
     }
   }
 

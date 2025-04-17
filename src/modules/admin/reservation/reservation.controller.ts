@@ -3,7 +3,6 @@ import {
   Get,
   Post,
   Body,
-  // Patch,
   Param,
   Delete,
   Query,
@@ -43,6 +42,7 @@ import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { ReservationStatusDto } from './dto/reservation-status.dto';
 import { ReservationStatusAvailableActions } from './entities/reservation.status-actions';
+import { UpdateManyDto, UpdateManyResponseDto } from './dto/update-many.dto';
 
 @ApiTags('Reservations')
 @ApiBadRequestResponse({
@@ -72,6 +72,42 @@ export class ReservationController {
     @GetUser() user: UserData,
   ) {
     return this.reservationService.create(createReservationDto, user);
+  }
+
+  @Delete('deactivate')
+  @ApiOperation({
+    summary: 'Update reservation logic deletion status to deactivate',
+  })
+  @ApiOkResponse({
+    type: UpdateManyResponseDto,
+    description: 'The updated reservation',
+  })
+  @ApiBadRequestResponse({
+    description: 'Bad Request - Error en la validación de datos',
+  })
+  deactivateReservations(
+    @GetUser() user: UserData,
+    @Body() body: UpdateManyDto,
+  ) {
+    return this.reservationService.deactivateReservations(body, user);
+  }
+
+  @Patch('reactivate')
+  @ApiOperation({
+    summary: 'Update reservation logic deletion status to reactivate',
+  })
+  @ApiOkResponse({
+    type: UpdateManyResponseDto,
+    description: 'The updated reservation',
+  })
+  @ApiBadRequestResponse({
+    description: 'Bad Request - Error en la validación de datos',
+  })
+  reactivateReservations(
+    @GetUser() user: UserData,
+    @Body() body: UpdateManyDto,
+  ) {
+    return this.reservationService.reactivateReservations(body, user);
   }
 
   @Patch('transition-status/:id')
