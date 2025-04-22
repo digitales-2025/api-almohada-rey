@@ -234,6 +234,7 @@ enum PaymentDetailMethod {
   PLIN
   PAYPAL
   IZI_PAY
+  PENDING_PAYMENT
 }
 
 enum PaymentDetailStatus {

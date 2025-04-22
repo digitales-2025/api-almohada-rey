@@ -8,6 +8,7 @@ export {
   PaymentData,
   PaymentDetailData,
   SummaryPaymentData,
+  RoomPaymentDetailsData,
 } from './payment.interface';
 
 export { HttpResponse } from './https-response.interface';

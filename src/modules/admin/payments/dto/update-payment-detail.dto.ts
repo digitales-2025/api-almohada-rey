@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { PaymentDetailMethod, PaymentDetailType } from '@prisma/client';
+import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { PaymentDetailMethod } from '@prisma/client';
 import { Transform } from 'class-transformer';
 import {
   IsDateString,
@@ -10,56 +10,40 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
+import { CreatePaymentDetailDto } from './create-payment-detail.dto';
 
 // DTO para la creacion de un Payment Detail
-export class CreatePaymentDetailDto {
-  @ApiProperty({
-    name: 'paymentDetailId',
-    description: 'ID del detalle de pago',
-    required: false,
-  })
-  @IsString()
-  @IsUUID()
-  @IsOptional()
-  paymentDetailId?: string;
-
+export class UpdatePaymentDetailDto extends PartialType(
+  CreatePaymentDetailDto,
+) {
   @ApiProperty({
     name: 'paymentDate',
     description: 'Date of the payment',
     example: '2021-09-21',
+    required: false,
   })
   @IsDateString()
   @IsNotEmpty()
+  @IsOptional()
   paymentDate: string;
 
   @ApiProperty({
     name: 'description',
     description: 'Descripción del detalle de pago',
     example: 'Descripción del detalle de pago',
+    required: false,
   })
   @IsString()
   @IsNotEmpty()
+  @IsOptional()
   description: string;
-
-  @ApiProperty({
-    name: 'type',
-    description:
-      'Tipo de  detalle de pago. Puede ser ROOM_RESERVATION o EXTRA_SERVICE',
-    example: 'ROOM_RESERVATION',
-  })
-  @IsString()
-  @IsNotEmpty()
-  @IsIn(['ROOM_RESERVATION', 'EXTRA_SERVICE'], {
-    message: "type must be either 'ROOM_RESERVATION' or 'EXTRA_SERVICE'",
-  })
-  @Transform(({ value }) => value.toUpperCase())
-  type: PaymentDetailType;
 
   @ApiProperty({
     name: 'method',
     description:
       'Método de pago utilizado. Puede ser CASH, CREDIT_CARD, DEBIT_CARD, TRANSFER, YAPE, PLIN, PAYPAL, IZI_PAY o PENDING_PAYMENT',
     example: 'CREDIT_CARD',
+    required: false,
   })
   @IsString()
   @IsNotEmpty()
@@ -77,9 +61,10 @@ export class CreatePaymentDetailDto {
     ],
     {
       message:
-        "method must be one of: 'CASH', 'CREDIT_CARD', 'DEBIT_CARD', 'TRANSFER', 'YAPE', 'PLIN', 'PAYPAL', 'IZI_PAY', 'PENDING_PAYMENT'",
+        "method must be one of: 'CASH', 'CREDIT_CARD', 'DEBIT_CARD', 'TRANSFER', 'YAPE', 'PLIN', 'PAYPAL', 'IZI_PAY' or 'PENDING_PAYMENT'",
     },
   )
+  @IsOptional()
   @Transform(({ value }) => value.toUpperCase())
   method: PaymentDetailMethod;
 
@@ -142,17 +127,21 @@ export class CreatePaymentDetailDto {
     name: 'unitPrice',
     description: 'Precio unitario',
     example: '100.00',
+    required: false,
   })
   @IsNumber()
   @IsNotEmpty()
+  @IsOptional()
   unitPrice: number;
 
   @ApiProperty({
     name: 'subtotal',
     description: 'Precio total',
     example: '100.00',
+    required: false,
   })
   @IsNumber()
   @IsNotEmpty()
+  @IsOptional()
   subtotal: number;
 }

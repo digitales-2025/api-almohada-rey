@@ -29,3 +29,17 @@ export function getCurrentLimaDate(): Date {
     0,
   );
 }
+
+export function calculateStayNights(
+  checkInDate: string,
+  checkOutDate: string,
+): number {
+  const checkIn = new Date(checkInDate);
+  const checkOut = new Date(checkOutDate);
+
+  // Calculamos la diferencia en milisegundos y convertimos a días
+  const diffTime = checkOut.getTime() - checkIn.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  return diffDays;
+}

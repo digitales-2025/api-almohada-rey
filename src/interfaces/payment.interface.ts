@@ -5,10 +5,16 @@ export type PaymentData = Pick<
   'id' | 'code' | 'date' | 'amount' | 'amountPaid' | 'status'
 > & {
   observations?: string;
+  missingDays?: number;
+  paymentDays?: number;
   reservation: {
     id: string;
     checkInDate: Date;
     checkOutDate: Date;
+    customer: {
+      id: string;
+      name: string;
+    };
   };
   paymentDetail: PaymentDetailData[];
 };
@@ -48,6 +54,7 @@ export type SummaryPaymentData = Pick<
   Payment,
   'id' | 'code' | 'date' | 'amount' | 'amountPaid' | 'status'
 > & {
+  observations?: string;
   reservation: {
     customer: {
       id: string;
@@ -55,3 +62,33 @@ export type SummaryPaymentData = Pick<
     };
   };
 };
+
+export interface RoomPaymentDetailsData {
+  id: string;
+  code: string;
+  date: string;
+  amount: number;
+  amountPaid: number;
+  status: string;
+  observations?: string;
+  missingDays: number;
+  paymentDays: number;
+  reservation: {
+    id: string;
+    checkInDate: Date;
+    checkOutDate: Date;
+    room?: {
+      id: string;
+      number: number;
+      RoomTypes: {
+        id: string;
+        name: string;
+        price: number;
+      };
+    };
+    customer: {
+      id: string;
+      name: string;
+    };
+  };
+}
