@@ -1184,23 +1184,25 @@ export class PaymentsService {
             where: { paymentId },
           });
 
-          const payment = await prisma.payment.findUnique({
-            where: { id: paymentId },
-          });
-
           const newAmountPaid = allPaymentDetails
             .filter((d) => d.status === 'PAID')
             .reduce((sum, d) => sum + Number(d.subtotal), 0);
 
+          // Obtén el amount actualizado
+          const updatedPayment = await prisma.payment.findUnique({
+            where: { id: paymentId },
+          });
+
+          const updatedAmount = updatedPayment.amount;
           const updatedPaymentData: any = {
             amountPaid: newAmountPaid,
           };
 
-          const allPaid = allPaymentDetails.every((d) => d.status === 'PAID');
-
-          if (allPaid && payment.amount === newAmountPaid) {
-            updatedPaymentData.status = 'PAID';
-          }
+          // Actualizar el estado basado en la comparación entre amount y amountPaid
+          updatedPaymentData.status =
+            newAmountPaid >= updatedAmount
+              ? PaymentDetailStatus.PAID
+              : PaymentDetailStatus.PENDING;
 
           const latestPaymentDate = allPaymentDetails
             .filter((d) => d.paymentDate)
