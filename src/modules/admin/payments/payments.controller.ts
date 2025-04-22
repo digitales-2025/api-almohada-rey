@@ -28,6 +28,8 @@ import {
   UserData,
 } from 'src/interfaces';
 import { CreateManyPaymentDetailDto } from './dto/create-many-payment-detail.dto';
+import { UpdatePaymentDetailDto } from './dto/update-payment-detail.dto';
+import { UpdatePaymentDetailsBatchDto } from './dto/updatePaymentDetailsBatch.dto';
 
 @ApiTags('Admin Payments')
 @ApiUnauthorizedResponse({ description: 'Unauthorized' })
@@ -78,13 +80,49 @@ export class PaymentsController {
     return this.paymentsService.findOne(id);
   }
 
+  @ApiOperation({ summary: 'Update payment by ID' })
+  @ApiOkResponse({ description: 'Payment updated successfully' })
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePaymentDto: UpdatePaymentDto) {
-    return this.paymentsService.update(+id, updatePaymentDto);
+  update(
+    @Param('id') id: string,
+    @Body() updatePaymentDto: UpdatePaymentDto,
+    @GetUser() user: UserData,
+  ): Promise<HttpResponse<SummaryPaymentData>> {
+    return this.paymentsService.update(id, updatePaymentDto, user);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.paymentsService.remove(+id);
+  @ApiOperation({ summary: 'Update a single payment detail' })
+  @ApiOkResponse({ description: 'Payment detail updated successfully' })
+  @Patch('detail/:id')
+  updatePaymentDetail(
+    @Param('id') paymentDetailId: string,
+    @Body() updatePaymentDetailDto: UpdatePaymentDetailDto,
+    @GetUser() user: UserData,
+  ): Promise<HttpResponse<PaymentDetailData>> {
+    return this.paymentsService.updatePaymentDetail(
+      paymentDetailId,
+      updatePaymentDetailDto,
+      user,
+    );
+  }
+
+  @ApiOperation({ summary: 'Update multiple payment details with same values' })
+  @ApiOkResponse({ description: 'Payment details batch updated successfully' })
+  @Patch('details/batch')
+  updatePaymentDetailsBatch(
+    @Body() updateBatchDto: UpdatePaymentDetailsBatchDto,
+    @GetUser() user: UserData,
+  ): Promise<HttpResponse<PaymentDetailData[]>> {
+    return this.paymentsService.updatePaymentDetailsBatch(updateBatchDto, user);
+  }
+
+  @ApiOperation({ summary: 'Delete a payment detail by ID' })
+  @ApiOkResponse({ description: 'Payment detail deleted successfully' })
+  @Delete('detail/:id')
+  removePaymentDetail(
+    @Param('id') id: string,
+    @GetUser() user: UserData,
+  ): Promise<HttpResponse<{ message: string }>> {
+    return this.paymentsService.removePaymentDetail(id, user);
   }
 }
