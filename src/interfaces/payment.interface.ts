@@ -62,3 +62,33 @@ export type SummaryPaymentData = Pick<
     };
   };
 };
+
+export interface RoomPaymentDetailsData {
+  id: string;
+  code: string;
+  date: string;
+  amount: number;
+  amountPaid: number;
+  status: string;
+  observations?: string;
+  missingDays: number;
+  paymentDays: number;
+  reservation: {
+    id: string;
+    checkInDate: Date;
+    checkOutDate: Date;
+    room?: {
+      id: string;
+      number: number;
+      RoomTypes: {
+        id: string;
+        name: string;
+        price: number;
+      };
+    };
+    customer: {
+      id: string;
+      name: string;
+    };
+  };
+}

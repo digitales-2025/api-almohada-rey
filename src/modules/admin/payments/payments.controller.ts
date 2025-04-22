@@ -24,6 +24,7 @@ import {
   HttpResponse,
   PaymentData,
   PaymentDetailData,
+  RoomPaymentDetailsData,
   SummaryPaymentData,
   UserData,
 } from 'src/interfaces';
@@ -78,6 +79,15 @@ export class PaymentsController {
   @Get(':id')
   findOne(@Param('id') id: string): Promise<PaymentData> {
     return this.paymentsService.findOne(id);
+  }
+
+  @ApiOperation({ summary: 'Get room payment details by payment ID' })
+  @ApiOkResponse({ description: 'Room payment details retrieved successfully' })
+  @Get('room/details/:id')
+  findRoomPaymentDetails(
+    @Param('id') id: string,
+  ): Promise<RoomPaymentDetailsData> {
+    return this.paymentsService.findRoomPaymentDetailsById(id);
   }
 
   @ApiOperation({ summary: 'Update payment by ID' })

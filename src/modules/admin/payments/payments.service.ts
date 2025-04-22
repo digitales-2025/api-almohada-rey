@@ -11,6 +11,7 @@ import {
   HttpResponse,
   PaymentData,
   PaymentDetailData,
+  RoomPaymentDetailsData,
   SummaryPaymentData,
   UserData,
 } from 'src/interfaces';
@@ -19,7 +20,6 @@ import { AuditService } from '../audit/audit.service';
 import { RoomService } from '../room/services/room.service';
 import {
   AuditActionType,
-  PaymentDetail,
   PaymentDetailStatus,
   ReservationStatus,
 } from '@prisma/client';
@@ -432,7 +432,8 @@ export class PaymentsService {
 
       // 4. Crear los detalles de pago dentro de una transacción
       const createdDetails = await this.prisma.$transaction(async (prisma) => {
-        const details: PaymentDetail[] = [];
+        const details = [];
+        const realValues = new Map(); // Usaremos un Map para almacenar los valores reales
 
         for (const detail of paymentDetail) {
           // Validaciones por tipo
@@ -457,6 +458,10 @@ export class PaymentsService {
               ? PaymentDetailStatus.PENDING
               : PaymentDetailStatus.PAID;
 
+          // Si método es PENDING_PAYMENT guardamos subtotal como 0
+          const subtotal =
+            detail.method === 'PENDING_PAYMENT' ? 0 : detail.subtotal;
+
           const newDetail = await prisma.paymentDetail.create({
             data: {
               paymentId,
@@ -466,7 +471,7 @@ export class PaymentsService {
               method: detail.method,
               status: detailStatus,
               unitPrice: detail.unitPrice,
-              subtotal: detail.subtotal,
+              subtotal: subtotal,
               ...(detail.quantity && { quantity: detail.quantity }),
               ...(detail.productId && { productId: detail.productId }),
               ...(detail.roomId && { roomId: detail.roomId }),
@@ -486,6 +491,9 @@ export class PaymentsService {
             },
           });
 
+          // Almacenamos el valor real en el Map usando el ID del detalle como clave
+          realValues.set(newDetail.id, detail.subtotal);
+
           // Auditoría
           await this.audit.create({
             entityId: newDetail.id,
@@ -499,8 +507,13 @@ export class PaymentsService {
         }
 
         // 5. Recalcular montos en el pago padre
-        const totalSubtotal = details.reduce((sum, d) => sum + d.subtotal, 0);
-        const paidSubtotal = details
+        // Para el amount, sumamos el valor real de todos los extras, sin importar el método de pago
+        const amountIncrement = details
+          .filter((d) => d.type !== 'ROOM_RESERVATION')
+          .reduce((sum, d) => sum + realValues.get(d.id), 0);
+
+        // Para amountPaid, sólo sumamos lo efectivamente pagado (no los PENDING_PAYMENT)
+        const amountPaidIncrement = details
           .filter((d) => d.method !== 'PENDING_PAYMENT')
           .reduce((sum, d) => sum + d.subtotal, 0);
 
@@ -511,8 +524,8 @@ export class PaymentsService {
         });
         if (!parent) throw new BadRequestException('Payment not found');
 
-        const newAmount = parent.amount + totalSubtotal;
-        const newAmountPaid = parent.amountPaid + paidSubtotal;
+        const newAmount = parent.amount + amountIncrement;
+        const newAmountPaid = parent.amountPaid + amountPaidIncrement;
 
         const latestPaymentDate = details
           .map((d) => d.paymentDate)
@@ -728,6 +741,160 @@ export class PaymentsService {
       missingDays,
       paymentDays: paidDays,
     };
+  }
+
+  /**
+   * Obtiene un pago por su ID con enfoque en datos de habitación y resumen de días.
+   * @param id ID del pago a buscar
+   * @returns Pago encontrado con datos detallados de habitación y días
+   * @throws BadRequestException si el pago no existe
+   */
+  async findRoomPaymentDetailsById(
+    id: string,
+  ): Promise<RoomPaymentDetailsData> {
+    try {
+      const paymentDb = await this.prisma.payment.findFirst({
+        where: { id },
+        select: {
+          id: true,
+          code: true,
+          date: true,
+          amount: true,
+          amountPaid: true,
+          status: true,
+          observations: true,
+          reservation: {
+            select: {
+              id: true,
+              checkInDate: true,
+              checkOutDate: true,
+              customer: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+              // Añadimos la selección de la habitación desde la reserva
+              room: {
+                select: {
+                  id: true,
+                  number: true,
+                  RoomTypes: {
+                    select: {
+                      id: true,
+                      name: true,
+                      price: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          paymentDetail: {
+            select: {
+              id: true,
+              paymentDate: true,
+              description: true,
+              type: true,
+              method: true,
+              status: true,
+              unitPrice: true,
+              subtotal: true,
+              quantity: true,
+              days: true,
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+              service: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+              room: {
+                select: {
+                  id: true,
+                  number: true,
+                  RoomTypes: {
+                    select: {
+                      id: true,
+                      name: true,
+                      price: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!paymentDb) {
+        throw new BadRequestException('Este pago no existe');
+      }
+
+      // Calculamos el número total de noches de la reserva
+      const totalNights = calculateStayNights(
+        paymentDb.reservation.checkInDate.toISOString(),
+        paymentDb.reservation.checkOutDate.toISOString(),
+      );
+
+      // Sumamos los días ya pagados (de detalles tipo ROOM_RESERVATION con status PAID)
+      const paidDays = paymentDb.paymentDetail
+        .filter(
+          (detail) =>
+            detail.type === 'ROOM_RESERVATION' && detail.status === 'PAID',
+        )
+        .reduce((sum, detail) => sum + (detail.days || 0), 0);
+
+      // Calculamos los días que faltan por pagar
+      const missingDays = Math.max(0, totalNights - paidDays);
+
+      // Creamos un objeto con la estructura correcta y asegurándonos que los tipos coincidan
+      const result: RoomPaymentDetailsData = {
+        id: paymentDb.id,
+        code: paymentDb.code,
+        date: paymentDb.date,
+        amount: paymentDb.amount,
+        amountPaid: paymentDb.amountPaid,
+        status: paymentDb.status,
+        observations: paymentDb.observations,
+        missingDays,
+        paymentDays: paidDays,
+        reservation: {
+          id: paymentDb.reservation.id,
+          checkInDate: paymentDb.reservation.checkInDate, // Convertimos la fecha a objeto Date
+          checkOutDate: paymentDb.reservation.checkOutDate, // Convertimos la fecha a objeto Date
+          room: paymentDb.reservation.room
+            ? {
+                id: paymentDb.reservation.room.id,
+                number: paymentDb.reservation.room.number,
+                RoomTypes: {
+                  id: paymentDb.reservation.room.RoomTypes.id,
+                  name: paymentDb.reservation.room.RoomTypes.name,
+                  price: paymentDb.reservation.room.RoomTypes.price,
+                },
+              }
+            : undefined,
+          customer: {
+            id: paymentDb.reservation.customer.id,
+            name: paymentDb.reservation.customer.name,
+          },
+        },
+        // Omitimos paymentDetail ya que no está en la interfaz que compartiste
+      };
+
+      return result;
+    } catch (error) {
+      this.logger.error('Error al obtener detalles de pago de habitación');
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      handleException(error, 'Error al obtener detalles de pago de habitación');
+    }
   }
 
   /**
@@ -1163,7 +1330,6 @@ export class PaymentsService {
         const currentAmount = paymentDetail.payment.amount;
         const currentAmountPaid = paymentDetail.payment.amountPaid;
 
-        const newAmount = currentAmount - detailSubtotal;
         const newAmountPaid =
           paymentDetail.status === 'PAID'
             ? currentAmountPaid - detailSubtotal
@@ -1185,7 +1351,7 @@ export class PaymentsService {
           });
 
           const newPaymentStatus =
-            remainingDetails.length === 0 || newAmountPaid >= newAmount
+            remainingDetails.length === 0 || newAmountPaid >= currentAmount
               ? PaymentDetailStatus.PAID
               : PaymentDetailStatus.PENDING;
 
@@ -1204,7 +1370,6 @@ export class PaymentsService {
           await prisma.payment.update({
             where: { id: paymentId },
             data: {
-              amount: newAmount,
               amountPaid: newAmountPaid,
               status: newPaymentStatus,
               ...(latestPaymentDate && { date: latestPaymentDate }),
@@ -1457,10 +1622,28 @@ export class PaymentsService {
           where: { paymentId },
         });
 
-        const totalAmount = allDetails.reduce(
-          (sum, detail) => sum + detail.subtotal,
-          0,
+        // Modificación aquí: Calcular el amount diferente según el tipo de detalle
+        let totalAmount = 0;
+
+        // Si existe al menos un detalle de habitación (ROOM_RESERVATION), mantenemos el amount original
+        const hasRoomReservation = allDetails.some(
+          (detail) => detail.type === 'ROOM_RESERVATION',
         );
+
+        if (hasRoomReservation) {
+          // Mantener el amount original para reservas de habitación
+          const payment = await prisma.payment.findUnique({
+            where: { id: paymentId },
+            select: { amount: true },
+          });
+          totalAmount = payment.amount;
+        } else {
+          // Para casos sin reservación de habitación, calcular la suma normal
+          totalAmount = allDetails.reduce(
+            (sum, detail) => sum + detail.subtotal,
+            0,
+          );
+        }
 
         const totalAmountPaid = allDetails
           .filter((detail) => detail.status === 'PAID')
@@ -1476,14 +1659,15 @@ export class PaymentsService {
         }
 
         const paymentStatus =
-          totalAmount > 0 && totalAmount === totalAmountPaid
+          totalAmount > 0 && totalAmountPaid >= totalAmount
             ? PaymentDetailStatus.PAID
             : PaymentDetailStatus.PENDING;
 
         await prisma.payment.update({
           where: { id: paymentId },
           data: {
-            amount: totalAmount,
+            // Solo actualizamos amount si no hay detalles de tipo ROOM_RESERVATION
+            ...(hasRoomReservation ? {} : { amount: totalAmount }),
             amountPaid: totalAmountPaid,
             status: paymentStatus,
             ...(latestPaymentDate && { date: latestPaymentDate }),
@@ -1542,6 +1726,15 @@ export class PaymentsService {
               amountPaid: true,
             },
           },
+          product: { select: { id: true, name: true } },
+          room: {
+            select: {
+              id: true,
+              number: true,
+              RoomTypes: { select: { id: true, name: true, price: true } },
+            },
+          },
+          service: { select: { id: true, name: true } },
         },
       });
 
@@ -1550,38 +1743,39 @@ export class PaymentsService {
       }
 
       const paymentId = paymentDetail.payment.id;
-      const detailSubtotal = paymentDetail.subtotal;
       const detailStatus = paymentDetail.status;
-      const paymentMethod = paymentDetail.method; // Método de pago desde PaymentDetail
+      const detailType = paymentDetail.type;
 
-      // Valores actuales del pago antes de la eliminación
+      // Montos actuales
       const currentAmount = paymentDetail.payment.amount;
       const currentAmountPaid = paymentDetail.payment.amountPaid;
 
-      // Calcular nuevos montos después de eliminar este detalle
-      // Siempre restamos del monto total
-      const newAmount = currentAmount - detailSubtotal;
+      // Calcular el valor real que representa el detalle
+      let realDetailValue = paymentDetail.subtotal;
 
-      // Solo restamos del monto pagado si el detalle estaba pagado
-      let newAmountPaid = currentAmountPaid;
-      if (detailStatus === 'PAID') {
-        newAmountPaid = currentAmountPaid - detailSubtotal;
+      // Si es un PENDING_PAYMENT y es de tipo EXTRA_SERVICE, calculamos su valor real
+      // multiplicando unitPrice * quantity, sin importar el valor en subtotal
+      if (
+        paymentDetail.method === 'PENDING_PAYMENT' &&
+        detailType === 'EXTRA_SERVICE'
+      ) {
+        const unitPrice = paymentDetail.unitPrice;
+        const quantity = paymentDetail.quantity || 1;
+        realDetailValue = unitPrice * quantity;
       }
 
-      // Si el método de pago no es 'PENDING_PAYMENT', debemos ajustar `amountPaid`
-      if (paymentMethod !== 'PENDING_PAYMENT') {
-        // Si no es 'PENDING_PAYMENT', restamos del `amountPaid` también
-        newAmountPaid = currentAmountPaid - detailSubtotal;
-      }
+      // Solo restamos de amountPaid si estaba PAID
+      const newAmountPaid =
+        detailStatus === 'PAID'
+          ? currentAmountPaid - paymentDetail.subtotal
+          : currentAmountPaid;
 
-      // Eliminar el detalle y actualizar el pago dentro de una transacción
+      // Realizar la transacción para eliminar el detalle de pago y actualizar el pago
       await this.prisma.$transaction(async (prisma) => {
         // Eliminar el detalle de pago
-        await prisma.paymentDetail.delete({
-          where: { id: paymentDetailId },
-        });
+        await prisma.paymentDetail.delete({ where: { id: paymentDetailId } });
 
-        // Registrar la auditoría para el detalle eliminado
+        // Auditoría del detalle eliminado
         await this.audit.create({
           entityId: paymentDetailId,
           entityType: 'paymentDetail',
@@ -1590,45 +1784,72 @@ export class PaymentsService {
           createdAt: new Date(),
         });
 
-        // Obtener todos los detalles restantes para este pago
+        // Obtener los detalles restantes para este pago
         const remainingDetails = await prisma.paymentDetail.findMany({
           where: { paymentId },
         });
 
-        // Determinar nuevo estado del pago basado en los nuevos montos
-        // El pago solo estará "PAID" si el monto pagado es igual o superior al monto total
+        // Verificar si hay detalles de tipo ROOM_RESERVATION entre los restantes
+        const hasRoomReservation = remainingDetails.some(
+          (detail) => detail.type === 'ROOM_RESERVATION',
+        );
+
+        // Calcular el nuevo monto total (amount)
+        let newAmount: number;
+
+        if (hasRoomReservation) {
+          // Si hay detalles de habitación, mantenemos el monto original
+          // pero restamos el valor real si estamos eliminando un EXTRA_SERVICE
+          if (detailType === 'EXTRA_SERVICE') {
+            newAmount = currentAmount - realDetailValue;
+          } else {
+            newAmount = currentAmount;
+          }
+        } else if (detailType === 'ROOM_RESERVATION') {
+          // Si estamos eliminando un detalle de habitación y no quedan más,
+          // debemos recalcular el amount basado en los detalles restantes
+          newAmount = remainingDetails.reduce((sum, detail) => {
+            // Para los detalles PENDING_PAYMENT, usamos unitPrice * quantity
+            if (
+              detail.method === 'PENDING_PAYMENT' &&
+              detail.type === 'EXTRA_SERVICE'
+            ) {
+              return sum + detail.unitPrice * (detail.quantity || 1);
+            }
+            return sum + detail.subtotal;
+          }, 0);
+        } else {
+          // Si estamos eliminando un detalle que no es habitación
+          // Usamos el valor real calculado para ajustar el amount
+          newAmount = currentAmount - realDetailValue;
+        }
+
+        // Determinar el nuevo estado del pago
         const newPaymentStatus =
           newAmountPaid >= newAmount
             ? PaymentDetailStatus.PAID
             : PaymentDetailStatus.PENDING;
 
-        // Obtener la fecha más reciente de los detalles restantes
+        // Fecha más reciente de pago
         let latestPaymentDate: string | null = null;
-        if (
-          remainingDetails.length > 0 &&
-          remainingDetails.some((detail) => detail.paymentDate)
-        ) {
-          const paymentDates = remainingDetails
-            .filter((detail) => detail.paymentDate)
-            .map((detail) => detail.paymentDate);
+        const paymentDates = remainingDetails
+          .filter((d) => d.paymentDate)
+          .map((d) => d.paymentDate)
+          .sort((a, b) => (a > b ? -1 : 1));
+        if (paymentDates.length > 0) latestPaymentDate = paymentDates[0];
 
-          // Ordenar fechas descendentemente
-          paymentDates.sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
-          latestPaymentDate = paymentDates[0];
-        }
-
-        // Actualizar el pago con los nuevos valores calculados
+        // Actualizar el pago con los nuevos valores
         await prisma.payment.update({
           where: { id: paymentId },
           data: {
-            amount: newAmount, // Monto total actualizado
-            amountPaid: newAmountPaid, // Monto pagado actualizado
-            status: newPaymentStatus, // Estado recalculado
+            amount: newAmount,
+            amountPaid: newAmountPaid,
+            status: newPaymentStatus,
             ...(latestPaymentDate && { date: latestPaymentDate }),
           },
         });
 
-        // Registrar la auditoría para el pago actualizado
+        // Auditoría del pago actualizado
         await this.audit.create({
           entityId: paymentId,
           entityType: 'payment',
@@ -1650,11 +1871,9 @@ export class PaymentsService {
         `Error al eliminar el detalle de pago: ${error.message}`,
         error.stack,
       );
-
       if (error instanceof BadRequestException) {
         throw error;
       }
-
       handleException(error, 'Error al eliminar el detalle de pago');
     }
   }
