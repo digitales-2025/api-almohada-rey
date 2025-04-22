@@ -436,6 +436,14 @@ export class PaymentsService {
         const realValues = new Map(); // Usaremos un Map para almacenar los valores reales
 
         for (const detail of paymentDetail) {
+          // Si es ROOM_RESERVATION con método PENDING_PAYMENT, lo omitimos y continuamos
+          if (
+            detail.type === 'ROOM_RESERVATION' &&
+            detail.method === 'PENDING_PAYMENT'
+          ) {
+            continue;
+          }
+
           // Validaciones por tipo
           if (detail.type === 'ROOM_RESERVATION' && !detail.roomId) {
             throw new BadRequestException(
@@ -1745,18 +1753,19 @@ export class PaymentsService {
       const paymentId = paymentDetail.payment.id;
       const detailStatus = paymentDetail.status;
       const detailType = paymentDetail.type;
+      const detailMethod = paymentDetail.method;
 
       // Montos actuales
       const currentAmount = paymentDetail.payment.amount;
       const currentAmountPaid = paymentDetail.payment.amountPaid;
 
-      // Calcular el valor real que representa el detalle
+      // Calcular el valor real que representa el detalle para EXTRA_SERVICE
       let realDetailValue = paymentDetail.subtotal;
 
       // Si es un PENDING_PAYMENT y es de tipo EXTRA_SERVICE, calculamos su valor real
       // multiplicando unitPrice * quantity, sin importar el valor en subtotal
       if (
-        paymentDetail.method === 'PENDING_PAYMENT' &&
+        detailMethod === 'PENDING_PAYMENT' &&
         detailType === 'EXTRA_SERVICE'
       ) {
         const unitPrice = paymentDetail.unitPrice;
@@ -1789,38 +1798,12 @@ export class PaymentsService {
           where: { paymentId },
         });
 
-        // Verificar si hay detalles de tipo ROOM_RESERVATION entre los restantes
-        const hasRoomReservation = remainingDetails.some(
-          (detail) => detail.type === 'ROOM_RESERVATION',
-        );
+        // IMPORTANTE: Sólo modificamos el amount cuando eliminamos un EXTRA_SERVICE
+        // Nunca modificamos el amount cuando eliminamos un ROOM_RESERVATION
+        let newAmount = currentAmount;
 
-        // Calcular el nuevo monto total (amount)
-        let newAmount: number;
-
-        if (hasRoomReservation) {
-          // Si hay detalles de habitación, mantenemos el monto original
-          // pero restamos el valor real si estamos eliminando un EXTRA_SERVICE
-          if (detailType === 'EXTRA_SERVICE') {
-            newAmount = currentAmount - realDetailValue;
-          } else {
-            newAmount = currentAmount;
-          }
-        } else if (detailType === 'ROOM_RESERVATION') {
-          // Si estamos eliminando un detalle de habitación y no quedan más,
-          // debemos recalcular el amount basado en los detalles restantes
-          newAmount = remainingDetails.reduce((sum, detail) => {
-            // Para los detalles PENDING_PAYMENT, usamos unitPrice * quantity
-            if (
-              detail.method === 'PENDING_PAYMENT' &&
-              detail.type === 'EXTRA_SERVICE'
-            ) {
-              return sum + detail.unitPrice * (detail.quantity || 1);
-            }
-            return sum + detail.subtotal;
-          }, 0);
-        } else {
-          // Si estamos eliminando un detalle que no es habitación
-          // Usamos el valor real calculado para ajustar el amount
+        if (detailType === 'EXTRA_SERVICE') {
+          // Si es un servicio extra, restamos su valor real del amount
           newAmount = currentAmount - realDetailValue;
         }
 
