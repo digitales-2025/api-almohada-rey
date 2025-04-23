@@ -7,18 +7,28 @@ import {
   Param,
   Delete,
   Query,
+  UploadedFile,
+  BadRequestException,
+  UseInterceptors,
+  Res,
+  ParseFilePipeBuilder,
+  HttpStatus,
 } from '@nestjs/common';
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { Auth, GetUser } from 'src/modules/admin/auth/decorators';
+import { Response } from 'express';
+import { Header } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiInternalServerErrorResponse,
   ApiOkResponse,
   ApiOperation,
   ApiQuery,
+  ApiResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -32,6 +42,8 @@ import { DeleteCustomerDto } from './dto/delete-customer.dto';
 import { Customer } from './entity/customer.entity';
 import { HistoryCustomerData } from 'src/interfaces/customer.interface';
 import { ReservationStatus } from '@prisma/client';
+import { ImportCustomersDto } from './dto/import-customers.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Admin Customers')
 @ApiUnauthorizedResponse({ description: 'Unauthorized' })
@@ -53,6 +65,91 @@ export class CustomersController {
     @GetUser() user: UserData,
   ): Promise<HttpResponse<CustomerData>> {
     return this.customersService.create(createCustomerDto, user);
+  }
+
+  @Post('import')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      fileFilter: (req, file, callback) => {
+        // Verificar que el archivo sea un Excel (.xlsx)
+        if (!file.originalname.match(/\.(xlsx)$/)) {
+          return callback(
+            new BadRequestException('Solo se permiten archivos Excel (.xlsx)'),
+            false,
+          );
+        }
+        callback(null, true);
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB máximo
+      },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Importar clientes desde un archivo Excel' })
+  @ApiResponse({
+    status: 200,
+    description: 'Clientes importados correctamente',
+  })
+  @ApiBadRequestResponse({
+    description: 'Formato de archivo inválido o datos incorrectos',
+  })
+  importCustomers(
+    @UploadedFile(
+      new ParseFilePipeBuilder()
+        .addFileTypeValidator({
+          fileType:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        })
+        .addMaxSizeValidator({
+          maxSize: 5 * 1024 * 1024, // 5MB
+        })
+        .build({
+          errorHttpStatusCode: HttpStatus.BAD_REQUEST,
+        }),
+    )
+    file: Express.Multer.File,
+    @Body() importCustomersDto: ImportCustomersDto,
+    @GetUser() user: UserData,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No se ha proporcionado ningún archivo');
+    }
+
+    return this.customersService.importFromExcel(
+      file,
+      importCustomersDto.continueOnError || true,
+      user,
+    );
+  }
+
+  @Get('import/template')
+  @ApiOperation({ summary: 'Download template to import client excel' })
+  @ApiResponse({
+    status: 200,
+    description: 'Plantilla Excel para importar clientes',
+  })
+  @Header(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  )
+  @Header('Content-Disposition', 'attachment; filename=plantilla_clientes.xlsx')
+  async downloadTemplate(@Res() res: Response) {
+    const workbook = await this.customersService.generateCustomerTemplate();
+
+    // Configurar el response
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=plantilla_clientes.xlsx',
+    );
+
+    // Enviar el archivo
+    await workbook.xlsx.write(res);
+    res.end();
   }
 
   @ApiOkResponse({ description: 'Customers found successfully' })

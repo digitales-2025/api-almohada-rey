@@ -16,7 +16,12 @@ import {
   UserPayload,
 } from 'src/interfaces';
 import { handleException } from 'src/utils';
-import { AuditActionType, ReservationStatus } from '@prisma/client';
+import {
+  AuditActionType,
+  CustomerDocumentType,
+  CustomerMaritalStatus,
+  ReservationStatus,
+} from '@prisma/client';
 import {
   createDynamicUpdateObject,
   hasNoChanges,
@@ -26,6 +31,7 @@ import { Customer } from './entity/customer.entity';
 import { CustomerRepository } from './repository/customer.repository';
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
 import { HistoryCustomerData } from 'src/interfaces/customer.interface';
+import * as excelJs from 'exceljs';
 
 @Injectable()
 export class CustomersService {
@@ -928,6 +934,908 @@ export class CustomersService {
         throw error;
       }
       handleException(error, 'Error deactivating customers');
+    }
+  }
+
+  /**
+   * Importar clientes desde un archivo Excel
+   * @param file Archivo Excel
+   * @param continueOnError Continuar con la importación si hay errores no relacionados con duplicados
+   * @param user Usuario que realiza la acción
+   * @returns Reporte de la importación
+   */
+  async importFromExcel(
+    file: Express.Multer.File,
+    continueOnError: boolean,
+    user: UserData,
+  ): Promise<
+    HttpResponse<{
+      total: number;
+      successful: number;
+      failed: number;
+      skipped: number;
+      errors: Array<{
+        row: number;
+        data: Record<string, unknown>;
+        error: string;
+        type: 'error' | 'duplicate';
+      }>;
+    }>
+  > {
+    try {
+      // Leer el archivo Excel usando exceljs (más consistente con cómo generamos las plantillas)
+      const workbook = new excelJs.Workbook();
+      await workbook.xlsx.load(file.buffer);
+
+      // Obtener la primera hoja del workbook (que debería ser "Plantilla")
+      const worksheet = workbook.worksheets[0];
+
+      if (!worksheet || worksheet.rowCount <= 1) {
+        throw new BadRequestException(
+          'El archivo no contiene datos o está vacío',
+        );
+      }
+
+      // Mapear las cabeceras esperadas (indice a nombre de campo)
+      const headerMap = {
+        0: 'name', // Nombre completo
+        1: 'address', // Dirección
+        2: 'birthPlace', // Lugar de nacimiento
+        3: 'birthDate', // Fecha nacimiento
+        4: 'country', // País
+        5: 'department', // Departamento
+        6: 'province', // Provincia
+        7: 'phone', // Teléfono
+        8: 'occupation', // Ocupación
+        9: 'documentType', // Tipo documento
+        10: 'documentNumber', // Número documento
+        11: 'email', // Email
+        12: 'maritalStatus', // Estado civil
+        13: 'companyName', // Nombre empresa
+        14: 'ruc', // RUC
+        15: 'companyAddress', // Dirección empresa
+      };
+
+      const data: Record<string, unknown>[] = [];
+
+      // Procesar cada fila (omitiendo la cabecera)
+      let firstRow = true;
+      worksheet.eachRow((row) => {
+        // Omitir la fila de cabecera
+        if (firstRow) {
+          firstRow = false;
+          return;
+        }
+
+        // Crear un objeto con los datos de la fila usando el mapeo de cabeceras
+        const rowData: Record<string, unknown> = {};
+
+        row.eachCell((cell, colIndex) => {
+          const fieldName = headerMap[colIndex - 1]; // exceljs usa índices base-1
+          if (fieldName) {
+            // Convertir el valor de la celda al tipo adecuado
+            let value: unknown = cell.value;
+
+            // Manejar diferentes tipos de valores de celda
+            if (value && typeof value === 'object') {
+              // Si es un objeto con propiedad 'result' (fechas en Excel), usar result
+              if ('result' in value) {
+                value = value.result;
+              }
+              // Si es un hipervínculo (como un correo electrónico), extraer el texto
+              else if ('text' in value && value.text) {
+                value = value.text;
+              }
+              // Si es un objeto RichText (texto con formato)
+              else if ('richText' in value) {
+                value = String(cell.text);
+              }
+              // Si tiene hyperlink (especialmente para emails)
+              else if ('hyperlink' in value) {
+                const hyperlink = String(value.hyperlink);
+                if (hyperlink.startsWith('mailto:')) {
+                  value = hyperlink.substring(7); // Eliminar 'mailto:'
+                } else {
+                  value = hyperlink;
+                }
+              }
+            }
+
+            // Si es una fecha, formatearla como string YYYY-MM-DD
+            if (value instanceof Date) {
+              value = value.toISOString().split('T')[0];
+            }
+
+            rowData[fieldName] = value;
+          }
+        });
+
+        // Solo agregar filas que tengan al menos un valor
+        const hasValues = Object.values(rowData).some(
+          (val) => val !== undefined && val !== null && val !== '',
+        );
+
+        if (hasValues) {
+          data.push(rowData);
+        }
+      });
+
+      if (data.length === 0) {
+        throw new BadRequestException(
+          'No se encontraron datos válidos para importar',
+        );
+      }
+
+      // Procesar los datos convertidos
+      const total = data.length;
+      let successful = 0;
+      let failed = 0;
+      let skipped = 0;
+      const errors: Array<{
+        row: number;
+        data: Record<string, unknown>;
+        error: string;
+        type: 'error' | 'duplicate';
+      }> = [];
+
+      // Procesar cada registro
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i];
+        try {
+          // Normalizar y validar datos
+          const customerData = this.mapExcelRowToDto(row);
+
+          // Verificar duplicados sin lanzar excepciones
+          const duplicateInfo = await this.checkForDuplicates(
+            customerData.documentNumber,
+            customerData.email,
+            customerData.ruc,
+          );
+
+          if (duplicateInfo) {
+            // Es un duplicado, lo omitimos
+            skipped++;
+            errors.push({
+              row: i + 2, // +2 porque la fila 1 es la cabecera
+              data: row,
+              error: duplicateInfo,
+              type: 'duplicate',
+            });
+            continue; // Pasar al siguiente registro
+          }
+
+          // Si no es duplicado, crear el cliente
+          await this.createCustomerWithoutValidation(customerData, user);
+          successful++;
+        } catch (error) {
+          failed++;
+
+          // Registrar el error
+          errors.push({
+            row: i + 2, // +2 porque la fila 1 es la cabecera
+            data: row,
+            error: error.message || 'Error desconocido',
+            type: 'error',
+          });
+
+          // Si no debe continuar con errores (que no sean duplicados), parar
+          if (!continueOnError) {
+            break;
+          }
+        }
+      }
+
+      return {
+        statusCode: HttpStatus.OK,
+        message: `Importación completada: ${successful} de ${total} clientes importados correctamente. ${skipped} duplicados omitidos.`,
+        data: {
+          total,
+          successful,
+          failed,
+          skipped,
+          errors,
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error en importación de Excel: ${error.message}`,
+        error.stack,
+      );
+
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      throw new BadRequestException(
+        `Error al procesar el archivo: ${error.message}`,
+      );
+    }
+  }
+
+  /**
+   * Generar plantilla Excel para importación de clientes
+   * @returns Buffer con el archivo Excel
+   */
+  async generateCustomerTemplate(): Promise<excelJs.Workbook> {
+    // Crear libro de trabajo
+    const workbook = new excelJs.Workbook();
+
+    // Definir opciones para los dropdowns
+    const documentTypes = ['DNI', 'PASSPORT', 'FOREIGNER_CARD'];
+    const maritalStatuses = ['SINGLE', 'MARRIED', 'DIVORCED', 'WIDOWED'];
+
+    // Crear solo la hoja de Plantilla (con todo el contenido de Ejemplo)
+    const templateSheet = workbook.addWorksheet('Plantilla');
+
+    // Configurar la plantilla con el contenido que antes estaba en "Ejemplo"
+    this.configureTemplateWithExampleContent(
+      templateSheet,
+      documentTypes,
+      maritalStatuses,
+    );
+
+    // Hoja de Instrucciones
+    const instructionsSheet = workbook.addWorksheet('Instrucciones');
+    this.configureInstructionsSheet(
+      instructionsSheet,
+      documentTypes,
+      maritalStatuses,
+    );
+
+    return workbook;
+  }
+
+  /**
+   *
+   * @param sheet Sheet de Excel
+   * @param documentTypes Tipos de documentos
+   * @param maritalStatuses Estados civiles
+   */
+  private configureTemplateWithExampleContent(
+    sheet: excelJs.Worksheet,
+    documentTypes: string[],
+    maritalStatuses: string[],
+  ) {
+    // Encabezados
+    const headers = [
+      'Nombre completo',
+      'Dirección',
+      'Lugar de nacimiento',
+      'Fecha nacimiento (YYYY-MM-DD)',
+      'País',
+      'Departamento',
+      'Provincia',
+      'Teléfono (+51987654321)',
+      'Ocupación',
+      'Tipo documento',
+      'Número documento',
+      'Email',
+      'Estado civil',
+      'Nombre empresa',
+      'RUC',
+      'Dirección empresa',
+    ];
+
+    // Agregar encabezados
+    sheet.addRow(headers);
+
+    // Estilo encabezados
+    sheet.getRow(1).eachCell((cell) => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFD3D3D3' },
+      };
+      cell.font = { bold: true };
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      };
+    });
+
+    // Agregar datos de ejemplo
+    sheet.addRow([
+      'Juan Pérez',
+      'Av. Principal 123',
+      'Lima',
+      '1990-01-01',
+      'Perú',
+      'Lima',
+      'Lima',
+      '+51987654321',
+      'Ingeniero',
+      'DNI',
+      '12345678',
+      'juan@example.com',
+      'SINGLE',
+      'Empresa S.A.',
+      '20123456789',
+      'Av. Comercial 456',
+    ]);
+
+    // Configurar anchos de columnas
+    sheet.columns = headers.map(() => ({ width: 25 }));
+
+    // Agregar listas desplegables (columna 10 = J, columna 13 = M)
+    // @ts-expect-error Property 'add' is not defined on type 'DataValidations'
+    sheet.dataValidations.add('J2:J100', {
+      type: 'list',
+      allowBlank: true,
+      formulae: [`"${documentTypes.join(',')}"`],
+      showDropDown: true,
+    });
+
+    // @ts-expect-error Property 'add' is not defined on type 'DataValidations'
+    sheet.dataValidations.add('M2:M100', {
+      type: 'list',
+      allowBlank: true,
+      formulae: [`"${maritalStatuses.join(',')}"`],
+      showDropDown: true,
+    });
+  }
+
+  /**
+   *
+   * @param sheet Sheet de Excel
+   * @param documentTypes Tipos de documentos
+   * @param maritalStatuses Estados civiles
+   */
+  private configureInstructionsSheet(
+    sheet: excelJs.Worksheet,
+    documentTypes: string[],
+    maritalStatuses: string[],
+  ) {
+    // Encabezados para la tabla de instrucciones
+    sheet.addRow([
+      'CAMPO',
+      'DESCRIPCIÓN',
+      'OBLIGATORIO',
+      'FORMATO / VALORES VÁLIDOS',
+    ]);
+
+    // Datos para la tabla de instrucciones
+    const instructionsData = [
+      ['Nombre completo', 'Nombre completo del cliente', 'Sí', ''],
+      ['Dirección', 'Dirección del cliente', 'Sí', ''],
+      ['Lugar de nacimiento', 'Lugar de nacimiento', 'Sí', ''],
+      [
+        'Fecha nacimiento',
+        'Fecha de nacimiento',
+        'No',
+        'YYYY-MM-DD (ej: 1990-01-01)',
+      ],
+      ['País', 'País de residencia', 'Sí', ''],
+      ['Departamento', 'Departamento', 'No', 'Solo para Perú'],
+      ['Provincia', 'Provincia', 'No', 'Solo para Perú'],
+      ['Teléfono', 'Teléfono con código de país', 'Sí', '+51987654321'],
+      ['Ocupación', 'Ocupación o profesión', 'Sí', ''],
+      [
+        'Tipo documento',
+        'Tipo de documento de identidad',
+        'Sí',
+        documentTypes.join(', '),
+      ],
+      ['Número documento', 'Número de documento', 'Sí', ''],
+      ['Email', 'Correo electrónico', 'No', ''],
+      [
+        'Estado civil',
+        'Estado civil del cliente',
+        'Sí',
+        maritalStatuses.join(', '),
+      ],
+      ['Nombre empresa', 'Nombre de la empresa', 'No', ''],
+      ['RUC', 'RUC de la empresa', 'No', 'Solo números, 11 dígitos'],
+      ['Dirección empresa', 'Dirección de la empresa', 'No', ''],
+    ];
+
+    // Agregar cada fila a la hoja
+    instructionsData.forEach((row) => {
+      sheet.addRow(row);
+    });
+
+    // Añadir espacio antes de la tabla de traducciones
+    sheet.addRow([]);
+    sheet.addRow([]);
+
+    // TABLA DE TRADUCCIONES DE OPCIONES
+    sheet.addRow(['TABLA DE TRADUCCIONES', '', '', '']);
+    const headerRow = sheet.lastRow;
+    headerRow.getCell(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF4F81BD' },
+    };
+    headerRow.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.getCell(1).alignment = { horizontal: 'center' };
+    sheet.mergeCells(`A${headerRow.number}:D${headerRow.number}`);
+
+    // Encabezados para tabla de traducciones
+    sheet.addRow(['CAMPO', 'VALOR', 'TRADUCCIÓN', 'DESCRIPCIÓN']);
+
+    // Datos para la tabla de traducciones: Tipos de documento
+    sheet.addRow([
+      'Tipo documento',
+      'DNI',
+      'DNI',
+      'Documento Nacional de Identidad',
+    ]);
+    sheet.addRow(['Tipo documento', 'PASSPORT', 'PASAPORTE', 'Pasaporte']);
+    sheet.addRow([
+      'Tipo documento',
+      'FOREIGNER_CARD',
+      'CARNÉ DE EXTRANJERÍA',
+      'Documento para extranjeros',
+    ]);
+
+    // Datos para la tabla de traducciones: Estado civil
+    sheet.addRow([
+      'Estado civil',
+      'SINGLE',
+      'SOLTERO/A',
+      'Persona que no ha contraído matrimonio',
+    ]);
+    sheet.addRow([
+      'Estado civil',
+      'MARRIED',
+      'CASADO/A',
+      'Persona unida en matrimonio',
+    ]);
+    sheet.addRow([
+      'Estado civil',
+      'DIVORCED',
+      'DIVORCIADO/A',
+      'Persona que ha disuelto legalmente su matrimonio',
+    ]);
+    sheet.addRow([
+      'Estado civil',
+      'WIDOWED',
+      'VIUDO/A',
+      'Persona cuyo cónyuge ha fallecido',
+    ]);
+
+    // Estilo para la tabla de traducciones
+    const translationStartRow = headerRow.number + 2; // +1 para el encabezado, +1 para empezar en datos
+    const translationEndRow = translationStartRow + 7; // 4 tipos doc + 4 estados civiles - 1
+
+    // Aplicar estilos al encabezado de la tabla de traducciones
+    sheet.getRow(translationStartRow - 1).eachCell((cell) => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF4F81BD' },
+      };
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    });
+
+    // Aplicar estilos a los datos de la tabla de traducciones
+    for (let i = translationStartRow; i <= translationEndRow; i++) {
+      sheet.getRow(i).eachCell((cell, colNumber) => {
+        // Agrupar por secciones con colores
+        const isTipoDocumento = i <= translationStartRow + 2; // Primeras 3 filas son tipo documento
+
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: {
+            argb: isTipoDocumento ? 'FFE6EFF7' : 'FFFCE4D6', // Azul claro para doc, naranja claro para estado civil
+          },
+        };
+
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' },
+        };
+
+        // Resaltar los valores originales (columna 2)
+        if (colNumber === 2) {
+          cell.font = { bold: true };
+        }
+
+        // Alineación
+        if (colNumber === 1) {
+          cell.alignment = { vertical: 'middle', horizontal: 'left' };
+        } else if (colNumber === 4) {
+          cell.alignment = { vertical: 'middle', horizontal: 'left' };
+        } else {
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        }
+      });
+    }
+
+    // Espacio antes de las notas finales
+    sheet.addRow([]);
+
+    // Agregar notas adicionales
+    sheet.addRow([
+      'NOTA:',
+      'Las celdas con listas desplegables están disponibles en la hoja "Plantilla" para "Tipo documento" y "Estado civil"',
+    ]);
+
+    sheet.addRow([
+      'IMPORTANTE:',
+      'Los campos marcados como obligatorios deben completarse para cada cliente',
+    ]);
+
+    // Estilos para las notas finales (resaltadas)
+    const notesStartRow = translationEndRow + 3;
+    for (let i = notesStartRow; i <= notesStartRow + 1; i++) {
+      sheet.getRow(i).getCell(1).font = {
+        bold: true,
+        color: { argb: 'FF4F81BD' },
+      };
+      sheet.getRow(i).getCell(2).font = { italic: true };
+    }
+
+    // Ajustar anchos de columna
+    sheet.columns = [
+      { width: 18 }, // Campo
+      { width: 20 }, // Descripción/Valor
+      { width: 20 }, // Obligatorio/Traducción
+      { width: 40 }, // Formato/Descripción
+    ];
+
+    // Estilos para la tabla principal
+    // Estilo para encabezados de la primera tabla
+    sheet.getRow(1).eachCell((cell) => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF4F81BD' }, // Azul más oscuro para los encabezados
+      };
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }; // Texto blanco
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    });
+
+    // Estilo para las celdas de datos de la primera tabla
+    for (let i = 2; i <= instructionsData.length + 1; i++) {
+      sheet.getRow(i).eachCell((cell, colNumber) => {
+        // Fondo alternado para mejor legibilidad
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: i % 2 === 0 ? 'FFE6EFF7' : 'FFFFFFFF' }, // Alternamos azul claro y blanco
+        };
+
+        // Resaltar la columna de obligatorio
+        if (colNumber === 3) {
+          cell.font = {
+            bold: cell.value === 'Sí',
+            color: { argb: cell.value === 'Sí' ? 'FFFF0000' : 'FF000000' }, // Rojo para "Sí", negro para "No"
+          };
+        }
+
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' },
+        };
+
+        // Alineación
+        if (colNumber === 1) {
+          cell.alignment = { vertical: 'middle', horizontal: 'left' };
+        } else {
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        }
+      });
+    }
+
+    // Congelar la primera fila (encabezados)
+    sheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+  }
+
+  /**
+   * Mapear una fila de Excel a un DTO de cliente
+   * @param row Fila del Excel
+   * @returns DTO del cliente
+   */
+  private mapExcelRowToDto(row: Record<string, unknown>): CreateCustomerDto {
+    // Validar campos obligatorios
+    if (
+      !row.name ||
+      !row.address ||
+      !row.birthPlace ||
+      !row.country ||
+      !row.documentNumber ||
+      !row.documentType ||
+      !row.phone ||
+      !row.occupation ||
+      !row.maritalStatus
+    ) {
+      throw new BadRequestException('Faltan campos obligatorios en la fila');
+    }
+
+    // Validar tipo de documento
+    const documentType = String(row.documentType).toUpperCase();
+    if (!['DNI', 'PASSPORT', 'FOREIGNER_CARD'].includes(documentType)) {
+      throw new BadRequestException(
+        `Tipo de documento inválido: ${documentType}`,
+      );
+    }
+
+    // Validar estado civil
+    const maritalStatus = String(row.maritalStatus).toUpperCase();
+    if (!['SINGLE', 'MARRIED', 'DIVORCED', 'WIDOWED'].includes(maritalStatus)) {
+      throw new BadRequestException(`Estado civil inválido: ${maritalStatus}`);
+    }
+
+    // Mapear datos a DTO
+    const customerDto: CreateCustomerDto = {
+      name: String(row.name).trim().toLowerCase(),
+      address: String(row.address).trim(),
+      birthPlace: String(row.birthPlace).trim(),
+      country: String(row.country).trim(),
+      documentNumber: String(row.documentNumber).trim(),
+      documentType: documentType as CustomerDocumentType,
+      maritalStatus: maritalStatus as CustomerMaritalStatus,
+      occupation: String(row.occupation).trim(),
+      phone: String(row.phone).trim(),
+    };
+
+    // Campos opcionales
+    if (row.email) {
+      // Manejar el caso de emails como hipervínculos
+      let email = row.email;
+
+      // Para hipervínculos: { text: 'correo@example.com', hyperlink: 'mailto:correo@example.com' }
+      if (typeof email === 'object' && email !== null) {
+        if ('text' in email) {
+          email = email.text;
+        } else if ('hyperlink' in email) {
+          // Si tiene hyperlink de tipo mailto:, extraer la parte del email
+          const hyperlink = String(email.hyperlink);
+          if (hyperlink.startsWith('mailto:')) {
+            email = hyperlink.substring(7); // Quitar 'mailto:'
+          }
+        }
+      }
+
+      customerDto.email = String(email).trim().toLowerCase();
+    }
+
+    if (row.birthDate) {
+      customerDto.birthDate = this.parseExcelDate(row.birthDate);
+    }
+
+    if (row.department) {
+      customerDto.department = String(row.department).trim();
+    }
+
+    if (row.province) {
+      customerDto.province = String(row.province).trim();
+    }
+
+    if (row.ruc) {
+      customerDto.ruc = String(row.ruc).trim();
+
+      if (row.companyName) {
+        customerDto.companyName = String(row.companyName).trim();
+      }
+
+      if (row.companyAddress) {
+        customerDto.companyAddress = String(row.companyAddress).trim();
+      }
+    }
+
+    return customerDto;
+  }
+
+  /**
+   * Convertir una fecha de Excel al formato ISO
+   * @param excelDate Fecha en formato Excel
+   * @returns Fecha en formato ISO
+   */
+  private parseExcelDate(excelDate: unknown): string {
+    // Si ya es string y tiene formato ISO, devolverlo
+    if (
+      typeof excelDate === 'string' &&
+      excelDate.match(/^\d{4}-\d{2}-\d{2}/)
+    ) {
+      return excelDate;
+    }
+
+    // Si es un número de Excel, convertirlo a fecha
+    if (typeof excelDate === 'number') {
+      // Excel usa días desde el 1 de enero de 1900
+      const date = new Date(Math.round((excelDate - 25569) * 86400 * 1000));
+      return date.toISOString().split('T')[0];
+    }
+
+    // Si es una fecha de JavaScript
+    if (excelDate instanceof Date) {
+      return excelDate.toISOString().split('T')[0];
+    }
+
+    throw new BadRequestException(`Formato de fecha inválido: ${excelDate}`);
+  }
+
+  /**
+   * Verificar si un cliente sería duplicado
+   * @param documentNumber Número de documento
+   * @param email Email (opcional)
+   * @param ruc RUC (opcional)
+   * @returns Mensaje de duplicado o null si no es duplicado
+   */
+  private async checkForDuplicates(
+    documentNumber: string,
+    email?: string,
+    ruc?: string,
+  ): Promise<string | null> {
+    // Verificar documento
+    const existingByDocument = await this.prisma.customer.findUnique({
+      where: { documentNumber },
+      select: { id: true, isActive: true },
+    });
+
+    if (existingByDocument) {
+      return `Número de documento ${documentNumber} ya existe${!existingByDocument.isActive ? ' (inactivo)' : ''}`;
+    }
+
+    // Verificar email si existe
+    if (email) {
+      const existingByEmail = await this.prisma.customer.findUnique({
+        where: { email },
+        select: { id: true, isActive: true },
+      });
+
+      if (existingByEmail) {
+        return `Email ${email} ya existe${!existingByEmail.isActive ? ' (inactivo)' : ''}`;
+      }
+    }
+
+    // Verificar ruc si existe
+    if (ruc) {
+      try {
+        // Validar longitud de RUC primero
+        if (ruc.length !== 11) {
+          return `La longitud del RUC ${ruc} es incorrecta`;
+        }
+
+        const existingByRuc = await this.prisma.customer.findUnique({
+          where: { ruc },
+          select: { id: true, isActive: true },
+        });
+
+        if (existingByRuc) {
+          return `RUC ${ruc} ya existe${!existingByRuc.isActive ? ' (inactivo)' : ''}`;
+        }
+      } catch (error) {
+        return `Error al validar RUC: ${error.message}`;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Crea un cliente sin validaciones adicionales de duplicados
+   * @param createCustomerDto Datos del cliente a crear
+   * @param user Usuario que realiza la acción
+   * @returns Cliente creado
+   */
+  private async createCustomerWithoutValidation(
+    createCustomerDto: CreateCustomerDto,
+    user: UserData,
+  ): Promise<CustomerData> {
+    const {
+      name,
+      address,
+      birthPlace,
+      country,
+      documentNumber,
+      documentType,
+      email,
+      birthDate,
+      maritalStatus,
+      occupation,
+      phone,
+      companyAddress,
+      companyName,
+      department,
+      province,
+      ruc,
+    } = createCustomerDto;
+
+    try {
+      // Crear el cliente y registrar la auditoría sin validaciones de duplicados
+      const newCustomer = await this.prisma.$transaction(async () => {
+        // Crear el nuevo cliente
+        const customer = await this.prisma.customer.create({
+          data: {
+            name,
+            address,
+            birthPlace,
+            country,
+            documentNumber,
+            documentType,
+            maritalStatus,
+            occupation,
+            phone,
+            ...(email && { email }),
+            ...(birthDate && { birthDate }),
+            ...(ruc && { ruc, companyAddress, companyName }),
+            ...(department && { department }),
+            ...(province && { province }),
+          },
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            birthPlace: true,
+            birthDate: true,
+            country: true,
+            documentNumber: true,
+            documentType: true,
+            email: true,
+            maritalStatus: true,
+            occupation: true,
+            phone: true,
+            ruc: true,
+            companyAddress: true,
+            companyName: true,
+            department: true,
+            province: true,
+            isActive: true,
+          },
+        });
+
+        // Registrar la auditoría de la creación del cliente
+        await this.audit.create({
+          entityId: customer.id,
+          entityType: 'customer',
+          action: AuditActionType.CREATE,
+          performedById: user.id,
+          createdAt: new Date(),
+        });
+
+        return customer;
+      });
+
+      return {
+        id: newCustomer.id,
+        name: newCustomer.name,
+        address: newCustomer.address,
+        birthPlace: newCustomer.birthPlace,
+        country: newCustomer.country,
+        ...(newCustomer.ruc && {
+          ruc: newCustomer.ruc,
+          companyAddress: newCustomer.companyAddress,
+          companyName: newCustomer.companyName,
+        }),
+        documentNumber: newCustomer.documentNumber,
+        documentType: newCustomer.documentType,
+        ...(newCustomer.email && { email: newCustomer.email }),
+        ...(newCustomer.birthDate && { birthDate: newCustomer.birthDate }),
+        maritalStatus: newCustomer.maritalStatus,
+        occupation: newCustomer.occupation,
+        phone: newCustomer.phone,
+        ...(newCustomer.department && { department: newCustomer.department }),
+        ...(newCustomer.province && { province: newCustomer.province }),
+        isActive: newCustomer.isActive,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error creating customer: ${error.message}`,
+        error.stack,
+      );
+      throw error;
     }
   }
 }
