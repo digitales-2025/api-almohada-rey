@@ -130,6 +130,7 @@ enum RoomStatus {
   AVAILABLE
   OCCUPIED
   CLEANING
+  INCOMPLETE
 }
 
 model Room {
