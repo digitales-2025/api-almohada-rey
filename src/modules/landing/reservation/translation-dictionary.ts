@@ -1,4 +1,4 @@
-import { Dictionary } from '../supportedLocales';
+import { Dictionary } from '../translations';
 
 export const errorDictionary: Dictionary = {
   'reservation.error.roomNotFound': {
