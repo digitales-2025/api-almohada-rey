@@ -69,6 +69,10 @@ async function bootstrap() {
       description:
         'Devuelve tipos de habitaciones activas con imagen principal',
     },
+    {
+      name: 'Admin Expenses',
+      description: 'Todos los Gastos',
+    },
   ];
 
   SwaggerModule.setup('api', app, document);

@@ -1,4 +1,5 @@
 import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
+import { expenseErrorMessages } from 'src/modules/admin/expense/errors/errors-expense';
 import { roomCleanErrorMessages } from 'src/modules/admin/room-clean/errors/errors-room-clean';
 import { roomTypeErrorMessages } from 'src/modules/admin/room-type/errors/errors-room-type';
 import { roomErrorMessages } from 'src/modules/admin/room/errors/errors-room';
@@ -142,6 +143,7 @@ export const entityErrorMessages = {
   roomErrorMessages,
   roomCleanErrorMessages,
   serviceErrorMessages,
+  expenseErrorMessages,
   // Para agregar un nuevo módulo:
   // 1. Crear constante de mensajes de error siguiendo la interfaz ErrorMessages
   // 2. Agregar aquí con una clave apropiada
