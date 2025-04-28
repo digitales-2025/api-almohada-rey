@@ -308,13 +308,13 @@ model Service {
 
 model HotelExpense {
   id             String               @id @default(uuid())
-  description    String              
+  description    String
   category       ExpenseCategory
   paymentMethod  ExpensePaymentMethod
-  amount         Decimal            @db.Decimal(10, 2)
-  date           String       
+  amount         Float
+  date           String
   documentType   ExpenseDocumentType? // Optional
-  documentNumber String?     
+  documentNumber String?
   createdAt      DateTime             @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime             @updatedAt
 }
@@ -336,4 +336,3 @@ enum ExpenseDocumentType {
   INVOICE
   OTHER
 }
-
