@@ -14,7 +14,7 @@ import { LandingReservationService } from './reservation.service';
 import { ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { DetailedRoom } from 'src/modules/admin/room/entities/room.entity';
 
-@Controller('reservation')
+@Controller('landing-reservation')
 export class ReservationController {
   constructor(private readonly reservationService: LandingReservationService) {}
 

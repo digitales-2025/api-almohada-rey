@@ -59,18 +59,18 @@ enum AuditActionType {
 model Customer {
   id             String                @id @default(uuid())
   name           String
-  address        String
-  birthPlace     String
+  address        String? //Admin is required, landing is not
+  birthPlace     String? //Admin is required, landing is not
   birthDate      String?
-  country        String
+  country        String? //Admin is required, landing is not
   department     String?
   province       String?
   phone          String
-  occupation     String
+  occupation     String? //Admin is required, landing is not
   documentType   CustomerDocumentType
   documentNumber String                @unique
   email          String?               @unique
-  maritalStatus  CustomerMaritalStatus
+  maritalStatus  CustomerMaritalStatus? //Admin is required, landing is not
   companyName    String?
   ruc            String?               @unique
   companyAddress String?
@@ -194,6 +194,7 @@ model Reservation {
   reason          String // Reason for reservation
   guests          Json? // List of companions
   observations    String? // Additional notes
+  didAcceptTerms     Boolean   @default(false)  // Accept terms and conditions
 
   payment Payment[] @relation("PaymentReservation")
 
