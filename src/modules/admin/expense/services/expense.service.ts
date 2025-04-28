@@ -149,15 +149,23 @@ export class ExpenseService {
     try {
       const currentExpense = await this.findById(id);
 
-      // Verificar si hay cambios
-      const updateDto: Partial<HotelExpenseEntity> = updateHotelExpenseDto;
+      // Si dataDocument es true, consideramos que hay cambios directamente
+      // ya que vamos a limpiar los campos documentType y documentNumber
+      if (updateHotelExpenseDto.dataDocument === true) {
+        // Continuar con las validaciones
+      }
+      // Si no está presente dataDocument, verificar cambios normalmente
+      else {
+        // Verificar si hay cambios en los demás campos
+        const updateDto: Partial<HotelExpenseEntity> = updateHotelExpenseDto;
 
-      if (!validateChanges(updateDto, currentExpense)) {
-        return {
-          success: true,
-          message: 'No se detectaron cambios en el gasto',
-          data: currentExpense,
-        };
+        if (!validateChanges(updateDto, currentExpense)) {
+          return {
+            success: true,
+            message: 'No se detectaron cambios en el gasto',
+            data: currentExpense,
+          };
+        }
       }
 
       // Validar monto positivo si se está actualizando
@@ -178,18 +186,22 @@ export class ExpenseService {
         }
       }
 
-      // Validación condicional para documentType y documentNumber
-      if (
-        (updateHotelExpenseDto.documentType &&
-          !currentExpense.documentNumber &&
-          !updateHotelExpenseDto.documentNumber) ||
-        (currentExpense.documentType &&
-          !currentExpense.documentNumber &&
-          updateHotelExpenseDto.documentNumber === '')
-      ) {
-        throw new BadRequestException(
-          expenseErrorMessages.documentNumberRequired,
-        );
+      // Si dataDocument es true, no realizamos validaciones de documento
+      // ya que vamos a limpiar esos campos
+      if (!updateHotelExpenseDto.dataDocument) {
+        // Validación condicional para documentType y documentNumber
+        if (
+          (updateHotelExpenseDto.documentType &&
+            !currentExpense.documentNumber &&
+            !updateHotelExpenseDto.documentNumber) ||
+          (currentExpense.documentType &&
+            !currentExpense.documentNumber &&
+            updateHotelExpenseDto.documentNumber === '')
+        ) {
+          throw new BadRequestException(
+            expenseErrorMessages.documentNumberRequired,
+          );
+        }
       }
 
       // Realizar la actualización
