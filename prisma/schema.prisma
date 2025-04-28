@@ -305,3 +305,35 @@ model Service {
 
   paymentDetail PaymentDetail[] @relation("PaymentDetailService")
 }
+
+model HotelExpense {
+  id             String               @id @default(uuid())
+  description    String              
+  category       ExpenseCategory
+  paymentMethod  ExpensePaymentMethod
+  amount         Decimal            @db.Decimal(10, 2)
+  date           String       
+  documentType   ExpenseDocumentType? // Optional
+  documentNumber String?     
+  createdAt      DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime             @updatedAt
+}
+
+enum ExpenseCategory {
+  FIXED
+  VARIABLE
+  OTHER
+}
+
+enum ExpensePaymentMethod {
+  CASH
+  TRANSFER
+  CARD
+}
+
+enum ExpenseDocumentType {
+  RECEIPT
+  INVOICE
+  OTHER
+}
+
