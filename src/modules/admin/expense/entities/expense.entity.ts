@@ -20,7 +20,7 @@ export class HotelExpenseEntity implements HotelExpense {
   paymentMethod: ExpensePaymentMethod;
 
   @ApiProperty()
-  amount: string; // O simplemente number si no necesitas la precisión exacta de Decimal en la entidad
+  amount: number; // O simplemente number si no necesitas la precisión exacta de Decimal en la entidad
 
   @ApiProperty()
   date: string; // Cambiado de String a Date para representar mejor la fecha/hora
