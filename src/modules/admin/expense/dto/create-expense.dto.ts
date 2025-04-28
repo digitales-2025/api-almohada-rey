@@ -6,8 +6,7 @@ import {
   IsOptional,
   MaxLength,
   IsDateString,
-  IsNumberString,
-  Matches,
+  IsNumber,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import {
@@ -50,31 +49,13 @@ export class CreateHotelExpenseDto {
   paymentMethod: ExpensePaymentMethod;
 
   @ApiProperty({
-    description: 'Monto del gasto',
-    example: '150.75',
-    type: String,
-    format: 'decimal',
-    required: true,
+    name: 'amount',
+    description: 'Precio del gasto (en formato numérico)',
+    example: '100.15',
   })
-  @IsNumberString(
-    { no_symbols: false },
-    { message: 'El monto debe ser un número válido' },
-  )
-  @Matches(/^\d+(\.\d{1,2})?$/, {
-    message: 'El monto debe tener máximo 2 decimales',
-  })
-  @Transform(({ value }) => {
-    // Asegurar que sea un string para evitar problemas de precisión en JavaScript
-    const stringValue = value.toString();
-    // Validar que sea un número positivo
-    const numValue = parseFloat(stringValue);
-    if (isNaN(numValue) || numValue <= 0) {
-      throw new Error('El monto debe ser un número positivo');
-    }
-    // Devolver el valor como string para Prisma
-    return stringValue;
-  })
-  amount: string; // Cambiado a string para mantener precisión exacta
+  @IsNumber()
+  @IsNotEmpty()
+  amount: number; // Cambiado a string para mantener precisión exacta
 
   @ApiProperty({
     description:
