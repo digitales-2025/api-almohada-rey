@@ -62,6 +62,25 @@ services:
       - "traefik.http.routers.almohada-frontend-develop.tls.domains[0].sans=*.acide.win"
       - "traefik.http.services.almohada-frontend-develop.loadbalancer.server.port=3000"
 
+  almohada-landing-develop:
+    image: docker.io/digitalesacide/almohada-landing-develop:0
+    container_name: almohada-landing-develop
+    restart: unless-stopped
+    environment:
+      NODE_ENV: "production"
+    networks:
+      - proxy
+      - almohada-network-develop
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.almohada-landing-develop.rule=Host(`almohada-landing-develop.acide.win`)"
+      - "traefik.http.routers.almohada-landing-develop.entrypoints=websecure"
+      - "traefik.http.routers.almohada-landing-develop.tls=true"
+      - "traefik.http.routers.almohada-landing-develop.tls.certresolver=dns-cloudflare"
+      - "traefik.http.routers.almohada-landing-develop.tls.domains[0].main=acide.win"
+      - "traefik.http.routers.almohada-landing-develop.tls.domains[0].sans=*.acide.win"
+      - "traefik.http.services.almohada-landing-develop.loadbalancer.server.port=3000"
+
   almohada-db-develop:
     image: postgres:latest
     container_name: almohada-db-develop
