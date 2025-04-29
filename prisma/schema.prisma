@@ -180,12 +180,12 @@ enum ReservationStatus {
 
 model Reservation {
   id              String            @id @default(uuid())
-  customer        Customer          @relation(fields: [customerId], references: [id])
-  customerId      String
+  customer        Customer?        @relation(fields: [customerId], references: [id]) //Required for the admin, but optional for the landing page
+  customerId      String?           //Required for the admin, but optional for the landing page
   room            Room              @relation(fields: [roomId], references: [id])
   roomId          String
-  user            User              @relation(fields: [userId], references: [id])
-  userId          String
+  user            User?             @relation(fields: [userId], references: [id]) //Required for the admin, but optional for the landing page
+  userId          String?           //Required for the admin, but optional for the landing page
   reservationDate DateTime          @default(now()) @db.Timestamptz(6)
   checkInDate     DateTime          @db.Timestamptz(6)
   checkOutDate    DateTime          @db.Timestamptz(6)
@@ -194,6 +194,7 @@ model Reservation {
   reason          String // Reason for reservation
   guests          Json? // List of companions
   observations    String? // Additional notes
+  didAcceptExtraServices Boolean   @default(false) // Accept extra services
   didAcceptTerms     Boolean   @default(false)  // Accept terms and conditions
 
   payment Payment[] @relation("PaymentReservation")
