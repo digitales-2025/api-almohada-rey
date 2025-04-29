@@ -53,8 +53,6 @@ export class PrismaService
       const query = event.query.replace(/\s+/g, ' ').trim();
       const params = event.params ? JSON.stringify(event.params) : '';
 
-      this.logger.debug(`[Query] ${query} ${params} (${event.duration}ms)`);
-
       if (event.duration >= 500) {
         this.logger.warn(
           `Slow query detected! Duration: ${event.duration}ms\n` +

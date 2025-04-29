@@ -1,6 +1,12 @@
 import { ReactivateReservationsUseCase } from './use-cases/reactivateReservations.use-case';
 import { DeactivateReservationsUseCase } from './use-cases/deactivateReservations.use-case';
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
 import {
@@ -29,6 +35,7 @@ import { ReservationStatus } from '@prisma/client';
 import { ReservationStateFactory } from './states';
 import { ReservationStatusAvailableActions } from './entities/reservation.status-actions';
 import { UpdateManyDto, UpdateManyResponseDto } from './dto/update-many.dto';
+import { ReservationGateway } from 'src/modules/websockets/reservation.gateway';
 
 @Injectable()
 export class ReservationService {
@@ -44,6 +51,8 @@ export class ReservationService {
     private readonly reservationStateFactory: ReservationStateFactory,
     private readonly deactivateReservationsUseCase: DeactivateReservationsUseCase,
     private readonly reactivateReservationsUseCase: ReactivateReservationsUseCase,
+    @Inject(forwardRef(() => ReservationGateway))
+    private readonly reservationGateway: ReservationGateway,
   ) {
     this.errorHandler = new BaseErrorHandler(
       this.logger,
@@ -67,10 +76,27 @@ export class ReservationService {
         throw new BadRequestException('Habitación no disponible');
       }
 
-      const reservation = this.createReservationUseCase.execute(
+      const reservation = await this.createReservationUseCase.execute(
         createReservationDto,
         userData,
       );
+
+      // Emitir evento de nueva reservación por WebSocket
+      if (reservation.success && reservation.data) {
+        // Obtén los detalles completos de la reserva para emitirlos
+        const detailedReservation = await this.findOneDetailed(
+          reservation.data.id,
+        );
+        if (detailedReservation) {
+          this.reservationGateway.emitNewReservation(detailedReservation);
+
+          // Notificar cambio en la disponibilidad de habitaciones
+          this.reservationGateway.emitAvailabilityChange(
+            createReservationDto.checkInDate,
+            createReservationDto.checkOutDate,
+          );
+        }
+      }
       return reservation;
     } catch (error) {
       this.errorHandler.handleError(error, 'creating');
@@ -151,6 +177,30 @@ export class ReservationService {
         userData,
       );
 
+      // Emitir evento de actualización por WebSocket
+      if (reservation.success && reservation.data) {
+        // Obtén los detalles completos de la reserva para emitirlos
+        const detailedReservation = await this.findOneDetailed(
+          reservation.data.id,
+        );
+        if (detailedReservation) {
+          this.reservationGateway.emitReservationUpdate(detailedReservation);
+
+          // Si hubo cambio en las fechas, emitir cambio de disponibilidad
+          if (
+            updateReservationDto.checkInDate ||
+            updateReservationDto.checkOutDate
+          ) {
+            this.reservationGateway.emitAvailabilityChange(
+              updateReservationDto.checkInDate ||
+                originalReservation.checkInDate,
+              updateReservationDto.checkOutDate ||
+                originalReservation.checkOutDate,
+            );
+          }
+        }
+      }
+
       return reservation;
     } catch (error) {
       this.errorHandler.handleError(error, 'updating');
@@ -162,7 +212,21 @@ export class ReservationService {
     userData: UserData,
   ): Promise<BaseApiResponse<UpdateManyResponseDto>> {
     try {
-      return this.deactivateReservationsUseCase.execute(dto.ids, userData);
+      const result = this.deactivateReservationsUseCase.execute(
+        dto.ids,
+        userData,
+      );
+
+      // Emitir eventos de eliminación para cada reservación desactivada
+      result.then((response) => {
+        if (response.success && dto.ids.length > 0) {
+          dto.ids.forEach((id) => {
+            this.reservationGateway.emitReservationDeleted(id);
+          });
+        }
+      });
+
+      return result;
     } catch (error) {
       this.errorHandler.handleError(error, 'deactivating');
     }
@@ -173,7 +237,26 @@ export class ReservationService {
     userData: UserData,
   ): Promise<BaseApiResponse<UpdateManyResponseDto>> {
     try {
-      return this.reactivateReservationsUseCase.execute(dto.ids, userData);
+      const result = this.reactivateReservationsUseCase.execute(
+        dto.ids,
+        userData,
+      );
+
+      // Emitir eventos de actualización para cada reservación reactivada
+      result.then(async (response) => {
+        if (response.success && dto.ids.length > 0) {
+          for (const id of dto.ids) {
+            const detailedReservation = await this.findOneDetailed(id);
+            if (detailedReservation) {
+              this.reservationGateway.emitReservationUpdate(
+                detailedReservation,
+              );
+            }
+          }
+        }
+      });
+
+      return result;
     } catch (error) {
       this.errorHandler.handleError(error, 'reactivating');
     }
@@ -197,6 +280,16 @@ export class ReservationService {
         newStatus,
         userData,
       );
+
+      // Emitir evento de actualización por WebSocket
+      reservation.then(async (result) => {
+        if (result.success && result.data) {
+          const detailedReservation = await this.findOneDetailed(id);
+          if (detailedReservation) {
+            this.reservationGateway.emitReservationUpdate(detailedReservation);
+          }
+        }
+      });
       return reservation;
     } catch (error) {
       this.errorHandler.handleError(error, 'updating');
@@ -467,12 +560,19 @@ export class ReservationService {
         // response.roomTypeName = room.RoomTypes.name;
       }
 
+      // NUEVO: Emitir evento de consulta de disponibilidad
+      this.reservationGateway.emitRoomAvailabilityChecked(
+        roomId,
+        checkInDate,
+        checkOutDate,
+        isAvailable,
+      );
+
       return response;
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
     }
   }
-
   /**
    * Obtiene todas las reservas que se solapan con un rango de fechas específico
    * @param checkInDate - Fecha de inicio en formato ISO
@@ -560,9 +660,13 @@ export class ReservationService {
           },
         });
 
-      // if (forUpdate && reservationId && originalReservation) {
-      //   reservations.push(originalReservation);
-      // }
+      // Emitir las reservaciones encontradas para mantener sincronizados a los clientes
+      this.reservationGateway.emitReservationsInInterval(
+        checkInDate,
+        checkOutDate,
+        reservations,
+      );
+
       return reservations;
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
@@ -642,6 +746,9 @@ export class ReservationService {
         },
         include: { RoomTypes: true },
       });
+
+      // Emitir evento de cambio de disponibilidad para mantener a los clientes actualizados
+      this.reservationGateway.emitAvailabilityChange(checkInDate, checkOutDate);
 
       return availableRooms;
     } catch (error) {
