@@ -9,19 +9,22 @@ export class ExpenseRepository extends BaseRepository<HotelExpenseEntity> {
   }
 
   /**
-   * Busca gastos por fecha
-   * @param date Fecha del gasto (formato YYYY-MM-DD)
-   * @returns Promise con array de gastos
+   * Busca gastos por año y mes (ignorando el día)
+   * @param date Fecha completa (formato YYYY-MM-DD)
+   * @returns Promise con array de gastos del año y mes indicados
    */
   async findByDate(date: string): Promise<HotelExpenseEntity[]> {
-    // Busca gastos cuyo campo date comience con la fecha proporcionada
+    console.log('🚀 ~ ExpenseRepository ~ findByYearAndMonth ~ date:', date);
+    // Extrae el año y mes: "YYYY-MM"
+    const yearMonth = date.slice(0, 7);
+
     const expenses = await this.prisma.hotelExpense.findMany({
       where: {
         date: {
-          startsWith: date,
+          startsWith: yearMonth, // Solo año y mes
         },
       },
-      orderBy: { createdAt: 'desc' }, // Ordenados por fecha de creación descendente
+      orderBy: { createdAt: 'desc' },
     });
     return expenses.map((expense) => new HotelExpenseEntity(expense));
   }

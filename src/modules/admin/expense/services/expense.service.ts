@@ -87,7 +87,9 @@ export class ExpenseService {
    */
   async findAll(): Promise<HotelExpenseEntity[]> {
     try {
-      return this.expenseRepository.findMany();
+      return this.expenseRepository.findMany({
+        orderBy: { createdAt: 'desc' },
+      });
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
       throw error;

@@ -155,25 +155,4 @@ export class ExpenseController {
   ): Promise<BaseApiResponse<HotelExpenseEntity[]>> {
     return this.expenseService.deleteMany(deleteHotelExpenseDto, user);
   }
-
-  /**
-   * Reactiva múltiples gastos
-   * Nota: Este endpoint asume que existe un campo o lógica para marcar gastos como inactivos/activos,
-   * aunque no está definido en el modelo actual de HotelExpense.
-   */
-  /*   @Patch('reactivate/all')
-  @ApiOperation({ summary: 'Reactivar múltiples gastos' })
-  @ApiOkResponse({
-    description: 'Gastos reactivados exitosamente',
-    type: BaseApiResponse,
-  })
-  @ApiBadRequestResponse({
-    description: 'IDs inválidos o gastos no existen',
-  })
-  reactivateAll(
-    @Body() deleteHotelExpenseDto: DeleteHotelExpenseDto,
-    @GetUser() user: UserData,
-  ): Promise<BaseApiResponse<HotelExpenseEntity[]>> {
-    return this.expenseService.reactivateMany(deleteHotelExpenseDto.ids, user);
-  } */
 }
