@@ -198,6 +198,9 @@ model Reservation {
 
   payment Payment[] @relation("PaymentReservation")
 
+  // Pendiente de eliminar pagos
+  isPendingDeletePayment Boolean @default(false) // Flag to indicate if the payment is pending deletion
+
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt
