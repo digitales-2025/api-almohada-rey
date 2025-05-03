@@ -636,6 +636,11 @@ export class PaymentsService {
     }
   }
 
+  /**
+   * Obtiene todos los pagos paginados.
+   * @param options Opciones para la paginación
+   * @returns PaginatedResponse con los pagos paginados
+   */
   async findAllPaginated(options: {
     page: number;
     pageSize: number;
