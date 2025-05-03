@@ -18,9 +18,15 @@ import { ChangeReservationStatusUseCase } from './use-cases/changeReservationSta
 import { DeactivateReservationsUseCase } from './use-cases/deactivateReservations.use-case';
 import { ReactivateReservationsUseCase } from './use-cases/reactivateReservations.use-case';
 import { WebsocketsModule } from 'src/modules/websockets/websockets.module';
+import { PaymentsModule } from '../payments/payments.module';
 
 @Module({
-  imports: [AuditModule, RoomModule, forwardRef(() => WebsocketsModule)],
+  imports: [
+    AuditModule,
+    RoomModule,
+    forwardRef(() => WebsocketsModule),
+    forwardRef(() => PaymentsModule),
+  ],
   controllers: [ReservationController],
   providers: [
     ReservationService,
