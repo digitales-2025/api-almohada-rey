@@ -43,7 +43,18 @@ export class LandingReservationService {
       // Asegurarnos que locale es válido o usar 'es' como predeterminado
       const validLocale = ['es', 'en'].includes(locale) ? locale : 'es';
 
+      Logger.log(
+        `Check available rooms for checkInDate: ${checkInDate}, checkOutDate: ${checkOutDate}, guestNumber: ${guestNumber}, roomId: ${roomId}, locale: ${locale}`,
+        LandingReservationService.name,
+      );
+
+      Logger.log(
+        `Parsed checkInDate: ${parsedCheckInDate}, parsed checkOutDate: ${parsedCheckOutDate}`,
+        LandingReservationService.name,
+      );
+
       // Validate date format
+      // Validate dates are valid (not invalid format or non-existent dates)
       if (
         isNaN(parsedCheckInDate.getTime()) ||
         isNaN(parsedCheckOutDate.getTime())
@@ -59,6 +70,10 @@ export class LandingReservationService {
 
       // Validate that check-in is before check-out
       if (parsedCheckInDate >= parsedCheckOutDate) {
+        Logger.log(
+          `Check-in date ${parsedCheckInDate} is not before check-out date ${parsedCheckOutDate}`,
+          LandingReservationService.name,
+        );
         throw new BadRequestException(
           this.translation.getTranslations(
             'reservationCheckinAfterCheckout',
