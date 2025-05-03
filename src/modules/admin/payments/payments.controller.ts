@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -17,6 +18,7 @@ import {
   ApiInternalServerErrorResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -31,6 +33,7 @@ import {
 import { CreateManyPaymentDetailDto } from './dto/create-many-payment-detail.dto';
 import { UpdatePaymentDetailDto } from './dto/update-payment-detail.dto';
 import { UpdatePaymentDetailsBatchDto } from './dto/updatePaymentDetailsBatch.dto';
+import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 
 @ApiTags('Admin Payments')
 @ApiUnauthorizedResponse({ description: 'Unauthorized' })
@@ -72,6 +75,37 @@ export class PaymentsController {
   @Get()
   findAll(): Promise<SummaryPaymentData[]> {
     return this.paymentsService.findAll();
+  }
+
+  @ApiOperation({ summary: 'Get paginated payments' })
+  @ApiQuery({
+    name: 'page',
+    description: 'Page number',
+    type: Number,
+    example: 1,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'pageSize',
+    description: 'Number of items per page',
+    type: Number,
+    example: 10,
+    required: false,
+  })
+  @ApiOkResponse({ description: 'Payments paginated retrieved successfully' })
+  @Get('paginated/all')
+  findAllPaginated(
+    @GetUser() user: UserData,
+    @Query('page') page: string = '1',
+    @Query('pageSize') pageSize: string = '10',
+  ): Promise<PaginatedResponse<SummaryPaymentData>> {
+    const pageNumber = parseInt(page, 10) || 1;
+    const pageSizeNumber = parseInt(pageSize, 10) || 10;
+
+    return this.paymentsService.findAllPaginated({
+      page: pageNumber,
+      pageSize: pageSizeNumber,
+    });
   }
 
   @ApiOperation({ summary: 'Get payment by ID' })
