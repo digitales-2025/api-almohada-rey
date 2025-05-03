@@ -32,6 +32,8 @@ import { CustomerRepository } from './repository/customer.repository';
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
 import { HistoryCustomerData } from 'src/interfaces/customer.interface';
 import * as excelJs from 'exceljs';
+import { PaginationService } from 'src/pagination/pagination.service';
+import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 
 @Injectable()
 export class CustomersService {
@@ -41,6 +43,7 @@ export class CustomersService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly customerRepository: CustomerRepository,
+    private readonly paginationService: PaginationService,
   ) {}
 
   /**
@@ -355,6 +358,79 @@ export class CustomersService {
     } catch (error) {
       this.logger.error('Error getting all customers');
       handleException(error, 'Error getting all customers');
+    }
+  }
+
+  /**
+   * Obtiene todos los clientes de forma paginada.
+   * @param user Usuario que realiza la consulta
+   * @param options Opciones de paginación (página y tamaño de página)
+   * @returns Lista paginada de clientes
+   */
+  async findAllPaginated(
+    user: UserPayload,
+    options: { page: number; pageSize: number },
+  ): Promise<PaginatedResponse<CustomerData>> {
+    try {
+      const { page, pageSize } = options;
+
+      return await this.paginationService.paginate<any, CustomerData>({
+        model: 'customer',
+        page,
+        pageSize,
+        where: {
+          // Filtrar por isActive solo si no es super admin
+          ...(user.isSuperAdmin ? {} : { isActive: true }),
+        },
+        select: {
+          id: true,
+          name: true,
+          address: true,
+          birthPlace: true,
+          country: true,
+          documentNumber: true,
+          documentType: true,
+          email: true,
+          birthDate: true,
+          maritalStatus: true,
+          occupation: true,
+          phone: true,
+          ruc: true,
+          companyAddress: true,
+          companyName: true,
+          department: true,
+          province: true,
+          isActive: true,
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+        transformer: (customer) => ({
+          id: customer.id,
+          name: customer.name,
+          address: customer.address,
+          birthPlace: customer.birthPlace,
+          country: customer.country,
+          ...(customer.ruc && {
+            ruc: customer.ruc,
+            companyAddress: customer.companyAddress,
+            companyName: customer.companyName,
+          }),
+          documentNumber: customer.documentNumber,
+          documentType: customer.documentType,
+          ...(customer.email && { email: customer.email }),
+          ...(customer.birthDate && { birthDate: customer.birthDate }),
+          maritalStatus: customer.maritalStatus,
+          occupation: customer.occupation,
+          phone: customer.phone,
+          ...(customer.department && { department: customer.department }),
+          ...(customer.province && { province: customer.province }),
+          isActive: customer.isActive,
+        }),
+      });
+    } catch (error) {
+      this.logger.error('Error getting paginated customers', error.stack);
+      handleException(error, 'Error getting paginated customers');
     }
   }
 
