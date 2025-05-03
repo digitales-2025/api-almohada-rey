@@ -17,8 +17,11 @@ import {
   ReactivateExpensesUseCase,
 } from '../use-cases';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
+import { PaginationParams } from 'src/utils/paginated-response/pagination.types';
+import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 
 import { AuditService } from '../../audit/audit.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class ExpenseService {
@@ -87,7 +90,9 @@ export class ExpenseService {
    */
   async findAll(): Promise<HotelExpenseEntity[]> {
     try {
-      return this.expenseRepository.findMany();
+      return this.expenseRepository.findMany({
+        orderBy: { createdAt: 'desc' },
+      });
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
       throw error;
@@ -106,27 +111,43 @@ export class ExpenseService {
     }
   }
 
-  /**
-   * Busca gastos por fecha
-   */
-  async findByDate(date: string): Promise<HotelExpenseEntity[]> {
+  async findByDatePaginated(
+    pagination: PaginationParams,
+    filters: { date?: string },
+  ): Promise<PaginatedResponse<HotelExpenseEntity>> {
     try {
-      // Validar formato de fecha
-      try {
-        new Date(date);
-      } catch (error) {
-        throw new BadRequestException(expenseErrorMessages.invalidDateFormat);
-        throw error;
+      const where: Prisma.HotelExpenseWhereInput = {};
+
+      if (filters.date) {
+        // Ejemplo de valores: "2025-00", "0000-05", "2025-05"
+        const [year, month] = filters.date.split('-');
+
+        if (year !== '0000' && month !== '00') {
+          // Año y mes específicos: YYYY-MM
+          where.date = { startsWith: `${year}-${month}` };
+        } else if (year !== '0000' && month === '00') {
+          // Solo año: YYYY
+          where.date = { startsWith: `${year}-` };
+        } else if (year === '0000' && month !== '00') {
+          // Solo mes: MM (en la posición correcta)
+          // Busca fechas que tengan -MM- en la posición central (YYYY-MM-DD)
+          where.date = { contains: `-${month}-` };
+        }
+        // Si ambos son "00", no se filtra por fecha (mostrar todo)
       }
 
-      const expenses = await this.expenseRepository.findByDate(date);
-      return expenses;
+      return await this.expenseRepository.findManyPaginated<HotelExpenseEntity>(
+        pagination,
+        {
+          where,
+          orderBy: { createdAt: 'desc' }, // Ordena por fecha de creación, pero filtra por date
+        },
+      );
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
       throw error;
     }
   }
-
   /**
    * Busca un gasto por su ID (método auxiliar)
    */

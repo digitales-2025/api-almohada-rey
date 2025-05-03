@@ -20,6 +20,7 @@ import {
   ApiOkResponse,
   ApiNotFoundResponse,
   ApiQuery,
+  getSchemaPath,
 } from '@nestjs/swagger';
 import { UserData } from 'src/interfaces';
 import {
@@ -30,6 +31,10 @@ import {
 import { HotelExpenseEntity } from '../entities/expense.entity';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { Auth, GetUser } from '../../auth/decorators';
+import {
+  PaginatedResponse,
+  PaginationMetadata,
+} from 'src/utils/paginated-response/PaginatedResponse.dto';
 
 /**
  * Controlador REST para gestionar gastos del hotel.
@@ -103,18 +108,51 @@ export class ExpenseController {
    * Obtiene gastos por fecha
    */
   @Get('filter/date')
-  @ApiOperation({ summary: 'Obtener gastos por fecha' })
+  @ApiOperation({ summary: 'Obtener gastos por fecha (paginado y filtrado)' })
   @ApiQuery({
     name: 'date',
-    required: true,
-    description: 'Fecha del gasto (formato YYYY-MM-DD)',
+    required: false,
+    description: 'Fecha del gasto (formato YYYY-MM-DD, opcional)',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Número de página',
+    type: Number,
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'pageSize',
+    required: false,
+    description: 'Cantidad de elementos por página',
+    type: Number,
+    example: 10,
   })
   @ApiOkResponse({
-    description: 'Gastos encontrados para la fecha especificada',
-    type: [HotelExpenseEntity],
+    schema: {
+      title: 'PaginatedExpenseResponse',
+      type: 'object',
+      properties: {
+        data: {
+          type: 'array',
+          items: { $ref: getSchemaPath(HotelExpenseEntity) },
+        },
+        meta: { $ref: getSchemaPath(PaginationMetadata) },
+      },
+    },
+    description: 'Lista paginada de gastos',
   })
-  findByDate(@Query('date') date: string): Promise<HotelExpenseEntity[]> {
-    return this.expenseService.findByDate(date);
+  findByDate(
+    @Query('date') date?: string,
+    @Query('page') page: string = '1',
+    @Query('pageSize') pageSize: string = '10',
+  ): Promise<PaginatedResponse<HotelExpenseEntity>> {
+    const pageNumber = parseInt(page, 10) || 1;
+    const pageSizeNumber = parseInt(pageSize, 10) || 10;
+    return this.expenseService.findByDatePaginated(
+      { page: pageNumber, pageSize: pageSizeNumber },
+      { date },
+    );
   }
 
   /**
@@ -155,25 +193,4 @@ export class ExpenseController {
   ): Promise<BaseApiResponse<HotelExpenseEntity[]>> {
     return this.expenseService.deleteMany(deleteHotelExpenseDto, user);
   }
-
-  /**
-   * Reactiva múltiples gastos
-   * Nota: Este endpoint asume que existe un campo o lógica para marcar gastos como inactivos/activos,
-   * aunque no está definido en el modelo actual de HotelExpense.
-   */
-  /*   @Patch('reactivate/all')
-  @ApiOperation({ summary: 'Reactivar múltiples gastos' })
-  @ApiOkResponse({
-    description: 'Gastos reactivados exitosamente',
-    type: BaseApiResponse,
-  })
-  @ApiBadRequestResponse({
-    description: 'IDs inválidos o gastos no existen',
-  })
-  reactivateAll(
-    @Body() deleteHotelExpenseDto: DeleteHotelExpenseDto,
-    @GetUser() user: UserData,
-  ): Promise<BaseApiResponse<HotelExpenseEntity[]>> {
-    return this.expenseService.reactivateMany(deleteHotelExpenseDto.ids, user);
-  } */
 }
