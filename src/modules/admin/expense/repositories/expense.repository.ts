@@ -14,7 +14,6 @@ export class ExpenseRepository extends BaseRepository<HotelExpenseEntity> {
    * @returns Promise con array de gastos del año y mes indicados
    */
   async findByDate(date: string): Promise<HotelExpenseEntity[]> {
-    console.log('🚀 ~ ExpenseRepository ~ findByYearAndMonth ~ date:', date);
     // Extrae el año y mes: "YYYY-MM"
     const yearMonth = date.slice(0, 7);
 
