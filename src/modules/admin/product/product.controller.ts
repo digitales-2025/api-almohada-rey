@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -18,6 +19,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -29,6 +31,7 @@ import {
 } from 'src/interfaces';
 import { DeleteProductDto } from './dto/delete-product.dto';
 import { ProductType } from '@prisma/client';
+import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 
 @ApiTags('Admin Products')
 @ApiUnauthorizedResponse({ description: 'Unauthorized' })
@@ -57,6 +60,45 @@ export class ProductController {
   @Get()
   findAll(@GetUser() user: UserPayload): Promise<ProductData[]> {
     return this.productService.findAll(user);
+  }
+
+  @Get('paginated')
+  @ApiOperation({ summary: 'Get paginated products' })
+  @ApiQuery({
+    name: 'page',
+    description: 'Page number',
+    type: Number,
+    example: 1,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'pageSize',
+    description: 'Number of items per page',
+    type: Number,
+    example: 10,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'type',
+    description: 'Product type filter',
+    enum: ProductType,
+    required: false,
+  })
+  @ApiOperation({ summary: 'Get all paginated products' })
+  findAllPaginated(
+    @GetUser() user: UserPayload,
+    @Query('page') page: string = '1',
+    @Query('pageSize') pageSize: string = '10',
+    @Query('type') type?: ProductType,
+  ): Promise<PaginatedResponse<ProductData>> {
+    const pageNumber = parseInt(page, 10) || 1;
+    const pageSizeNumber = parseInt(pageSize, 10) || 10;
+
+    return this.productService.findAllPaginated(user, {
+      page: pageNumber,
+      pageSize: pageSizeNumber,
+      type,
+    });
   }
 
   @ApiOkResponse({ description: 'Products found successfully' })
