@@ -17,8 +17,11 @@ import {
   ReactivateExpensesUseCase,
 } from '../use-cases';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
+import { PaginationParams } from 'src/utils/paginated-response/pagination.types';
+import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 
 import { AuditService } from '../../audit/audit.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class ExpenseService {
@@ -109,20 +112,27 @@ export class ExpenseService {
   }
 
   /**
-   * Busca gastos por fecha
+   * Busca gastos paginados y opcionalmente filtrados por fecha (año y mes)
    */
-  async findByDate(date: string): Promise<HotelExpenseEntity[]> {
+  async findByDatePaginated(
+    pagination: PaginationParams,
+    filters: { date?: string },
+  ): Promise<PaginatedResponse<HotelExpenseEntity>> {
     try {
-      // Validar formato de fecha
-      try {
-        new Date(date);
-      } catch (error) {
-        throw new BadRequestException(expenseErrorMessages.invalidDateFormat);
-        throw error;
+      const where: Prisma.HotelExpenseWhereInput = {};
+
+      if (filters.date) {
+        const dateObj = new Date(filters.date);
+        if (isNaN(dateObj.getTime())) {
+          throw new BadRequestException('Formato de fecha inválido');
+        }
+        where.date = { startsWith: filters.date.slice(0, 7) };
       }
 
-      const expenses = await this.expenseRepository.findByDate(date);
-      return expenses;
+      return await this.expenseRepository.findManyPaginated<HotelExpenseEntity>(
+        pagination,
+        { where, orderBy: { createdAt: 'desc' } },
+      );
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
       throw error;
