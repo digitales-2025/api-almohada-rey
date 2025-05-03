@@ -8,6 +8,7 @@ export type Dictionary = {
   [key: string]: Translations;
 };
 
+export const defaultLocale: SupportedLocales = 'es';
 export const supportedLocales: SupportedLocales[] = ['es', 'en'];
 export const supportedLocalesMap: Record<SupportedLocales, string> = {
   es: 'es',

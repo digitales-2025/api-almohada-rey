@@ -44,7 +44,7 @@ import { ReservationStatusDto } from './dto/reservation-status.dto';
 import { ReservationStatusAvailableActions } from './entities/reservation.status-actions';
 import { UpdateManyDto, UpdateManyResponseDto } from './dto/update-many.dto';
 
-@ApiTags('Reservations')
+@ApiTags('Admin Reservations')
 @ApiBadRequestResponse({
   description:
     'Bad Request - Error en la validación de datos o solicitud incorrecta',

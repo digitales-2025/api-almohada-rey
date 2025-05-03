@@ -49,7 +49,7 @@ async function bootstrap() {
     { name: 'Admin Audit', description: 'Gestión de auditoría' },
     { name: 'Admin Customers', description: 'Gestión de clientes' },
     {
-      name: 'Reservations',
+      name: 'Admin Reservations',
       description: 'Gestión de reservaciones de habitaciones',
     },
     { name: 'Admin Products', description: 'Gestión de productos' },
@@ -68,6 +68,10 @@ async function bootstrap() {
       name: 'Landing Room Types',
       description:
         'Devuelve tipos de habitaciones activas con imagen principal',
+    },
+    {
+      name: 'Landing Reservations',
+      description: 'Gestión de reservaciones de habitaciones',
     },
   ];
 

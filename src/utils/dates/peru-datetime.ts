@@ -1,4 +1,4 @@
-import { SupportedLocales } from 'src/modules/landing/translations';
+import { SupportedLocales } from 'src/modules/landing/i18n/translations';
 
 export const LIMA_TIMEZONE = {
   /** Lima, Peru timezone offset in hours (UTC-5) */

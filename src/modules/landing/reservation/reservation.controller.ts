@@ -11,10 +11,12 @@ import {
 import { LandingReservationService } from './reservation.service';
 // import { CreateReservationDto } from './dto/create-reservation.dto';
 // import { UpdateReservationDto } from './dto/update-reservation.dto';
-import { ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { DetailedRoom } from 'src/modules/admin/room/entities/room.entity';
+import { CheckAvailableRoomsQueryDto } from './dto/landing-chack-available-rooms.dto';
 
-@Controller('landing-reservation')
+@ApiTags('Landing Reservations')
+@Controller({ path: 'landing-reservation', version: '1' })
 export class ReservationController {
   constructor(private readonly reservationService: LandingReservationService) {}
 
@@ -93,12 +95,12 @@ export class ReservationController {
   })
   @ApiResponse({ status: 400, description: 'Invalid input parameters' })
   checkAvailableRooms(
-    @Query('checkInDate') checkInDate: string,
-    @Query('checkOutDate') checkOutDate: string,
-    @Query('guestNumber') guestNumber: number,
-    @Query('roomId') roomId?: string,
+    @Query() checkAvailabilityQueryDto: CheckAvailableRoomsQueryDto,
   ) {
-    return this.reservationService.checkAvilableRooms({
+    const { checkInDate, checkOutDate, guestNumber, roomId, locale } =
+      checkAvailabilityQueryDto;
+    return this.reservationService.checkAvailableRooms({
+      locale,
       checkInDate,
       checkOutDate,
       guestNumber,

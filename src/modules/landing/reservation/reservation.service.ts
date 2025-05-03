@@ -3,21 +3,23 @@ import { reservationErrorMessages } from 'src/modules/admin/reservation/errors/e
 // import { CreateReservationDto } from './dto/create-reservation.dto';
 // import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { ReservationRepository } from 'src/modules/admin/reservation/repository/reservation.repository';
-import { ReservationService } from 'src/modules/admin/reservation/reservation.service';
 import { DetailedRoom } from 'src/modules/admin/room/entities/room.entity';
 import { RoomRepository } from 'src/modules/admin/room/repositories/room.repository';
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
 import { errorDictionary } from './translation-dictionary';
 import { getLimaTime } from 'src/utils/dates/peru-datetime';
+import { CheckAvailableRoomsQueryDto } from './dto/landing-chack-available-rooms.dto';
+import { Translation } from '../i18n/translation';
 
 @Injectable()
 export class LandingReservationService {
-  private readonly logger = new Logger(ReservationService.name);
+  private readonly logger = new Logger(LandingReservationService.name);
   private readonly errorHandler: BaseErrorHandler;
   constructor(
     // private readonly reservationService: ReservationService,
     private readonly reservationRepository: ReservationRepository,
     private readonly roomRepository: RoomRepository,
+    private readonly translation: Translation,
   ) {
     this.errorHandler = new BaseErrorHandler(
       this.logger,
@@ -25,22 +27,21 @@ export class LandingReservationService {
       reservationErrorMessages,
     );
   }
-  async checkAvilableRooms({
+  async checkAvailableRooms({
     checkInDate,
     checkOutDate,
     guestNumber,
     roomId,
-  }: {
-    checkInDate: string;
-    checkOutDate: string;
-    guestNumber: number;
-    roomId?: string;
-  }): Promise<DetailedRoom[]> {
+    locale,
+  }: CheckAvailableRoomsQueryDto): Promise<DetailedRoom[]> {
     // Implementación de la lógica para verificar la disponibilidad de habitaciones;
     try {
       // Parse string dates to Date objects
       const parsedCheckInDate = new Date(checkInDate);
       const parsedCheckOutDate = new Date(checkOutDate);
+
+      // Asegurarnos que locale es válido o usar 'es' como predeterminado
+      const validLocale = ['es', 'en'].includes(locale) ? locale : 'es';
 
       // Validate date format
       if (
@@ -48,14 +49,22 @@ export class LandingReservationService {
         isNaN(parsedCheckOutDate.getTime())
       ) {
         throw new BadRequestException(
-          errorDictionary['reservation.error.invalidDate'],
+          this.translation.getTranslations(
+            'reservation_InvalidDate',
+            validLocale,
+            errorDictionary,
+          ),
         );
       }
 
       // Validate that check-in is before check-out
       if (parsedCheckInDate >= parsedCheckOutDate) {
         throw new BadRequestException(
-          errorDictionary['reservation.error.checkInAfterCheckOut'],
+          this.translation.getTranslations(
+            'reservationCheckinAfterCheckout',
+            validLocale,
+            errorDictionary,
+          ),
         );
       }
 
@@ -64,7 +73,11 @@ export class LandingReservationService {
       startOfToday.setHours(0, 0, 0, 0); // Set to the start of today
       if (parsedCheckInDate < startOfToday) {
         throw new BadRequestException(
-          errorDictionary['reservation.error.dateInThePast'],
+          this.translation.getTranslations(
+            'reservation_DateInThePast',
+            validLocale,
+            errorDictionary,
+          ),
         );
       }
 
@@ -111,6 +124,7 @@ export class LandingReservationService {
 
       // Aquí puedes agregar la lógica para filtrar las habitaciones según el número de huéspedes
     } catch (error) {
+      Logger.error(error);
       this.errorHandler.handleError(error, 'getting');
     }
   }

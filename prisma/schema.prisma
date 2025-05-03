@@ -193,6 +193,7 @@ model Reservation {
   origin          String // Origin place from the customer
   reason          String // Reason for reservation
   guests          Json? // List of companions
+  requestedGuestNumber Int? // Number of guests requested in the landing
   observations    String? // Additional notes
   didAcceptExtraServices Boolean   @default(false) // Accept extra services
   didAcceptTerms     Boolean   @default(false)  // Accept terms and conditions
