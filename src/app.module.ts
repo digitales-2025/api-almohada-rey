@@ -16,6 +16,7 @@ import { RoomModule } from './modules/admin/room/room.module';
 import { RoomCleanModule } from './modules/admin/room-clean/room-clean.module';
 import { ServiceModule } from './modules/admin/service/service.module';
 import { LandRoomTypeModule } from './modules/landing/room-type/land-room-type.module';
+import { ExpenseModule } from './modules/admin/expense/expense.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { LandRoomTypeModule } from './modules/landing/room-type/land-room-type.m
     RoomCleanModule,
     ServiceModule,
     LandRoomTypeModule,
+    ExpenseModule,
   ],
   controllers: [AppController],
   providers: [AppService],
