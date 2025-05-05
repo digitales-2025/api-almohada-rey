@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  forwardRef,
+  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -11,6 +13,7 @@ import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { AuditRepository } from 'src/modules/admin/audit/audit.repository';
 import { ReservationStateFactory } from '../states/reservation-state.factory';
 import { UpdateManyResponseDto } from '../dto/update-many.dto';
+import { PaymentsService } from '../../payments/payments.service';
 
 @Injectable()
 export class DeactivateReservationsUseCase {
@@ -19,6 +22,8 @@ export class DeactivateReservationsUseCase {
     private readonly reservationRepository: ReservationRepository,
     private readonly auditRepository: AuditRepository,
     private readonly stateFactory: ReservationStateFactory,
+    @Inject(forwardRef(() => PaymentsService))
+    private readonly paymentsService: PaymentsService,
   ) {}
 
   async execute(
@@ -79,7 +84,10 @@ export class DeactivateReservationsUseCase {
             const currentAvailableActions =
               this.stateFactory.getAvailableActions(reservation.status);
 
-            if (!currentAvailableActions.canDeactivate) {
+            if (
+              !currentAvailableActions.canDeactivate &&
+              !reservation.isPendingDeletePayment
+            ) {
               results.failed.push({
                 id,
                 reason:
@@ -88,12 +96,17 @@ export class DeactivateReservationsUseCase {
               continue;
             }
 
-            if (!reservation.isActive) {
+            if (!reservation.isActive && !reservation.isPendingDeletePayment) {
               results.failed.push({
                 id,
                 reason: 'La reservación ya se encuentra desactivada',
               });
               continue;
+            }
+
+            // 5. Eliminar el pago asociado a la reservación si existe
+            if (reservation.isPendingDeletePayment) {
+              await this.paymentsService.removePaymentByReservationId(id, user);
             }
 
             // 4. Actualizar la reservación
@@ -102,11 +115,14 @@ export class DeactivateReservationsUseCase {
               {
                 isActive: false,
                 updatedAt: new Date(),
+                ...(reservation.isPendingDeletePayment && {
+                  isPendingDeletePayment: false,
+                }),
               },
               tx,
             );
 
-            // 5. Registrar auditoría
+            // 6. Registrar auditoría
             await this.auditRepository.createWithTx(
               {
                 entityId: id,

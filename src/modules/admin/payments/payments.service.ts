@@ -31,6 +31,8 @@ import { UpdatePaymentDetailDto } from './dto/update-payment-detail.dto';
 import { validateArray, validateChanges } from 'src/prisma/src/utils';
 import { UpdatePaymentDetailsBatchDto } from './dto/updatePaymentDetailsBatch.dto';
 import { calculateStayNights } from 'src/utils/dates/peru-datetime';
+import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
+import { PaginationService } from 'src/pagination/pagination.service';
 
 @Injectable()
 export class PaymentsService {
@@ -38,10 +40,10 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    /*     private readonly reservationService: ReservationService, */
     private readonly roomService: RoomService,
     private readonly serviceService: ServiceService,
     private readonly productService: ProductService,
+    private readonly paginationService: PaginationService,
   ) {}
 
   /**
@@ -631,6 +633,61 @@ export class PaymentsService {
     } catch (error) {
       this.logger.error('Error getting all payments');
       handleException(error, 'Error getting all payments');
+    }
+  }
+
+  /**
+   * Obtiene todos los pagos paginados.
+   * @param options Opciones para la paginación
+   * @returns PaginatedResponse con los pagos paginados
+   */
+  async findAllPaginated(options: {
+    page: number;
+    pageSize: number;
+  }): Promise<PaginatedResponse<SummaryPaymentData>> {
+    try {
+      const { page, pageSize } = options;
+
+      return await this.paginationService.paginate<any, SummaryPaymentData>({
+        model: 'payment',
+        page,
+        pageSize,
+        select: {
+          id: true,
+          code: true,
+          amount: true,
+          amountPaid: true,
+          date: true,
+          status: true,
+          reservation: {
+            select: {
+              customer: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+        transformer: (payment) => ({
+          id: payment.id,
+          code: payment.code,
+          amount: payment.amount,
+          amountPaid: payment.amountPaid,
+          date: payment.date,
+          status: payment.status,
+          reservation: {
+            customer: {
+              id: payment.reservation.customer.id,
+              name: payment.reservation.customer.name,
+            },
+          },
+        }),
+      });
+    } catch (error) {
+      this.logger.error('Error getting paginated payments', error.stack);
+      handleException(error, 'Error getting paginated payments');
     }
   }
 
@@ -1860,6 +1917,90 @@ export class PaymentsService {
         throw error;
       }
       handleException(error, 'Error al eliminar el detalle de pago');
+    }
+  }
+
+  async removePaymentByReservationId(
+    reservationId: string,
+    user: UserData,
+  ): Promise<HttpResponse<{ message: string }>> {
+    try {
+      const payment = await this.prisma.payment.findFirst({
+        where: { reservationId },
+        include: {
+          reservation: {
+            include: {
+              customer: true,
+            },
+          },
+          paymentDetail: true, // Incluimos los detalles de pago para validar
+        },
+      });
+
+      if (!payment) {
+        throw new BadRequestException(
+          'No se encontró el pago asociado a la reservación',
+        );
+      }
+
+      // Verificar si tiene detalles de pago
+      const hasDetails =
+        payment.paymentDetail && payment.paymentDetail.length > 0;
+
+      await this.prisma.$transaction(async (prisma) => {
+        // Si tiene detalles de pago, eliminarlos primero
+        if (hasDetails) {
+          // Registrar auditoría para cada detalle eliminado
+          for (const detail of payment.paymentDetail) {
+            await this.audit.create({
+              entityId: detail.id,
+              entityType: 'paymentDetail',
+              action: AuditActionType.DELETE,
+              performedById: user.id,
+              createdAt: new Date(),
+            });
+          }
+
+          // Eliminar todos los detalles de pago asociados
+          await prisma.paymentDetail.deleteMany({
+            where: { paymentId: payment.id },
+          });
+        }
+
+        // Luego eliminar el pago principal
+        await prisma.payment.delete({ where: { id: payment.id } });
+
+        // Registrar la auditoría del pago eliminado
+        await this.audit.create({
+          entityId: payment.id,
+          entityType: 'payment',
+          action: AuditActionType.DELETE,
+          performedById: user.id,
+          createdAt: new Date(),
+        });
+      });
+
+      return {
+        statusCode: HttpStatus.OK,
+        message: 'Pago eliminado correctamente',
+        data: {
+          message: hasDetails
+            ? `El pago y sus ${payment.paymentDetail.length} detalles asociados han sido eliminados`
+            : `El pago de la reservación ha sido eliminado`,
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error al eliminar el pago por reservación: ${error.message}`,
+        error.stack,
+      );
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+      handleException(error, 'Error al eliminar el pago por reservación');
     }
   }
 }

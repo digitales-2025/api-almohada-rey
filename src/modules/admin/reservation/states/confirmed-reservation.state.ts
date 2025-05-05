@@ -7,10 +7,14 @@ import {
 } from './reservation-state.interface';
 import { PrismaTransaction } from 'src/prisma/src/types/prisma.types';
 import { Injectable } from '@nestjs/common';
+import { ReservationRepository } from '../repository/reservation.repository';
 
 @Injectable()
 export class ConfirmedReservationState implements ReservationStateHandler {
-  constructor(private readonly roomRepository: RoomRepository) {}
+  constructor(
+    private readonly roomRepository: RoomRepository,
+    private readonly reservationRepository: ReservationRepository,
+  ) {}
 
   canTransitionTo(
     targetStatus: ReservationStatus,
@@ -53,6 +57,16 @@ export class ConfirmedReservationState implements ReservationStateHandler {
       await this.roomRepository.updateWithTx(
         reservation.roomId,
         { status: 'OCCUPIED' },
+        tx,
+      );
+    }
+
+    if (targetStatus === 'CANCELED') {
+      await this.reservationRepository.updateWithTx(
+        reservation.id,
+        {
+          isPendingDeletePayment: true,
+        },
         tx,
       );
     }

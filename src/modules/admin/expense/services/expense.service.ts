@@ -113,34 +113,30 @@ export class ExpenseService {
 
   async findByDatePaginated(
     pagination: PaginationParams,
-    filters: { date?: string },
+    filters: { month?: string; year?: string },
   ): Promise<PaginatedResponse<HotelExpenseEntity>> {
     try {
       const where: Prisma.HotelExpenseWhereInput = {};
 
-      if (filters.date) {
-        // Ejemplo de valores: "2025-00", "0000-05", "2025-05"
-        const [year, month] = filters.date.split('-');
-
-        if (year !== '0000' && month !== '00') {
-          // Año y mes específicos: YYYY-MM
-          where.date = { startsWith: `${year}-${month}` };
-        } else if (year !== '0000' && month === '00') {
-          // Solo año: YYYY
-          where.date = { startsWith: `${year}-` };
-        } else if (year === '0000' && month !== '00') {
-          // Solo mes: MM (en la posición correcta)
-          // Busca fechas que tengan -MM- en la posición central (YYYY-MM-DD)
-          where.date = { contains: `-${month}-` };
-        }
-        // Si ambos son "00", no se filtra por fecha (mostrar todo)
+      // Manejo de filtros separados por mes y año
+      if (filters.year && filters.month) {
+        // Si tenemos ambos, año y mes
+        where.date = { startsWith: `${filters.year}-${filters.month}` };
+      } else if (filters.year && !filters.month) {
+        // Solo año
+        where.date = { startsWith: `${filters.year}-` };
+      } else if (!filters.year && filters.month) {
+        // Solo mes
+        // Busca fechas que tengan -MM- en la posición correcta (YYYY-MM-DD)
+        where.date = { contains: `-${filters.month}-` };
       }
+      // Si no hay ningún filtro, se muestran todos los registros
 
       return await this.expenseRepository.findManyPaginated<HotelExpenseEntity>(
         pagination,
         {
           where,
-          orderBy: { createdAt: 'desc' }, // Ordena por fecha de creación, pero filtra por date
+          orderBy: { createdAt: 'desc' },
         },
       );
     } catch (error) {
@@ -172,7 +168,7 @@ export class ExpenseService {
 
       // Si dataDocument es true, consideramos que hay cambios directamente
       // ya que vamos a limpiar los campos documentType y documentNumber
-      if (updateHotelExpenseDto.dataDocument === true) {
+      if (updateHotelExpenseDto.dataDocument === false) {
         // Continuar con las validaciones
       }
       // Si no está presente dataDocument, verificar cambios normalmente
@@ -209,7 +205,7 @@ export class ExpenseService {
 
       // Si dataDocument es true, no realizamos validaciones de documento
       // ya que vamos a limpiar esos campos
-      if (!updateHotelExpenseDto.dataDocument) {
+      if (updateHotelExpenseDto.dataDocument) {
         // Validación condicional para documentType y documentNumber
         if (
           (updateHotelExpenseDto.documentType &&

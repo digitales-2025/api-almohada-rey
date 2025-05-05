@@ -4,9 +4,13 @@ import { AppModule } from './app.module';
 import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { generalEnvs } from './config';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Configurar el adaptador WebSocket
+  app.useWebSocketAdapter(new IoAdapter(app)); // Añadido para WebSockets
   app.enableCors({
     origin: [generalEnvs.WEB_URL],
     credentials: true,

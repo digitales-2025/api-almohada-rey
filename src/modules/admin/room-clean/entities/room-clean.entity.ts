@@ -39,3 +39,31 @@ export class CleaningChecklist extends BaseEntity {
     Object.assign(this, partial);
   }
 }
+
+// Tipo extendido con relaciones
+export type DetailedCleaningChecklist = CleaningChecklist & {
+  Room?: {
+    number: number;
+    RoomTypes: {
+      id: string;
+      name: string;
+    };
+  };
+
+  userCheck?: {
+    id: string;
+    name: string;
+  };
+};
+
+export type CleaningChecklistWithRoom = {
+  Room?: {
+    number: number;
+    RoomTypes: {
+      id: string;
+      name: string;
+    };
+  };
+
+  cleaningChecklist: DetailedCleaningChecklist[];
+};

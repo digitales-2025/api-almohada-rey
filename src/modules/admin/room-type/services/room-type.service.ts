@@ -29,6 +29,7 @@ import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler
 import { validateArray, validateChanges } from 'src/prisma/src/utils';
 import { AuditService } from '../../audit/audit.service';
 import { AuditActionType } from '@prisma/client';
+import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 
 @Injectable()
 export class RoomTypeService {
@@ -150,6 +151,58 @@ export class RoomTypeService {
       );
 
       return roomTypesWithImages;
+    } catch (error) {
+      this.errorHandler.handleError(error, 'getting');
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene todos los tipos de habitaciones con sus imágenes de forma paginada
+   * @param user Usuario que realiza la consulta
+   * @param options Opciones de paginación (página y tamaño de página)
+   * @returns Lista paginada de tipos de habitación con sus imágenes
+   */
+  async findAllPaginated(
+    user: UserPayload,
+    options: { page: number; pageSize: number },
+  ): Promise<
+    PaginatedResponse<
+      RoomType & { imagesRoomType: Array<{ id: string; url: string }> }
+    >
+  > {
+    try {
+      const { page, pageSize } = options;
+
+      // Definir filtro según el rol del usuario
+      const filter = user.isSuperAdmin ? {} : { isActive: true };
+
+      // Obtener los tipos de habitaciones paginados usando el método del repositorio base
+      const paginatedResult = await this.roomTypeRepository.findManyPaginated(
+        { page, pageSize },
+        {
+          where: filter,
+          orderBy: { createdAt: 'desc' },
+        },
+      );
+
+      // Para cada tipo de habitación en los resultados, obtener sus imágenes
+      const roomTypesWithImages = await Promise.all(
+        paginatedResult.data.map(async (roomType) => {
+          const imagesRoomType =
+            await this.roomTypeRepository.findImagesByRoomTypeId(roomType.id);
+          return {
+            ...roomType,
+            imagesRoomType,
+          };
+        }),
+      );
+
+      // Devolver los resultados con el mismo formato de respuesta paginada
+      return {
+        data: roomTypesWithImages,
+        meta: paginatedResult.meta,
+      };
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
       throw error;

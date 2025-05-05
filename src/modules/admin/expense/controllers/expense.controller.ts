@@ -110,9 +110,16 @@ export class ExpenseController {
   @Get('filter/date')
   @ApiOperation({ summary: 'Obtener gastos por fecha (paginado y filtrado)' })
   @ApiQuery({
-    name: 'date',
+    name: 'month',
     required: false,
-    description: 'Fecha del gasto (formato YYYY-MM-DD, opcional)',
+    type: String,
+    description: 'Mes para filtrar (ejemplo: enero, febrero, etc.)',
+  })
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    type: String,
+    description: 'Año para filtrar (ejemplo: 2023, 2024, etc.)',
   })
   @ApiQuery({
     name: 'page',
@@ -143,7 +150,8 @@ export class ExpenseController {
     description: 'Lista paginada de gastos',
   })
   findByDate(
-    @Query('date') date?: string,
+    @Query('month') month?: string,
+    @Query('year') year?: string,
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
   ): Promise<PaginatedResponse<HotelExpenseEntity>> {
@@ -151,7 +159,7 @@ export class ExpenseController {
     const pageSizeNumber = parseInt(pageSize, 10) || 10;
     return this.expenseService.findByDatePaginated(
       { page: pageNumber, pageSize: pageSizeNumber },
-      { date },
+      { month, year },
     );
   }
 

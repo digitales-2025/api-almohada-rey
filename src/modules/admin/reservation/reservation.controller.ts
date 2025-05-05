@@ -317,12 +317,6 @@ export class ReservationController {
     @Query('forUpdate') forUpdate: boolean = false,
     @Query('reservationId') reservationId?: string,
   ): Promise<DetailedRoom[]> {
-    // const checkAvailabilityDto: CheckAvailabilityDto = {
-    //   roomId: '',
-    //   checkInDate,
-    //   checkOutDate,
-    // };
-
     return this.reservationService.getAllAvailableRooms(
       checkInDate,
       checkOutDate,

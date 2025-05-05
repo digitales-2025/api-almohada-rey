@@ -17,6 +17,7 @@ import { RoomTypeService } from '../../room-type/services/room-type.service';
 import { StatusRoomDto } from '../dto/status.dto';
 import { AuditActionType } from '@prisma/client';
 import { AuditService } from '../../audit/audit.service';
+import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 
 @Injectable()
 export class RoomService {
@@ -206,6 +207,99 @@ export class RoomService {
           lamp: room.lamp,
         };
       });
+    } catch (error) {
+      this.errorHandler.handleError(error, 'getting');
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene todas las habitaciones de forma paginada con información detallada
+   * @param user Datos del usuario que realiza la solicitud
+   * @param options Opciones de paginación (página y tamaño de página)
+   * @returns Lista paginada de habitaciones con información detallada
+   */
+  async findAllPaginated(
+    user: UserPayload,
+    options: { page: number; pageSize: number },
+  ): Promise<PaginatedResponse<FindAllRoom>> {
+    try {
+      const { page, pageSize } = options;
+
+      // Definir filtro según el rol del usuario
+      const filter = user.isSuperAdmin ? {} : { isActive: true };
+
+      // Usar el método paginado del repositorio base
+      const paginatedResult =
+        await this.roomRepository.findManyPaginated<FindAllRoom>(
+          { page, pageSize },
+          {
+            where: filter,
+            include: {
+              RoomTypes: {
+                include: {
+                  ImageRoomType: {
+                    select: {
+                      id: true,
+                      imageUrl: true,
+                      isMain: true,
+                    },
+                  },
+                },
+              },
+            },
+            orderBy: { createdAt: 'asc' },
+          },
+        );
+
+      // Mapear los resultados y obtener solo la imagen principal como objeto único
+      const roomsWithMainImage = paginatedResult.data.map((room) => {
+        // Valor por defecto para la imagen principal
+        let mainImage = { id: '', imageUrl: '', isMain: false };
+
+        // Verificar si ImageRoomType es un array antes de usar find()
+        if (Array.isArray(room.RoomTypes.ImageRoomType)) {
+          const foundImage = room.RoomTypes.ImageRoomType.find(
+            (img) => img.isMain === true,
+          );
+          if (foundImage) {
+            // Solo extraer los campos necesarios
+            mainImage = {
+              id: foundImage.id,
+              imageUrl: foundImage.imageUrl,
+              isMain: foundImage.isMain,
+            };
+          }
+        }
+
+        return {
+          id: room.id,
+          number: room.number,
+          status: room.status,
+          tv: room.tv,
+          area: room.area,
+          floorType: room.floorType,
+          isActive: room.isActive,
+          RoomTypes: {
+            id: room.RoomTypes.id,
+            name: room.RoomTypes.name,
+            ImageRoomType: mainImage, // Ahora es un objeto único con solo los campos necesarios
+          },
+          // Incluir las propiedades de limpieza
+          trashBin: room.trashBin,
+          towel: room.towel,
+          toiletPaper: room.toiletPaper,
+          showerSoap: room.showerSoap,
+          handSoap: room.handSoap,
+          lamp: room.lamp,
+        };
+      });
+
+      // Devolver los resultados con el mismo formato de respuesta paginada
+      return {
+        data: roomsWithMainImage,
+        meta: paginatedResult.meta,
+      };
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
       throw error;

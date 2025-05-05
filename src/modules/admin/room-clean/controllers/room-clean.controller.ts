@@ -5,6 +5,8 @@ import {
   Body,
   /*   Patch, */
   Param,
+  Query,
+  Patch,
   /*   Delete, */
 } from '@nestjs/common';
 import { CleaningChecklistService } from '../services/room-clean.service';
@@ -17,14 +19,19 @@ import {
   ApiParam,
   ApiOkResponse,
   ApiNotFoundResponse,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { UserData } from 'src/interfaces';
 import {
   CreateCleaningChecklistDto,
+  UpdateCleaningChecklistDto,
   /*   UpdateCleaningChecklistDto,
   DeleteCleaningChecklistDto, */
 } from '../dto';
-import { CleaningChecklist } from '../entities/room-clean.entity';
+import {
+  CleaningChecklist,
+  CleaningChecklistWithRoom,
+} from '../entities/room-clean.entity';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { Auth, GetUser } from '../../auth/decorators';
 
@@ -102,12 +109,38 @@ export class CleaningChecklistController {
   @Get('room/:roomId')
   @ApiOperation({ summary: 'Obtener registros de limpieza por habitación' })
   @ApiParam({ name: 'roomId', description: 'ID de la habitación' })
-  @ApiOkResponse({
-    description: 'Registros de limpieza encontrados',
-    type: [CleaningChecklist],
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Número de página para paginación',
   })
-  findByRoom(@Param('roomId') roomId: string): Promise<CleaningChecklist[]> {
-    return this.cleaningService.findByRoom(roomId);
+  @ApiQuery({
+    name: 'month',
+    required: false,
+    type: String,
+    description: 'Mes para filtrar (ejemplo: enero, febrero, etc.)',
+  })
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    type: String,
+    description: 'Año para filtrar (ejemplo: 2023, 2024, etc.)',
+  })
+  findByRoom(
+    @Param('roomId') roomId: string,
+    @Query('page') page?: number,
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+  ): Promise<{
+    data: CleaningChecklistWithRoom;
+    pagination?: {
+      totalItems: number;
+      totalPages: number;
+      currentPage: number;
+    };
+  }> {
+    return this.cleaningService.findByRoom(roomId, { page, month, year });
   }
 
   /**
@@ -124,6 +157,28 @@ export class CleaningChecklistController {
     return this.cleaningService.findByDate(date);
   }
 
-  /**
-   * Actualiza un registro de limpieza existente   */
+  @Patch(':id')
+  @ApiOperation({ summary: 'Actualizar registro de limpieza' })
+  @ApiParam({
+    name: 'id',
+    description: 'ID del registro de limpieza a actualizar',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Registro de limpieza actualizado exitosamente',
+    type: BaseApiResponse,
+  })
+  @ApiBadRequestResponse({
+    description: 'Datos de entrada inválidos',
+  })
+  @ApiNotFoundResponse({
+    description: 'Registro de limpieza no encontrado',
+  })
+  update(
+    @Param('id') id: string,
+    @Body() updateCleaningDto: UpdateCleaningChecklistDto,
+    @GetUser() user: UserData,
+  ): Promise<BaseApiResponse<CleaningChecklist>> {
+    return this.cleaningService.update(id, updateCleaningDto, user);
+  }
 }

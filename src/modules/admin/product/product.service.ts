@@ -22,6 +22,8 @@ import {
   hasNoChanges,
 } from 'src/utils/update-validations.util';
 import { DeleteProductDto } from './dto/delete-product.dto';
+import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
+import { PaginationService } from 'src/pagination/pagination.service';
 
 @Injectable()
 export class ProductService {
@@ -29,6 +31,7 @@ export class ProductService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly paginationService: PaginationService,
   ) {}
 
   private async generateCodeProduct(type: ProductType): Promise<string> {
@@ -188,6 +191,59 @@ export class ProductService {
   }
 
   /**
+   * Obtiene todos los productos de forma paginada con filtro opcional por tipo.
+   * @param user Usuario que realiza la consulta
+   * @param options Opciones de paginación y filtrado
+   * @returns Lista paginada de productos
+   */
+  async findAllPaginated(
+    user: UserPayload,
+    options: {
+      page: number;
+      pageSize: number;
+      type?: ProductType; // Filtro opcional por tipo
+    },
+  ): Promise<PaginatedResponse<ProductData>> {
+    try {
+      const { page, pageSize, type } = options;
+
+      return await this.paginationService.paginate<any, ProductData>({
+        model: 'product',
+        page,
+        pageSize,
+        where: {
+          // Filtrar por isActive solo si no es super admin
+          ...(user.isSuperAdmin ? {} : { isActive: true }),
+          // Filtrar por tipo si se proporciona
+          ...(type ? { type } : {}),
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          type: true,
+          unitCost: true,
+          isActive: true,
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+        transformer: (product) => ({
+          id: product.id,
+          code: product.code,
+          name: product.name,
+          type: product.type,
+          unitCost: product.unitCost,
+          isActive: product.isActive,
+        }),
+      });
+    } catch (error) {
+      this.logger.error('Error getting paginated products', error.stack);
+      handleException(error, 'Error getting paginated products');
+    }
+  }
+
+  /**
    * Buscar todos los productos por tipo
    * @param type Tipo de producto
    * @returns Lista de productos del tipo especificado
@@ -309,7 +365,7 @@ export class ProductService {
     updateProductDto: UpdateProductDto,
     user: UserData,
   ): Promise<HttpResponse<ProductData>> {
-    const { name } = updateProductDto;
+    const { name, type } = updateProductDto;
 
     try {
       const productDB = await this.findById(id);
@@ -327,8 +383,18 @@ export class ProductService {
         };
       }
 
+      // Si el tipo del producto cambió, generar un nuevo código
+      let newCode: string | undefined;
+      if (type && type !== productDB.type) {
+        newCode = await this.generateCodeProduct(type);
+      }
+
       // Construir el objeto de actualización dinámicamente solo con los campos presentes
-      const updateData = createDynamicUpdateObject(updateProductDto, productDB);
+      const updateData = {
+        ...createDynamicUpdateObject(updateProductDto, productDB),
+        // Si hay un nuevo código, agregarlo al objeto de actualización
+        ...(newCode ? { code: newCode } : {}),
+      };
 
       // Transacción para realizar la actualización
       const updatedProduct = await this.prisma.$transaction(async (prisma) => {

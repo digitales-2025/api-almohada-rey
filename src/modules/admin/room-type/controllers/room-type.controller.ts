@@ -10,6 +10,7 @@ import {
   UploadedFiles,
   BadRequestException,
   UploadedFile,
+  Query,
 } from '@nestjs/common';
 import { RoomTypeService } from '../services/room-type.service';
 
@@ -23,6 +24,8 @@ import {
   ApiNotFoundResponse,
   ApiConsumes,
   ApiBody,
+  ApiQuery,
+  getSchemaPath,
 } from '@nestjs/swagger';
 
 import {
@@ -39,6 +42,7 @@ import { FormatDataCreateInterceptor } from './format-data-create.interceptor';
 import { Auth, GetUser } from '../../auth/decorators';
 import { UserData, UserPayload } from 'src/interfaces';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
+import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 
 /**
  * Controlador REST para gestionar tipos de habitaciones del hotel.
@@ -75,6 +79,91 @@ export class RoomTypeController {
     Array<RoomType & { imagesRoomType: Array<{ id: string; url: string }> }>
   > {
     return this.roomTypeService.findAll(user);
+  }
+
+  /**
+   * Obtiene todos los tipos de habitaciones con paginación
+   */
+  @Get('paginated')
+  @ApiOperation({
+    summary: 'Obtener tipos de habitaciones paginados con sus imágenes',
+    description:
+      'Devuelve una lista paginada de tipos de habitaciones con sus imágenes asociadas',
+  })
+  @ApiQuery({
+    name: 'page',
+    description: 'Número de página',
+    type: Number,
+    example: 1,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'pageSize',
+    description: 'Cantidad de elementos por página',
+    type: Number,
+    example: 10,
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista paginada de tipos de habitaciones con sus imágenes',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'array',
+          items: {
+            allOf: [
+              { $ref: getSchemaPath(RoomType) },
+              {
+                type: 'object',
+                properties: {
+                  imagesRoomType: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        id: { type: 'string' },
+                        url: { type: 'string' },
+                        isMain: { type: 'boolean' },
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+        meta: {
+          type: 'object',
+          properties: {
+            total: { type: 'number' },
+            page: { type: 'number' },
+            pageSize: { type: 'number' },
+            totalPages: { type: 'number' },
+            hasNext: { type: 'boolean' },
+            hasPrevious: { type: 'boolean' },
+          },
+        },
+      },
+    },
+  })
+  findAllPaginated(
+    @GetUser() user: UserPayload,
+    @Query('page') page: string = '1',
+    @Query('pageSize') pageSize: string = '10',
+  ): Promise<
+    PaginatedResponse<
+      RoomType & { imagesRoomType: Array<{ id: string; url: string }> }
+    >
+  > {
+    const pageNumber = parseInt(page, 10) || 1;
+    const pageSizeNumber = parseInt(pageSize, 10) || 10;
+
+    return this.roomTypeService.findAllPaginated(user, {
+      page: pageNumber,
+      pageSize: pageSizeNumber,
+    });
   }
 
   @Get('summary/active')

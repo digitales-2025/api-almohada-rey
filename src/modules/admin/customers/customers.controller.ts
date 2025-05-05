@@ -44,6 +44,7 @@ import { HistoryCustomerData } from 'src/interfaces/customer.interface';
 import { ReservationStatus } from '@prisma/client';
 import { ImportCustomersDto } from './dto/import-customers.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 
 @ApiTags('Admin Customers')
 @ApiUnauthorizedResponse({ description: 'Unauthorized' })
@@ -157,6 +158,37 @@ export class CustomersController {
   @Get()
   findAll(@GetUser() user: UserPayload): Promise<CustomerData[]> {
     return this.customersService.findAll(user);
+  }
+
+  @Get('paginated')
+  @ApiOperation({ summary: 'Get paginated customers' })
+  @ApiQuery({
+    name: 'page',
+    description: 'Page number',
+    type: Number,
+    example: 1,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'pageSize',
+    description: 'Number of items per page',
+    type: Number,
+    example: 10,
+    required: false,
+  })
+  @ApiOkResponse({ description: 'Customers found paginated successfully' })
+  findAllPaginated(
+    @GetUser() user: UserPayload,
+    @Query('page') page: string = '1',
+    @Query('pageSize') pageSize: string = '10',
+  ): Promise<PaginatedResponse<CustomerData>> {
+    const pageNumber = parseInt(page, 10) || 1;
+    const pageSizeNumber = parseInt(pageSize, 10) || 10;
+
+    return this.customersService.findAllPaginated(user, {
+      page: pageNumber,
+      pageSize: pageSizeNumber,
+    });
   }
 
   @Get('searchByDocNumber')
