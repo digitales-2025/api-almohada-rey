@@ -287,7 +287,9 @@ model Product {
   type     ProductType
   isActive Boolean     @default(true)
 
-  paymentDetail PaymentDetail[] @relation("PaymentDetailProduct")
+  paymentDetail   PaymentDetail[]   @relation("PaymentDetailProduct")
+  movementsDetail MovementsDetail[] @relation("ProductsMovementsDetail")
+  stock           Stock[]           @relation("ProductStock")
 
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt
@@ -336,7 +338,77 @@ enum ExpensePaymentMethod {
 }
 
 enum ExpenseDocumentType {
-  RECEIPT
-  INVOICE
+  RECEIPT // Boleta
+  INVOICE // Factura
   OTHER
+}
+
+model Movements {
+  id         String @id @unique @default(uuid())
+  codeUnique String @unique
+
+  dateMovement      String
+  type              TypeMovements
+  typePurchaseOrder ExpenseDocumentType?
+  documentNumber    String?
+
+  description String?
+
+  warehouse   Warehouse @relation("WarehouseMovements", fields: [warehouseId], references: [id])
+  warehouseId String
+
+  movementsDetail MovementsDetail[] @relation("MovementsDetailMovements")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+}
+
+enum TypeMovements {
+  INPUT
+  OUTPUT
+}
+
+model MovementsDetail {
+  id String @id @unique @default(uuid())
+
+  quantity Float
+  unitCost Float
+  subtotal Float
+
+  product   Product @relation("ProductsMovementsDetail", fields: [productId], references: [id])
+  productId String
+
+  movements   Movements @relation("MovementsDetailMovements", fields: [movementsId], references: [id])
+  movementsId String
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+}
+
+model Warehouse {
+  id   String      @id @unique @default(uuid())
+  type ProductType
+
+  stock Stock[] @relation("WarehouseStock")
+
+  movements Movements[] @relation("WarehouseMovements")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+}
+
+model Stock {
+  id        String @id @unique @default(uuid())
+  quantity  Float
+  unitCost  Float
+  totalCost Float
+
+  warehouse   Warehouse @relation("WarehouseStock", fields: [warehouseId], references: [id])
+  warehouseId String
+
+  product   Product @relation("ProductStock", fields: [productId], references: [id])
+  productId String
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
 }
