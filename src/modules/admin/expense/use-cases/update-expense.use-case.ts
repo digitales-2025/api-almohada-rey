@@ -33,7 +33,7 @@ export class UpdateExpenseUseCase {
         };
 
         // Si dataDocument está presente y es true, forzar documentType y documentNumber a null
-        if (updateHotelExpenseDto.dataDocument === true) {
+        if (updateHotelExpenseDto.dataDocument === false) {
           updateData.documentType = null;
           updateData.documentNumber = null;
         }
