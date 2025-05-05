@@ -1,7 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { reservationErrorMessages } from 'src/modules/admin/reservation/errors/errors.reservation';
-// import { CreateReservationDto } from './dto/create-reservation.dto';
-// import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { ReservationRepository } from 'src/modules/admin/reservation/repository/reservation.repository';
 import { DetailedRoom } from 'src/modules/admin/room/entities/room.entity';
 import { RoomRepository } from 'src/modules/admin/room/repositories/room.repository';
