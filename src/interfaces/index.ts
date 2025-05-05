@@ -11,4 +11,12 @@ export {
   RoomPaymentDetailsData,
 } from './payment.interface';
 
+export { WarehouseData, SummaryWarehouseData } from './warehouse.interface';
+
+export {
+  MovementsData,
+  MovementsDetailData,
+  SummaryMovementsData,
+} from './movement.interface';
+
 export { HttpResponse } from './https-response.interface';
