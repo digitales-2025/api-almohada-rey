@@ -53,7 +53,7 @@ async function bootstrap() {
     { name: 'Admin Audit', description: 'Gestión de auditoría' },
     { name: 'Admin Customers', description: 'Gestión de clientes' },
     {
-      name: 'Reservations',
+      name: 'Admin Reservations',
       description: 'Gestión de reservaciones de habitaciones',
     },
     { name: 'Admin Products', description: 'Gestión de productos' },
@@ -63,10 +63,12 @@ async function bootstrap() {
     },
     { name: 'Admin Rooms', description: 'Gestión de habitaciones' },
 
-    { name: 'Room Cleaning', description: 'Gestión de limpiezas' },
+    { name: 'Admin Room Cleaning', description: 'Gestión de limpiezas' },
 
     { name: 'Admin Services', description: 'Gestión de servicios' },
     { name: 'Admin Payments', description: 'Gestión de pagos' },
+    { name: 'Admin Movements', description: 'Gestión de movimientos' },
+    { name: 'Admin Warehouse', description: 'Gestión de almacenes' },
 
     {
       name: 'Landing Room Types',

@@ -39,7 +39,7 @@ import { Auth, GetUser } from '../../auth/decorators';
  * Controlador REST para gestionar registros de limpieza de habitaciones.
  * Expone endpoints para operaciones CRUD sobre registros de limpieza.
  */
-@ApiTags('Room Cleaning')
+@ApiTags('Admin Room Cleaning')
 @ApiBadRequestResponse({
   description:
     'Bad Request - Error en la validación de datos o solicitud incorrecta',
