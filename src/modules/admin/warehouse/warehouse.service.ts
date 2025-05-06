@@ -12,6 +12,7 @@ import { SummaryWarehouseData, WarehouseData } from 'src/interfaces';
 import { handleException } from 'src/utils';
 import { PaginationService } from 'src/pagination/pagination.service';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
+import { ProductType } from '@prisma/client';
 
 @Injectable()
 export class WarehouseService {
@@ -62,6 +63,56 @@ export class WarehouseService {
     } catch (error) {
       this.logger.error('Error getting all warehouses');
       handleException(error, 'Error getting all warehouses');
+    }
+  }
+
+  /**
+   * Obtiene un almacén por su tipo
+   * @param type Tipo de almacén a buscar
+   * @returns Almacén encontrado o error si no existe
+   */
+  async findWarehouseByType(type: ProductType): Promise<SummaryWarehouseData> {
+    try {
+      const warehouse = await this.prisma.warehouse.findFirst({
+        where: { type },
+        select: {
+          id: true,
+          type: true,
+          stock: {
+            select: {
+              quantity: true,
+              totalCost: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+      });
+
+      if (!warehouse) {
+        throw new NotFoundException(`No warehouse found with type: ${type}`);
+      }
+
+      // Transformamos el único warehouse al tipo SummaryWarehouseData
+      return {
+        id: warehouse.id,
+        type: warehouse.type,
+        quantityProducts: warehouse.stock.reduce(
+          (sum, item) => sum + (item.quantity || 0),
+          0,
+        ),
+        totalCost: warehouse.stock.reduce(
+          (sum, item) => sum + (item.totalCost || 0),
+          0,
+        ),
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error getting warehouse by type: ${type}`,
+        error.stack,
+      );
+      handleException(error, `Error getting warehouse by type: ${type}`);
     }
   }
 
