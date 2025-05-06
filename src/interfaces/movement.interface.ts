@@ -22,6 +22,7 @@ export type SummaryMovementsData = Pick<
   Movements,
   'id' | 'codeUnique' | 'dateMovement' | 'type' | 'description'
 > & {
+  typeProduct?: ProductType;
   warehouse: { id: string; type: ProductType };
   typePurchaseOrder?: ExpenseDocumentType;
   documentNumber?: string;

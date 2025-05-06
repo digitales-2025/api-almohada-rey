@@ -574,6 +574,7 @@ export class MovementsService {
         transformer: (movement) => ({
           id: movement.id,
           codeUnique: movement.codeUnique,
+          typeProduct: movement.warehouse.type,
           dateMovement: movement.dateMovement,
           type: movement.type,
           description: movement.description,
