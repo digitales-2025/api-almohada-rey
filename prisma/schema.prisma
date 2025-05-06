@@ -257,8 +257,11 @@ model PaymentDetail {
   transactionNumber String? @unique // Número de transacción en caso de pagos por la landing page
 
   // Si es que el payment detail es para compra de productos
-  product   Product? @relation("PaymentDetailProduct", fields: [productId], references: [id])
-  productId String?
+  product           Product?         @relation("PaymentDetailProduct", fields: [productId], references: [id])
+  productId         String?
+  movementsDetail   MovementsDetail? @relation("PaymentMovementDetail", fields: [movementsDetailId], references: [id])
+  movementsDetailId String?
+
   // Si el payment es del tipo servicio extra
   service   Service? @relation("PaymentDetailService", fields: [serviceId], references: [id])
   serviceId String?
@@ -377,6 +380,8 @@ model MovementsDetail {
 
   product   Product @relation("ProductsMovementsDetail", fields: [productId], references: [id])
   productId String
+
+  paymentDetail PaymentDetail[] @relation("PaymentMovementDetail")
 
   movements   Movements @relation("MovementsDetailMovements", fields: [movementsId], references: [id])
   movementsId String
