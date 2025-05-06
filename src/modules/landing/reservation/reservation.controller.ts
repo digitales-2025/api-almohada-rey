@@ -13,7 +13,7 @@ import { LandingReservationService } from './reservation.service';
 // import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { DetailedRoom } from 'src/modules/admin/room/entities/room.entity';
-import { CheckAvailableRoomsQueryDto } from './dto/landing-chack-available-rooms.dto';
+import { CheckAvailableRoomsQueryDto } from './dto/landing-check-available-rooms.dto';
 
 @ApiTags('Landing Reservations')
 @Controller({ path: 'landing-reservation', version: '1' })

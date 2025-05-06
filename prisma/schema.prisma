@@ -78,6 +78,8 @@ model Customer {
   createdAt      DateTime              @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime              @updatedAt
 
+  createdByLandingPage Boolean?        @default(false) // Indicates if the customer was created through the landing page and if that's the case, notify the admin to complete the missing data
+
   reservations Reservation[]
 }
 
@@ -193,8 +195,8 @@ model Reservation {
   checkInDate     DateTime          @db.Timestamptz(6)
   checkOutDate    DateTime          @db.Timestamptz(6)
   status          ReservationStatus
-  origin          String // Origin place from the customer
-  reason          String // Reason for reservation
+  origin          String? // Origin place from the customer //Required for the admin, but optional for the landing page 
+  reason          String? // Reason for reservation //Mandatory for the admin, but optional for the landing page
   guests          Json? // List of companions
   requestedGuestNumber Int? // Number of guests requested in the landing
   observations    String? // Additional notes
@@ -206,6 +208,8 @@ model Reservation {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt
+
+  createdByLandingPage Boolean?        @default(false) // Indicates if the reservation was created through the landing page and if that's the case, notify the admin to complete the missing data
 }
 
 model Payment {

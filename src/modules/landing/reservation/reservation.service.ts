@@ -6,7 +6,7 @@ import { RoomRepository } from 'src/modules/admin/room/repositories/room.reposit
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
 import { errorDictionary } from './translation-dictionary';
 import { getLimaTime } from 'src/utils/dates/peru-datetime';
-import { CheckAvailableRoomsQueryDto } from './dto/landing-chack-available-rooms.dto';
+import { CheckAvailableRoomsQueryDto } from './dto/landing-check-available-rooms.dto';
 import { Translation } from '../i18n/translation';
 
 @Injectable()

@@ -129,6 +129,13 @@ export class Reservation extends BaseEntity {
   })
   updatedAt?: Date;
 
+  @ApiProperty({
+    description: 'Customer created by landing page',
+    required: false,
+    default: false,
+  })
+  createdByLandingPage?: boolean;
+
   constructor(partial: Partial<Reservation>) {
     super(partial);
     Object.assign(this, partial);
