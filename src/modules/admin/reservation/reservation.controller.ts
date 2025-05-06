@@ -10,7 +10,6 @@ import {
 } from '@nestjs/common';
 import { ReservationService } from './reservation.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
-// import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { Auth, GetUser } from '../auth/decorators';
 import { UserData, UserPayload } from 'src/interfaces';
 import {
@@ -44,7 +43,7 @@ import { ReservationStatusDto } from './dto/reservation-status.dto';
 import { ReservationStatusAvailableActions } from './entities/reservation.status-actions';
 import { UpdateManyDto, UpdateManyResponseDto } from './dto/update-many.dto';
 
-@ApiTags('Reservations')
+@ApiTags('Admin Reservations')
 @ApiBadRequestResponse({
   description:
     'Bad Request - Error en la validación de datos o solicitud incorrecta',

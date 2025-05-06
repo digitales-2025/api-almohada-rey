@@ -16,7 +16,6 @@ import {
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
-  ApiParam,
   ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -31,7 +30,7 @@ import {
 import { Auth, GetUser } from '../auth/decorators';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 
-@ApiTags('Movements')
+@ApiTags('Admin Movements')
 @ApiBadRequestResponse({ description: 'Bad Request' })
 @ApiUnauthorizedResponse({ description: 'Unauthorized' })
 @Auth()
@@ -74,9 +73,9 @@ export class MovementsController {
     return this.movementsService.findOne(id);
   }
 
-  @Get('type/:type/paginated')
+  @Get('type/paginated')
   @ApiOperation({ summary: 'Get paginated movements by type' })
-  @ApiParam({
+  @ApiQuery({
     name: 'type',
     required: true,
     enum: TypeMovements,
@@ -139,7 +138,7 @@ export class MovementsController {
     },
   })
   findByTypePaginated(
-    @Param('type') type: TypeMovements,
+    @Query('type') type: TypeMovements,
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
   ): Promise<PaginatedResponse<SummaryMovementsData>> {

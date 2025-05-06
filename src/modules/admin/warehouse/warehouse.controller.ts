@@ -2,9 +2,23 @@ import { Controller, Get, Param, Query } from '@nestjs/common';
 import { WarehouseService } from './warehouse.service';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 import { SummaryWarehouseData, WarehouseData } from 'src/interfaces';
-import { ApiOkResponse, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
+import { Auth } from '../auth/decorators';
+import { ProductType } from '@prisma/client';
 
-@Controller('warehouse')
+@ApiTags('Admin Warehouse')
+@ApiBadRequestResponse({ description: 'Bad Request' })
+@ApiUnauthorizedResponse({ description: 'Unauthorized' })
+@Auth()
+@Controller({ path: 'warehouse', version: '1' })
 export class WarehouseController {
   constructor(private readonly warehouseService: WarehouseService) {}
 
@@ -96,5 +110,20 @@ export class WarehouseController {
     @Query('movementId') movementId?: string,
   ): Promise<WarehouseData> {
     return this.warehouseService.findOne(id, movementId);
+  }
+
+  @ApiOperation({ summary: 'Get warehouse by type' })
+  @ApiParam({
+    name: 'type',
+    enum: ProductType,
+    enumName: 'ProductType',
+    description: 'Tipo de almacén (COMMERCIAL o INTERNAL_USE)',
+  })
+  @ApiOkResponse({ description: 'Get warehouse by type' })
+  @Get('all/type/:type')
+  findAllByType(
+    @Param('type') type: ProductType,
+  ): Promise<SummaryWarehouseData> {
+    return this.warehouseService.findWarehouseByType(type);
   }
 }
