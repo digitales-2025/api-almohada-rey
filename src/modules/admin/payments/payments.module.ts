@@ -8,6 +8,8 @@ import { RoomModule } from '../room/room.module';
 import { ServiceModule } from '../service/service.module';
 import { ProductModule } from '../product/product.module';
 import { PaginationModule } from 'src/pagination/pagination.module';
+import { MovementsModule } from '../movements/movements.module';
+import { WarehouseModule } from '../warehouse/warehouse.module';
 
 @Module({
   controllers: [PaymentsController],
@@ -20,6 +22,8 @@ import { PaginationModule } from 'src/pagination/pagination.module';
     ServiceModule,
     ProductModule,
     PaginationModule,
+    MovementsModule,
+    WarehouseModule,
   ],
   exports: [PaymentsService],
 })

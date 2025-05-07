@@ -124,113 +124,133 @@ export class MovementsService {
     user: UserData,
   ) {
     return await this.prisma.$transaction(async (prisma) => {
-      const warehouseDB = await this.warehouseService.findById(warehouseId);
-      let newQuantity;
-      let newTotalCost;
-      let subtotal;
-      let averageUnitCost;
-      await Promise.all(
-        movementDetail.map(async (detail) => {
-          const stockItem = warehouseDB.stock.find(
-            (item) => item.product.id === detail.productId,
-          );
+      // Mostrar info inicial del almacén para referencia
+      await this.warehouseService.findById(warehouseId);
 
-          if (type === TypeMovements.INPUT) {
-            if (stockItem) {
-              newQuantity = stockItem.quantity + detail.quantity;
-              subtotal = detail.quantity * detail.unitCost;
-              newTotalCost = parseFloat(
-                (stockItem.totalCost + subtotal).toFixed(4),
-              );
-              averageUnitCost = parseFloat(
-                (newTotalCost / newQuantity).toFixed(4),
-              );
+      // Procesamiento SECUENCIAL de detalles
+      for (const detail of movementDetail) {
+        // Consultar el stock actualizado DIRECTAMENTE desde la base de datos usando prisma
+        const stockItem = await prisma.stock.findFirst({
+          where: {
+            warehouseId: warehouseId,
+            productId: detail.productId,
+          },
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        });
 
-              // Si el recurso existe en el stock, sumar la cantidad
-              const stockMovement = await prisma.stock.update({
-                where: {
-                  id: stockItem.id,
-                },
-                data: {
-                  quantity: newQuantity,
-                  totalCost: newTotalCost,
-                  unitCost: averageUnitCost,
-                },
-              });
-              await this.prisma.audit.create({
-                data: {
-                  action: AuditActionType.UPDATE,
-                  entityId: stockMovement.id,
-                  entityType: 'stock',
-                  performedById: user.id,
-                },
-              });
-            } else {
-              subtotal = detail.quantity * detail.unitCost;
-              averageUnitCost = parseFloat(
-                (subtotal / detail.quantity).toFixed(4),
-              );
-              // Si el recurso no existe en el stock, crear un nuevo registro de stock
-              const stockMovement = await prisma.stock.create({
-                data: {
-                  warehouseId,
-                  productId: detail.productId,
-                  quantity: detail.quantity,
-                  unitCost: averageUnitCost,
-                  totalCost: detail.quantity * detail.unitCost,
-                },
-              });
-              await this.prisma.audit.create({
-                data: {
-                  action: AuditActionType.CREATE,
-                  entityId: stockMovement.id,
-                  entityType: 'stock',
-                  performedById: user.id,
-                },
-              });
-            }
-          } else if (type === TypeMovements.OUTPUT) {
-            if (stockItem) {
-              newQuantity = stockItem.quantity - detail.quantity;
-              subtotal = detail.quantity * stockItem.unitCost;
-              if (newQuantity === 0) {
-                newTotalCost = 0;
-                averageUnitCost = 0;
-              } else {
-                newTotalCost = parseFloat(
-                  (stockItem.totalCost - subtotal).toFixed(4),
-                );
-              }
-              // Si el recurso existe en el stock, restar la cantidad
-              const stockUpdateData: {
-                quantity: number;
-                totalCost: number;
-                unitCost?: number;
-              } = {
+        let newQuantity;
+        let newTotalCost;
+        let subtotal;
+        let averageUnitCost;
+
+        if (type === TypeMovements.INPUT) {
+          if (stockItem) {
+            newQuantity = stockItem.quantity + detail.quantity;
+            subtotal = detail.quantity * detail.unitCost;
+            newTotalCost = parseFloat(
+              (stockItem.totalCost + subtotal).toFixed(4),
+            );
+            averageUnitCost = parseFloat(
+              (newTotalCost / newQuantity).toFixed(4),
+            );
+
+            // Si el recurso existe en el stock, sumar la cantidad
+            const stockMovement = await prisma.stock.update({
+              where: {
+                id: stockItem.id,
+              },
+              data: {
                 quantity: newQuantity,
                 totalCost: newTotalCost,
-              };
-              if (newQuantity === 0) {
-                stockUpdateData.unitCost = averageUnitCost;
-              }
-              const stockMovement = await prisma.stock.update({
-                where: {
-                  id: stockItem.id,
-                },
-                data: stockUpdateData,
-              });
-              await this.prisma.audit.create({
-                data: {
-                  action: AuditActionType.UPDATE,
-                  entityId: stockMovement.id,
-                  entityType: 'stock',
-                  performedById: user.id,
-                },
-              });
-            }
+                unitCost: averageUnitCost,
+              },
+            });
+            await prisma.audit.create({
+              data: {
+                action: AuditActionType.UPDATE,
+                entityId: stockMovement.id,
+                entityType: 'stock',
+                performedById: user.id,
+              },
+            });
+          } else {
+            // Crear nuevo stock si no existe
+            subtotal = detail.quantity * detail.unitCost;
+            averageUnitCost = parseFloat(
+              (subtotal / detail.quantity).toFixed(4),
+            );
+
+            const stockMovement = await prisma.stock.create({
+              data: {
+                warehouseId,
+                productId: detail.productId,
+                quantity: detail.quantity,
+                unitCost: averageUnitCost,
+                totalCost: subtotal,
+              },
+            });
+            await prisma.audit.create({
+              data: {
+                action: AuditActionType.CREATE,
+                entityId: stockMovement.id,
+                entityType: 'stock',
+                performedById: user.id,
+              },
+            });
           }
-        }),
-      );
+        } else if (type === TypeMovements.OUTPUT) {
+          if (stockItem) {
+            newQuantity = stockItem.quantity - detail.quantity;
+            subtotal = detail.quantity * stockItem.unitCost;
+
+            if (newQuantity === 0) {
+              newTotalCost = 0;
+              averageUnitCost = 0;
+            } else {
+              newTotalCost = parseFloat(
+                (stockItem.totalCost - subtotal).toFixed(4),
+              );
+            }
+
+            // Si el recurso existe en el stock, restar la cantidad
+            const stockUpdateData: {
+              quantity: number;
+              totalCost: number;
+              unitCost?: number;
+            } = {
+              quantity: newQuantity,
+              totalCost: newTotalCost,
+            };
+
+            if (newQuantity === 0) {
+              stockUpdateData.unitCost = averageUnitCost;
+            }
+
+            const stockMovement = await prisma.stock.update({
+              where: {
+                id: stockItem.id,
+              },
+              data: stockUpdateData,
+            });
+
+            await prisma.audit.create({
+              data: {
+                action: AuditActionType.UPDATE,
+                entityId: stockMovement.id,
+                entityType: 'stock',
+                performedById: user.id,
+              },
+            });
+          }
+        }
+      }
     });
   }
 
@@ -245,64 +265,74 @@ export class MovementsService {
     type: TypeMovements,
     warehouseId: string,
   ) {
-    const warehouseDB = await this.warehouseService.findById(warehouseId);
     // Transacción para asegurar atomicidad
     await this.prisma.$transaction(async (tx) => {
-      await Promise.all(
-        movementDetail.map(async (detail) => {
-          const stockItem = warehouseDB.stock.find(
-            (item) => item.product.id === detail.productId,
-          );
+      // Procesar SECUENCIALMENTE (en lugar de Promise.all)
+      for (const detail of movementDetail) {
+        // Consultar el stock actualizado DIRECTAMENTE desde la base de datos para cada detalle
+        const stockItem = await tx.stock.findFirst({
+          where: {
+            warehouseId: warehouseId,
+            productId: detail.productId,
+          },
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        });
 
+        if (stockItem) {
           let newQuantity: number;
           let newTotalCost: number;
           let newAverageUnitCost: number;
           let subtotal: number;
 
-          if (stockItem) {
-            if (type === TypeMovements.INPUT) {
-              // Revertir un INPUT implica restar la cantidad y el costo
-              newQuantity = stockItem.quantity - detail.quantity;
-              subtotal = parseFloat(
-                (detail.quantity * detail.unitCost).toFixed(4),
-              );
+          if (type === TypeMovements.INPUT) {
+            // Revertir un INPUT implica restar la cantidad y el costo
+            newQuantity = stockItem.quantity - detail.quantity;
+            subtotal = parseFloat(
+              (detail.quantity * detail.unitCost).toFixed(4),
+            );
 
-              if (newQuantity === 0) {
-                newTotalCost = 0;
-                newAverageUnitCost = 0;
-              } else {
-                newTotalCost = parseFloat(
-                  (stockItem.totalCost - subtotal).toFixed(4),
-                );
-                newAverageUnitCost = parseFloat(
-                  (newTotalCost / newQuantity).toFixed(4),
-                );
-              }
-            } else if (type === TypeMovements.OUTPUT) {
-              // Revertir un OUTPUT implica sumar la cantidad y el costo
-              newQuantity = stockItem.quantity + detail.quantity;
-              subtotal = parseFloat(
-                (detail.quantity * detail.unitCost).toFixed(4),
-              );
+            if (newQuantity === 0) {
+              newTotalCost = 0;
+              newAverageUnitCost = 0;
+            } else {
               newTotalCost = parseFloat(
-                (stockItem.totalCost + subtotal).toFixed(4),
+                (stockItem.totalCost - subtotal).toFixed(4),
               );
               newAverageUnitCost = parseFloat(
                 (newTotalCost / newQuantity).toFixed(4),
               );
             }
-
-            await tx.stock.update({
-              where: { id: stockItem.id },
-              data: {
-                quantity: newQuantity,
-                totalCost: newTotalCost,
-                unitCost: newAverageUnitCost,
-              },
-            });
+          } else if (type === TypeMovements.OUTPUT) {
+            // Revertir un OUTPUT implica sumar la cantidad y el costo
+            newQuantity = stockItem.quantity + detail.quantity;
+            subtotal = parseFloat(
+              (detail.quantity * detail.unitCost).toFixed(4),
+            );
+            newTotalCost = parseFloat(
+              (stockItem.totalCost + subtotal).toFixed(4),
+            );
+            newAverageUnitCost = parseFloat(
+              (newTotalCost / newQuantity).toFixed(4),
+            );
           }
-        }),
-      );
+
+          await tx.stock.update({
+            where: { id: stockItem.id },
+            data: {
+              quantity: newQuantity,
+              totalCost: newTotalCost,
+              unitCost: newAverageUnitCost,
+            },
+          });
+        }
+      }
     });
   }
 
@@ -653,6 +683,11 @@ export class MovementsService {
             quantity: true,
             unitCost: true,
             subtotal: true,
+            paymentDetail: {
+              select: {
+                id: true,
+              },
+            },
             product: {
               select: {
                 id: true,
@@ -683,7 +718,10 @@ export class MovementsService {
           documentNumber: movement.documentNumber,
         }),
       }),
-      movementsDetail: movement.movementsDetail,
+      movementsDetail: movement.movementsDetail.map((detail) => ({
+        ...detail,
+        paymentDetail: detail.paymentDetail?.[0] || undefined,
+      })),
     };
   }
 
@@ -1021,6 +1059,16 @@ export class MovementsService {
       // Verificar que el movimiento existe
       const movement = await this.findById(id);
 
+      // Verificar si algún detalle del movimiento tiene pagos asociados
+      const hasPaymentDetails = movement.movementsDetail.some(
+        (detail) => detail.paymentDetail,
+      );
+      if (hasPaymentDetails) {
+        throw new BadRequestException(
+          'No se puede eliminar este movimiento porque tiene pagos asociados',
+        );
+      }
+
       const oppositeType =
         movement.type === TypeMovements.INPUT
           ? TypeMovements.OUTPUT
@@ -1084,6 +1132,138 @@ export class MovementsService {
         throw error;
       }
       handleException(error, 'Error deleting movement');
+    }
+  }
+
+  /**
+   * Elimina un detalle de movimiento específico
+   * @param id ID del detalle de movimiento a eliminar
+   * @param user Usuario que realiza la acción
+   * @returns Mensaje de confirmación o datos del movimiento eliminado
+   */
+  async removeMovementDetail(
+    id: string,
+    user: UserData,
+  ): Promise<HttpResponse<any>> {
+    try {
+      // 1. Buscar el detalle de movimiento por su ID
+      const movementDetail = await this.prisma.movementsDetail.findUnique({
+        where: { id },
+        include: {
+          movements: {
+            select: {
+              id: true,
+              type: true,
+              warehouseId: true,
+            },
+          },
+          product: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      if (!movementDetail) {
+        throw new NotFoundException('Movement detail not found');
+      }
+
+      // 2. Obtener el movimiento padre y verificar cuántos detalles tiene
+      const movementId = movementDetail.movements.id;
+      const remainingDetails = await this.prisma.movementsDetail.count({
+        where: {
+          movementsId: movementId,
+          id: { not: id }, // Excluir el detalle actual
+        },
+      });
+
+      // 3. Revertir el cambio en el stock para este detalle específico
+      const detailToRevert: CreateMovementDetailDto = {
+        productId: movementDetail.product.id,
+        quantity: movementDetail.quantity,
+        unitCost: movementDetail.unitCost,
+      };
+
+      await this.revertStockChanges(
+        [detailToRevert], // Solo revertimos este detalle específico
+        movementDetail.movements.type,
+        movementDetail.movements.warehouseId,
+      );
+
+      // 4. Eliminar el detalle
+      await this.prisma.movementsDetail.delete({
+        where: { id },
+      });
+
+      // 5. Registrar auditoría para el detalle eliminado
+      await this.prisma.audit.create({
+        data: {
+          action: AuditActionType.DELETE,
+          entityId: id,
+          entityType: 'movementsDetail',
+          performedById: user.id,
+        },
+      });
+
+      // 6. Si era el último detalle, eliminar el movimiento completo
+      if (remainingDetails === 0) {
+        const movement = await this.prisma.movements.delete({
+          where: { id: movementId },
+          select: {
+            id: true,
+            codeUnique: true,
+            type: true,
+            dateMovement: true,
+          },
+        });
+
+        // Registrar auditoría para el movimiento eliminado
+        await this.prisma.audit.create({
+          data: {
+            action: AuditActionType.DELETE,
+            entityId: movementId,
+            entityType: 'movements',
+            performedById: user.id,
+          },
+        });
+
+        return {
+          statusCode: HttpStatus.OK,
+          message:
+            'Movement detail deleted and movement removed because it was the last detail',
+          data: {
+            detailId: id,
+            movementRemoved: true,
+            movement: {
+              id: movement.id,
+              codeUnique: movement.codeUnique,
+            },
+          },
+        };
+      }
+
+      return {
+        statusCode: HttpStatus.OK,
+        message: 'Movement detail successfully deleted',
+        data: {
+          detailId: id,
+          movementRemoved: false,
+          movementId: movementId,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error deleting movement detail');
+
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+
+      handleException(error, 'Error deleting movement detail');
     }
   }
 }

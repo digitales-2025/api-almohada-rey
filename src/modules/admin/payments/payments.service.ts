@@ -13,6 +13,7 @@ import {
   PaymentDetailData,
   RoomPaymentDetailsData,
   SummaryPaymentData,
+  SummaryWarehouseData,
   UserData,
 } from 'src/interfaces';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -21,7 +22,9 @@ import { RoomService } from '../room/services/room.service';
 import {
   AuditActionType,
   PaymentDetailStatus,
+  ProductType,
   ReservationStatus,
+  TypeMovements,
 } from '@prisma/client';
 import { handleException } from 'src/utils';
 import { ServiceService } from '../service/services/service.service';
@@ -33,6 +36,9 @@ import { UpdatePaymentDetailsBatchDto } from './dto/updatePaymentDetailsBatch.dt
 import { calculateStayNights } from 'src/utils/dates/peru-datetime';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 import { PaginationService } from 'src/pagination/pagination.service';
+import { MovementsService } from '../movements/movements.service';
+import { CreateMovementDto } from '../movements/dto/create-movement.dto';
+import { WarehouseService } from '../warehouse/warehouse.service';
 
 @Injectable()
 export class PaymentsService {
@@ -43,6 +49,8 @@ export class PaymentsService {
     private readonly roomService: RoomService,
     private readonly serviceService: ServiceService,
     private readonly productService: ProductService,
+    private readonly movementsService: MovementsService,
+    private readonly warehouseService: WarehouseService,
     private readonly paginationService: PaginationService,
   ) {}
 
@@ -407,10 +415,11 @@ export class PaymentsService {
     user: UserData,
   ): Promise<HttpResponse<PaymentDetailData[]>> {
     const { paymentId, paymentDetail } = createManyPaymentDetailDto;
+    let warehouseDb: SummaryWarehouseData;
 
     try {
       // 1. Verificar que el pago existe
-      await this.findById(paymentId);
+      const payment = await this.findById(paymentId);
 
       // 2. Validar que hay detalles para crear
       if (!paymentDetail || paymentDetail.length === 0) {
@@ -423,6 +432,9 @@ export class PaymentsService {
       for (const detail of paymentDetail) {
         if (detail.productId) {
           await this.productService.findById(detail.productId);
+          warehouseDb = await this.warehouseService.findWarehouseByType(
+            ProductType.COMMERCIAL,
+          );
         }
         if (detail.serviceId) {
           await this.serviceService.findById(detail.serviceId);
@@ -434,11 +446,47 @@ export class PaymentsService {
 
       // 4. Crear los detalles de pago dentro de una transacción
       const createdDetails = await this.prisma.$transaction(async (prisma) => {
-        const details = [];
-        const realValues = new Map(); // Usaremos un Map para almacenar los valores reales
+        const details: PaymentDetailData[] = [];
+        const realValues = new Map<string, number>();
+
+        // Crear movimiento una sola vez si hay al menos un producto
+        const productDetails = paymentDetail.filter((d) => !!d.productId);
+        // Guardaremos una correspondencia entre cada detalle original y su movementDetail
+        const movementsDetailMap = new Map<number, string>();
+
+        if (productDetails.length > 0) {
+          const movementDto: CreateMovementDto = {
+            dateMovement: paymentDetail[0].paymentDate,
+            type: TypeMovements.OUTPUT,
+            warehouseId: warehouseDb.id,
+            description: `Salida por venta de productos - Pago: ${payment?.code}`,
+            movementDetail: productDetails.map((p) => ({
+              quantity: p.quantity ?? 1,
+              unitCost: p.unitPrice,
+              productId: p.productId!,
+            })),
+          };
+
+          const movement = await this.movementsService.create(
+            movementDto,
+            user,
+          );
+          // Crear un mapa relacionando cada detalle original con su movementDetail correspondiente
+          if (
+            movement.data.movementsDetail &&
+            movement.data.movementsDetail.length > 0
+          ) {
+            // Para cada detalle de movimiento, guardamos la relación índice -> movementsDetailId
+            movement.data.movementsDetail.forEach((detail, index) => {
+              movementsDetailMap.set(index, detail.id);
+            });
+          }
+        }
+
+        // Índice para rastrear la posición en productDetails
+        let productDetailIndex = 0;
 
         for (const detail of paymentDetail) {
-          // Si es ROOM_RESERVATION con método PENDING_PAYMENT, lo omitimos y continuamos
           if (
             detail.type === 'ROOM_RESERVATION' &&
             detail.method === 'PENDING_PAYMENT'
@@ -446,7 +494,6 @@ export class PaymentsService {
             continue;
           }
 
-          // Validaciones por tipo
           if (detail.type === 'ROOM_RESERVATION' && !detail.roomId) {
             throw new BadRequestException(
               'Para reservas de habitación, debe especificar la habitación',
@@ -462,15 +509,23 @@ export class PaymentsService {
             );
           }
 
-          // Determinar status del PaymentDetail según method
           const detailStatus: PaymentDetailStatus =
             detail.method === 'PENDING_PAYMENT'
               ? PaymentDetailStatus.PENDING
               : PaymentDetailStatus.PAID;
 
-          // Si método es PENDING_PAYMENT guardamos subtotal como 0
           const subtotal =
             detail.method === 'PENDING_PAYMENT' ? 0 : detail.subtotal;
+
+          // Si es un detalle de producto, obtenemos el movementsDetailId correspondiente
+          let movementsDetailId: string | undefined;
+
+          if (detail.productId) {
+            // Obtenemos el movementsDetailId por índice
+            movementsDetailId = movementsDetailMap.get(productDetailIndex);
+            // Incrementamos el índice solo para detalles de productos
+            productDetailIndex++;
+          }
 
           const newDetail = await prisma.paymentDetail.create({
             data: {
@@ -481,12 +536,13 @@ export class PaymentsService {
               method: detail.method,
               status: detailStatus,
               unitPrice: detail.unitPrice,
-              subtotal: subtotal,
+              subtotal,
               ...(detail.quantity && { quantity: detail.quantity }),
               ...(detail.productId && { productId: detail.productId }),
               ...(detail.roomId && { roomId: detail.roomId }),
               ...(detail.days && { days: detail.days }),
               ...(detail.serviceId && { serviceId: detail.serviceId }),
+              ...(movementsDetailId && { movementsDetailId }),
             },
             include: {
               product: { select: { id: true, name: true } },
@@ -501,10 +557,8 @@ export class PaymentsService {
             },
           });
 
-          // Almacenamos el valor real en el Map usando el ID del detalle como clave
           realValues.set(newDetail.id, detail.subtotal);
 
-          // Auditoría
           await this.audit.create({
             entityId: newDetail.id,
             entityType: 'paymentDetail',
@@ -517,17 +571,14 @@ export class PaymentsService {
         }
 
         // 5. Recalcular montos en el pago padre
-        // Para el amount, sumamos el valor real de todos los extras, sin importar el método de pago
         const amountIncrement = details
           .filter((d) => d.type !== 'ROOM_RESERVATION')
-          .reduce((sum, d) => sum + realValues.get(d.id), 0);
+          .reduce((sum, d) => sum + realValues.get(d.id)!, 0);
 
-        // Para amountPaid, sólo sumamos lo efectivamente pagado (no los PENDING_PAYMENT)
         const amountPaidIncrement = details
           .filter((d) => d.method !== 'PENDING_PAYMENT')
           .reduce((sum, d) => sum + d.subtotal, 0);
 
-        // Obtener montos actuales del payment
         const parent = await prisma.payment.findUnique({
           where: { id: paymentId },
           select: { amount: true, amountPaid: true },
@@ -556,7 +607,6 @@ export class PaymentsService {
           },
         });
 
-        // Auditoría del payment
         await this.audit.create({
           entityId: paymentId,
           entityType: 'payment',
@@ -1786,6 +1836,11 @@ export class PaymentsService {
       const paymentDetail = await this.prisma.paymentDetail.findUnique({
         where: { id: paymentDetailId },
         include: {
+          movementsDetail: {
+            select: {
+              id: true,
+            },
+          },
           payment: {
             select: {
               id: true,
@@ -1840,6 +1895,12 @@ export class PaymentsService {
 
       // Realizar la transacción para eliminar el detalle de pago y actualizar el pago
       await this.prisma.$transaction(async (prisma) => {
+        if (paymentDetail.movementsDetail) {
+          await this.movementsService.removeMovementDetail(
+            paymentDetail.movementsDetail.id,
+            user,
+          );
+        }
         // Eliminar el detalle de pago
         await prisma.paymentDetail.delete({ where: { id: paymentDetailId } });
 
@@ -1920,6 +1981,12 @@ export class PaymentsService {
     }
   }
 
+  /**
+   * Elimina el pago por ID de reservación.
+   * @param reservationId Id de la reservación
+   * @param user Usuario que realiza la acción
+   * @returns Mensaje de confirmación
+   */
   async removePaymentByReservationId(
     reservationId: string,
     user: UserData,

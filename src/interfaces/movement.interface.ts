@@ -15,6 +15,9 @@ export type MovementsDetailData = {
   quantity: number;
   unitCost: number;
   subtotal: number;
+  paymentDetail?: {
+    id: string;
+  };
   product: { id: string; name: string };
 };
 

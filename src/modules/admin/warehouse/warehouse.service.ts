@@ -13,6 +13,7 @@ import { handleException } from 'src/utils';
 import { PaginationService } from 'src/pagination/pagination.service';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 import { ProductType } from '@prisma/client';
+import { StockData } from 'src/interfaces/warehouse.interface';
 
 @Injectable()
 export class WarehouseService {
@@ -265,5 +266,42 @@ export class WarehouseService {
     }
 
     return warehouse as WarehouseData;
+  }
+
+  /**
+   * Obtiene el stock de un almacén filtrado por tipo de producto
+   * @param type Tipo de producto a buscar
+   * @returns Lista de datos de stock filtrados por tipo de producto
+   */
+  async findProductsStockByType(type: ProductType): Promise<StockData[]> {
+    const warehouse = await this.prisma.warehouse.findFirst({
+      where: { type },
+      select: {
+        stock: {
+          select: {
+            id: true,
+            quantity: true,
+            unitCost: true,
+            totalCost: true,
+            product: {
+              select: {
+                id: true,
+                name: true,
+                type: true,
+                code: true,
+                unitCost: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!warehouse) {
+      throw new NotFoundException('Warehouse not found');
+    }
+
+    // Devuelve directamente el array de StockData
+    return warehouse.stock;
   }
 }

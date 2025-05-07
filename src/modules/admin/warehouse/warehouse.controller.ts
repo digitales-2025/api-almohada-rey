@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { WarehouseService } from './warehouse.service';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
-import { SummaryWarehouseData, WarehouseData } from 'src/interfaces';
+import { StockData, SummaryWarehouseData, WarehouseData } from 'src/interfaces';
 import {
   ApiBadRequestResponse,
   ApiOkResponse,
@@ -125,5 +125,20 @@ export class WarehouseController {
     @Param('type') type: ProductType,
   ): Promise<SummaryWarehouseData> {
     return this.warehouseService.findWarehouseByType(type);
+  }
+
+  @ApiOperation({ summary: 'Get stock of products by warehouse type' })
+  @ApiParam({
+    name: 'type',
+    enum: ProductType,
+    enumName: 'ProductType',
+    description: 'Tipo de almacén (COMMERCIAL o INTERNAL_USE)',
+  })
+  @ApiOkResponse({ description: 'Get stock of products by warehouse type' })
+  @Get('stock/product/:type')
+  findProductsStockByType(
+    @Param('type') type: ProductType,
+  ): Promise<StockData[]> {
+    return this.warehouseService.findProductsStockByType(type);
   }
 }
