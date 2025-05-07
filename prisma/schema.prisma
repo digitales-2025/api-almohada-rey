@@ -392,6 +392,7 @@ model MovementsDetail {
 
 model Warehouse {
   id   String      @id @unique @default(uuid())
+  code String      @unique
   type ProductType
 
   stock Stock[] @relation("WarehouseStock")
