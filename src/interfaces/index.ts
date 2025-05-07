@@ -11,7 +11,11 @@ export {
   RoomPaymentDetailsData,
 } from './payment.interface';
 
-export { WarehouseData, SummaryWarehouseData } from './warehouse.interface';
+export {
+  WarehouseData,
+  SummaryWarehouseData,
+  StockData,
+} from './warehouse.interface';
 
 export {
   MovementsData,
