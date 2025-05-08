@@ -1,28 +1,28 @@
 pipeline {
 	agent {
 		docker {
-			image 'node:22'
+			image 'guergeiro/pnpm:22-10-alpine'
 			reuseNode true
-      args '-u 0:0'
+			args '-u 0:0 -v pnpm-store:/root/.pnpm-store'
 		}
 	}
+	environment {
+		NEXT_PUBLIC_IMAGE_DOMAIN="http://example.com"
+		PNPM_HOME="/root/.local/share/pnpm"
+	}
 	stages {
-		stage('Install') {
+		stage('Install dependencies') {
 			steps {
-				sh 'npm i -g pnpm'
-				sh 'pnpm i'
-				sh 'pnpx prisma generate'
+				sh 'pnpm config set store-dir /root/.pnpm-store'
+				sh 'pnpm i --frozen-lockfile'
 			}
 		}
-		stage('Validate lint rules') {
+		stage('Build Nextjs project') {
 			steps {
-				sh 'pnpm run lint'
-			}
-		}
-		stage('Build project') {
-			steps {
+				sh 'pnpm run check'
 				sh 'pnpm run build'
 			}
 		}
 	}
 }
+
