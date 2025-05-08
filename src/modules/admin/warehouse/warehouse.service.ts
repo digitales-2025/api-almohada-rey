@@ -35,6 +35,7 @@ export class WarehouseService {
       const warehouses = await this.prisma.warehouse.findMany({
         select: {
           id: true,
+          code: true,
           type: true,
           stock: {
             select: {
@@ -51,6 +52,7 @@ export class WarehouseService {
       // Mapea los resultados al tipo SummaryWarehouseData calculando totales
       return warehouses.map((warehouse) => ({
         id: warehouse.id,
+        code: warehouse.code,
         type: warehouse.type,
         quantityProducts: warehouse.stock.reduce(
           (sum, item) => sum + (item.quantity || 0),
@@ -78,6 +80,7 @@ export class WarehouseService {
         where: { type },
         select: {
           id: true,
+          code: true,
           type: true,
           stock: {
             select: {
@@ -98,6 +101,7 @@ export class WarehouseService {
       // Transformamos el único warehouse al tipo SummaryWarehouseData
       return {
         id: warehouse.id,
+        code: warehouse.code,
         type: warehouse.type,
         quantityProducts: warehouse.stock.reduce(
           (sum, item) => sum + (item.quantity || 0),
@@ -137,6 +141,7 @@ export class WarehouseService {
         select: {
           id: true,
           type: true,
+          code: true,
           stock: {
             select: {
               quantity: true,
@@ -155,6 +160,7 @@ export class WarehouseService {
         (warehouse) => ({
           id: warehouse.id,
           type: warehouse.type,
+          code: warehouse.code,
           quantityProducts: warehouse.stock.reduce(
             (sum, item) => sum + (item.quantity || 0),
             0,
@@ -210,6 +216,7 @@ export class WarehouseService {
       select: {
         id: true,
         type: true,
+        code: true,
         stock: {
           select: {
             id: true,
@@ -220,6 +227,7 @@ export class WarehouseService {
               select: {
                 id: true,
                 name: true,
+                code: true,
               },
             },
           },

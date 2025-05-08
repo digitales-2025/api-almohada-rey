@@ -1,10 +1,10 @@
 import { ProductType, Warehouse } from '@prisma/client';
 
-export type WarehouseData = Pick<Warehouse, 'id' | 'type'> & {
+export type WarehouseData = Pick<Warehouse, 'id' | 'code' | 'type'> & {
   stock: StockData[];
 };
 
-export type SummaryWarehouseData = Pick<Warehouse, 'id' | 'type'> & {
+export type SummaryWarehouseData = Pick<Warehouse, 'id' | 'code' | 'type'> & {
   quantityProducts: number;
   totalCost: number;
 };
