@@ -707,6 +707,7 @@ export class MovementsService {
               select: {
                 id: true,
                 name: true,
+                code: true,
               },
             },
           },
