@@ -18,6 +18,7 @@ import { ServiceModule } from './modules/admin/service/service.module';
 import { LandRoomTypeModule } from './modules/landing/room-type/land-room-type.module';
 import { ExpenseModule } from './modules/admin/expense/expense.module';
 import { WarehouseModule } from './modules/admin/warehouse/warehouse.module';
+import { ReportsModule } from './modules/admin/reports/reports.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { WarehouseModule } from './modules/admin/warehouse/warehouse.module';
     LandRoomTypeModule,
     ExpenseModule,
     WarehouseModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
