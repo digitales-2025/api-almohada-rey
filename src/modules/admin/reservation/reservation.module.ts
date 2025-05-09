@@ -36,6 +36,6 @@ import { ReactivateReservationsUseCase } from './use-cases/reactivateReservation
     DeactivateReservationsUseCase,
     ReactivateReservationsUseCase,
   ],
-  exports: [ReservationService, ReservationRepository],
+  exports: [ReservationService, ReservationRepository, ReservationStateFactory],
 })
 export class ReservationModule {}

@@ -247,6 +247,21 @@ export abstract class BaseRepository<T extends BaseEntity> {
   }
 
   /**
+   * Busca un registro por su ID y lo incluye en la respuesta.
+   * @template V - Tipo opcional para el retorno, por defecto es T
+   * @param id - ID del registro a buscar.
+   * @param include - Relaciones a incluir.
+   * @returns El registro encontrado o null si no se encuentra.
+   */
+  async findUnique<V = T>(params: QueryParams): Promise<V | null> {
+    const result = await this.prisma.measureQuery(
+      `findUnique${String(this.modelName)}`,
+      () => (this.prisma[this.modelName] as any).findUnique(params),
+    );
+    return result as unknown as V | null;
+  }
+
+  /**
    * Busca un registro por su id.
    * @template V - Tipo opcional para el retorno, por defecto es T
    * @param id - ID del registro a buscar.

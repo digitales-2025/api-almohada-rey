@@ -37,4 +37,28 @@ export const validationMessagesDictionary: GenericDictionary<ValidationMessages>
       en: 'Invalid client socket ID',
       es: 'ID de socket de cliente no válido',
     },
+    missingReservationId: {
+      en: 'Missing reservation ID',
+      es: 'ID de reserva faltante',
+    },
+    noReservationFound: {
+      en: 'No reservation found',
+      es: 'No se encontró ninguna reserva',
+    },
+    noValidReservationStatus: {
+      en: 'No valid reservation status',
+      es: 'Estado de reserva no válido',
+    },
+    cancelReservationException: {
+      en: 'An error occurred while canceling the reservation',
+      es: 'Ocurrió un error al cancelar la reserva',
+    },
+    updateReservationException: {
+      en: 'An error occurred while updating the reservation',
+      es: 'Ocurrió un error al actualizar la reserva',
+    },
+    confirmReservationException: {
+      en: 'An error occurred while confirming the reservation',
+      es: 'Ocurrió un error al confirmar la reserva',
+    },
   };

@@ -25,4 +25,12 @@ export const errorDictionary: Dictionary = {
     es: 'La fecha de check-in no puede ser en el pasado',
     en: 'Check-in date cannot be in the past',
   },
+  reservation_CancellationException: {
+    es: 'Error al cancelar la reserva',
+    en: 'Error canceling the reservation',
+  },
+  reservation_confirmationException: {
+    es: 'Error al confirmar la reserva',
+    en: 'Error confirming the reservation',
+  },
 };

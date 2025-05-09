@@ -42,4 +42,10 @@ export type SendingEventsKeys = keyof SendingEvents;
 
 export type ValidationMessages = {
   invalidClientSocketId: string;
+  missingReservationId: string;
+  noReservationFound: string;
+  noValidReservationStatus: string;
+  cancelReservationException: string;
+  updateReservationException: string;
+  confirmReservationException: string;
 };

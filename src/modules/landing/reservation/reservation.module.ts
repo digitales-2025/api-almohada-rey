@@ -5,9 +5,10 @@ import { ReservationModule as AdminReservationModule } from 'src/modules/admin/r
 import { ReservationController } from './reservation.controller';
 import { Translation } from '../i18n/translation';
 import { ReservationGateway } from './websockets/reservation.gateway';
+import { UsersModule } from 'src/modules/admin/users/users.module';
 
 @Module({
-  imports: [AdminReservationModule, RoomModule],
+  imports: [AdminReservationModule, RoomModule, UsersModule],
   controllers: [ReservationController],
   providers: [LandingReservationService, Translation, ReservationGateway],
 })

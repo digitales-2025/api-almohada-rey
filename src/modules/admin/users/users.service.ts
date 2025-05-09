@@ -571,6 +571,9 @@ export class UsersService {
     // Si es ADMIN puede ver todos los usuarios (activos e inactivos)
     if (user.userRol === UserRolType.ADMIN) {
       usersDB = await this.prisma.user.findMany({
+        where: {
+          isLandingUser: false,
+        },
         select: {
           id: true,
           name: true,
@@ -591,6 +594,7 @@ export class UsersService {
       usersDB = await this.prisma.user.findMany({
         where: {
           isActive: true,
+          isLandingUser: false,
         },
         select: {
           id: true,
@@ -640,6 +644,29 @@ export class UsersService {
       isSuperAdmin: userDB.isSuperAdmin,
       userRol: userDB.userRol,
     };
+  }
+
+  async findLandingUser(): Promise<Omit<UserData, 'claims'>> {
+    const userDB = await this.prisma.user.findFirst({
+      where: {
+        isLandingUser: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        userRol: true,
+        isSuperAdmin: true,
+        isActive: true,
+      },
+    });
+
+    if (!userDB) {
+      throw new NotFoundException('Landing user not found');
+    }
+
+    return userDB;
   }
 
   /**

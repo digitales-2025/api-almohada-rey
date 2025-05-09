@@ -8,6 +8,10 @@ import { errorDictionary } from './translation-dictionary';
 import { getLimaTime } from 'src/utils/dates/peru-datetime';
 import { CheckAvailableRoomsQueryDto } from './dto/landing-check-available-rooms.dto';
 import { Translation } from '../i18n/translation';
+import { ReservationService } from 'src/modules/admin/reservation/reservation.service';
+import { ReservationStatus } from '@prisma/client';
+import { UsersService } from 'src/modules/admin/users/users.service';
+import { SupportedLocales } from '../i18n/translations';
 
 @Injectable()
 export class LandingReservationService {
@@ -18,6 +22,8 @@ export class LandingReservationService {
     private readonly reservationRepository: ReservationRepository,
     private readonly roomRepository: RoomRepository,
     private readonly translation: Translation,
+    private readonly reservationService: ReservationService,
+    private readonly userService: UsersService,
   ) {
     this.errorHandler = new BaseErrorHandler(
       this.logger,
@@ -139,6 +145,71 @@ export class LandingReservationService {
     } catch (error) {
       Logger.error(error);
       this.errorHandler.handleError(error, 'getting');
+    }
+  }
+
+  async checkReservationExists(
+    reservationId: string,
+    externalRequest: boolean = false,
+  ) {
+    try {
+      const reservation = await this.reservationRepository.findUnique({
+        where: { id: reservationId },
+      });
+      if (!reservation) {
+        throw new BadRequestException(
+          this.translation.getTranslations(
+            'reservationNotFound',
+            'es',
+            errorDictionary,
+          ),
+        );
+      }
+      return reservation;
+    } catch (error) {
+      Logger.error(error);
+      if (externalRequest) this.errorHandler.handleError(error, 'getting');
+      return undefined;
+    }
+  }
+
+  async cancelReservation(id: string, locale?: SupportedLocales) {
+    try {
+      const landingUser = await this.userService.findLandingUser();
+
+      return await this.reservationService.changeReservationStatus(
+        id,
+        ReservationStatus.CANCELED,
+        landingUser,
+      );
+    } catch {
+      throw new Error(
+        this.translation.getTranslations(
+          'reservation_CancellationException',
+          locale,
+          errorDictionary,
+        ),
+      );
+    }
+  }
+
+  async confirmReservation(id: string, locale?: SupportedLocales) {
+    try {
+      const landingUser = await this.userService.findLandingUser();
+
+      return await this.reservationService.changeReservationStatus(
+        id,
+        ReservationStatus.CONFIRMED,
+        landingUser,
+      );
+    } catch {
+      throw new Error(
+        this.translation.getTranslations(
+          'reservation_confirmationException',
+          locale,
+          errorDictionary,
+        ),
+      );
     }
   }
 }

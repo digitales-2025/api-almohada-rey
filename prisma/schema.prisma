@@ -18,6 +18,7 @@ model User {
   lastLogin          DateTime    @default(now()) @db.Timestamptz(6)
   isActive           Boolean     @default(true)
   mustChangePassword Boolean     @default(true)
+  isLandingUser      Boolean     @default(false) // Indicates if the user was created through the landing page and if that's the case, notify the admin to complete the missing data
 
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt

@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { BaseI18nWsRequest } from 'src/websockets/dto/base-i18nRequest.dto';
 
 export class ResponseReservationWsDto {
   @ApiProperty({
@@ -30,4 +31,12 @@ export class ResponseReservationWsDto {
   //     example: 100.0,
   //   })
   //   paymentAmount: number;
+}
+
+export class BaseReservationWsActionsDto extends BaseI18nWsRequest {
+  @ApiProperty({
+    description: 'Reservation ID',
+    example: '67890',
+  })
+  reservationId: string;
 }

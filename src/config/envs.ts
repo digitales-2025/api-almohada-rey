@@ -20,6 +20,9 @@ type GeneralEnvVars = {
   MAIL_PORT: string;
   MAIL_USER: string;
   MAIL_PASS: string;
+
+  //sEEDS
+  SEED_LANDING_PASSWORD: string;
 };
 
 const schema = z
@@ -38,6 +41,7 @@ const schema = z
     MAIL_PORT: z.string(),
     MAIL_USER: z.string(),
     MAIL_PASS: z.string(),
+    SEED_LANDING_PASSWORD: z.string(),
   })
   .passthrough() satisfies z.ZodType<Partial<GeneralEnvVars>>;
 
@@ -62,4 +66,5 @@ export const generalEnvs: GeneralEnvVars = {
   MAIL_PORT: envVars.MAIL_PORT,
   MAIL_USER: envVars.MAIL_USER,
   MAIL_PASS: envVars.MAIL_PASS,
+  SEED_LANDING_PASSWORD: envVars.SEED_LANDING_PASSWORD,
 };
