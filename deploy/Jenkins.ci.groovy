@@ -17,6 +17,16 @@ pipeline {
 				sh 'pnpm i --frozen-lockfile'
 			}
 		}
+		stage('Generate Prisma types') {
+			steps {
+				sh 'pnpx prisma generate'
+			}
+		}
+		stage('Validate lint rules') {
+			steps {
+				sh 'pnpm run lint'
+			}
+		}
 		stage('Build Nextjs project') {
 			steps {
 				sh 'pnpm run check'
