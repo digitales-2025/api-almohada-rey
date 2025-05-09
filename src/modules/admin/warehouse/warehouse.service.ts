@@ -281,8 +281,11 @@ export class WarehouseService {
    * @param type Tipo de producto a buscar
    * @returns Lista de datos de stock filtrados por tipo de producto
    */
-  async findProductsStockByType(type: ProductType): Promise<StockData[]> {
-    const warehouse = await this.prisma.warehouse.findFirst({
+  async findProductsStockByType(
+    type: ProductType,
+    paymentDetailId?: string,
+  ): Promise<StockData[]> {
+    let warehouse = await this.prisma.warehouse.findFirst({
       where: { type },
       select: {
         stock: {
@@ -309,7 +312,42 @@ export class WarehouseService {
       throw new NotFoundException('Warehouse not found');
     }
 
-    // Devuelve directamente el array de StockData
+    // Si se proporciona paymentDetailId, ajustamos las cantidades
+    if (paymentDetailId) {
+      // Obtenemos el detalle de pago con su movimiento de detalle relacionado
+      const paymentDetail = await this.prisma.paymentDetail.findUnique({
+        where: { id: paymentDetailId },
+        include: {
+          movementsDetail: {
+            include: {
+              product: true,
+            },
+          },
+        },
+      });
+
+      // Si el detalle de pago tiene un movimiento de detalle asociado
+      if (paymentDetail?.movementsDetailId) {
+        const movementDetail = paymentDetail.movementsDetail;
+
+        // Ajustamos el stock para simular el estado anterior al movimiento
+        warehouse = {
+          ...warehouse,
+          stock: warehouse.stock.map((stockItem) => {
+            // Si el producto del stock coincide con el producto del detalle del movimiento
+            if (movementDetail.product.id === stockItem.product.id) {
+              return {
+                ...stockItem,
+                quantity: stockItem.quantity + movementDetail.quantity,
+              };
+            }
+            return stockItem;
+          }),
+        };
+      }
+    }
+
+    // Devuelve el array de StockData, potencialmente ajustado
     return warehouse.stock;
   }
 }

@@ -29,4 +29,5 @@ export type SummaryMovementsData = Pick<
   warehouse: { id: string; type: ProductType };
   typePurchaseOrder?: ExpenseDocumentType;
   documentNumber?: string;
+  hasPaymentAssigned?: boolean;
 };

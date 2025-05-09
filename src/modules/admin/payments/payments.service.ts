@@ -459,7 +459,7 @@ export class PaymentsService {
             dateMovement: paymentDetail[0].paymentDate,
             type: TypeMovements.OUTPUT,
             warehouseId: warehouseDb.id,
-            description: `Salida por venta de productos - Pago: ${payment?.code}`,
+            description: `Salida por venta de productos - ${payment?.code}`,
             movementDetail: productDetails.map((p) => ({
               quantity: p.quantity ?? 1,
               unitCost: p.unitPrice,
@@ -1191,6 +1191,7 @@ export class PaymentsService {
         );
       }
 
+      // 1. Obtener los detalles de pago, incluyendo la referencia a movementsDetail si existe
       const paymentDetails = await this.prisma.paymentDetail.findMany({
         where: { id: { in: paymentDetailIds } },
         include: {
@@ -1202,6 +1203,11 @@ export class PaymentsService {
             },
           },
           service: true,
+          movementsDetail: {
+            select: {
+              id: true,
+            },
+          },
         },
       });
 
@@ -1215,6 +1221,26 @@ export class PaymentsService {
         );
       }
 
+      // 2. Si se actualiza la fecha, procesar primero los detalles con movimientos asociados
+      if (paymentDate) {
+        // Filtrar los detalles que tienen un movimiento asociado
+        const detailsWithMovements = paymentDetails.filter(
+          (d) => d.movementsDetail?.id,
+        );
+
+        // Actualizar la fecha de los movimientos asociados usando updateMovementDateByDetail
+        for (const detail of detailsWithMovements) {
+          if (detail.movementsDetail?.id) {
+            await this.movementsService.updateMovementDateByDetail(
+              detail.movementsDetail.id,
+              paymentDate,
+              user,
+            );
+          }
+        }
+      }
+
+      // Continuar con el flujo normal de actualización por lotes
       const paymentIdMap = new Map<string, string[]>();
       paymentDetails.forEach((detail) => {
         const paymentId = detail.payment.id;
@@ -1286,6 +1312,7 @@ export class PaymentsService {
           });
         }
 
+        // Código existente para actualizar los pagos principales
         for (const [paymentId] of paymentIdMap.entries()) {
           const allPaymentDetails = await prisma.paymentDetail.findMany({
             where: { paymentId },
@@ -1377,6 +1404,7 @@ export class PaymentsService {
     user: UserData,
   ): Promise<HttpResponse<PaymentDetailData>> {
     try {
+      // 1. Buscar el detalle de pago incluyendo su movementsDetail si existe
       const paymentDetail = await this.prisma.paymentDetail.findUnique({
         where: { id: paymentDetailId },
         include: {
@@ -1392,11 +1420,49 @@ export class PaymentsService {
             },
           },
           service: { select: { id: true, name: true } },
+          // Incluimos movementsDetail para verificar si existe
+          movementsDetail: {
+            select: {
+              id: true,
+            },
+          },
         },
       });
 
       if (!paymentDetail) {
         throw new BadRequestException('Payment detail does not exist');
+      }
+
+      // 2. NUEVO: Si hay un movement detail asociado, llamar a handlePaymentDetailUpdate
+      let movementDetailId = paymentDetail.movementsDetail?.id;
+
+      if (
+        movementDetailId &&
+        (updatePaymentDetailDto.paymentDate !== undefined ||
+          updatePaymentDetailDto.quantity !== undefined ||
+          updatePaymentDetailDto.unitPrice !== undefined ||
+          updatePaymentDetailDto.productId !== undefined)
+      ) {
+        // Gestionar la actualización del detalle de movimiento antes de continuar
+        const result = await this.movementsService.handlePaymentDetailUpdate(
+          movementDetailId,
+          updatePaymentDetailDto,
+          user,
+        );
+
+        // Actualizar el ID del detalle de movimiento en caso de que haya cambiado
+        if (result && result.movementDetailId !== movementDetailId) {
+          // Actualizar la referencia al nuevo detalle de movimiento
+          await this.prisma.paymentDetail.update({
+            where: { id: paymentDetailId },
+            data: {
+              movementsDetailId: result.movementDetailId,
+            },
+          });
+
+          // Actualizar el ID para el resto del proceso
+          movementDetailId = result.movementDetailId;
+        }
       }
 
       if (updatePaymentDetailDto.productId) {
@@ -1739,28 +1805,15 @@ export class PaymentsService {
           where: { paymentId },
         });
 
-        // Modificación aquí: Calcular el amount diferente según el tipo de detalle
+        // Calculamos el amount total según la lógica de negocio
         let totalAmount = 0;
 
-        // Si existe al menos un detalle de habitación (ROOM_RESERVATION), mantenemos el amount original
-        const hasRoomReservation = allDetails.some(
-          (detail) => detail.type === 'ROOM_RESERVATION',
+        // Recalculamos siempre el monto total sumando todos los detalles
+        // sin importar si hay habitación o no
+        totalAmount = allDetails.reduce(
+          (sum, detail) => sum + detail.subtotal,
+          0,
         );
-
-        if (hasRoomReservation) {
-          // Mantener el amount original para reservas de habitación
-          const payment = await prisma.payment.findUnique({
-            where: { id: paymentId },
-            select: { amount: true },
-          });
-          totalAmount = payment.amount;
-        } else {
-          // Para casos sin reservación de habitación, calcular la suma normal
-          totalAmount = allDetails.reduce(
-            (sum, detail) => sum + detail.subtotal,
-            0,
-          );
-        }
 
         const totalAmountPaid = allDetails
           .filter((detail) => detail.status === 'PAID')
@@ -1783,8 +1836,8 @@ export class PaymentsService {
         await prisma.payment.update({
           where: { id: paymentId },
           data: {
-            // Solo actualizamos amount si no hay detalles de tipo ROOM_RESERVATION
-            ...(hasRoomReservation ? {} : { amount: totalAmount }),
+            // Siempre actualizamos el amount con el valor total calculado
+            amount: totalAmount,
             amountPaid: totalAmountPaid,
             status: paymentStatus,
             ...(latestPaymentDate && { date: latestPaymentDate }),
