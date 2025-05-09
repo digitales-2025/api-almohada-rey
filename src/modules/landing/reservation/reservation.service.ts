@@ -11,7 +11,8 @@ import { Translation } from '../i18n/translation';
 import { ReservationService } from 'src/modules/admin/reservation/reservation.service';
 import { ReservationStatus } from '@prisma/client';
 import { UsersService } from 'src/modules/admin/users/users.service';
-import { SupportedLocales } from '../i18n/translations';
+import { defaultLocale, SupportedLocales } from '../i18n/translations';
+import { CreateLandingReservationDto } from './dto/create-reservation.dto';
 
 @Injectable()
 export class LandingReservationService {
@@ -148,6 +149,30 @@ export class LandingReservationService {
     }
   }
 
+  // async findReservationById(
+  //   reservationId: string,
+  //   externalRequest: boolean = false,
+  //   locale: SupportedLocales = 'es',
+  // ) {
+  //   try {
+  //     const reservation = await this.reservationService.findOne(reservationId);
+  //     if (!reservation) {
+  //       throw new BadRequestException(
+  //         this.translation.getTranslations(
+  //           'reservationNotFound',
+  //           locale,
+  //           errorDictionary,
+  //         ),
+  //       );
+  //     }
+  //     return reservation;
+  //   } catch (error) {
+  //     Logger.error(error);
+  //     if (externalRequest) this.errorHandler.handleError(error, 'getting');
+  //     return undefined;
+  //   }
+  // }
+
   async checkReservationExists(
     reservationId: string,
     externalRequest: boolean = false,
@@ -170,6 +195,22 @@ export class LandingReservationService {
       Logger.error(error);
       if (externalRequest) this.errorHandler.handleError(error, 'getting');
       return undefined;
+    }
+  }
+
+  async createLandingReservation(
+    dto: CreateLandingReservationDto,
+    locale: SupportedLocales = defaultLocale,
+  ) {
+    try {
+      const landingUser = await this.userService.findLandingUser();
+      return await this.reservationService.createForLanding(
+        dto,
+        landingUser,
+        locale,
+      );
+    } catch (error) {
+      this.errorHandler.handleError(error, 'creating');
     }
   }
 

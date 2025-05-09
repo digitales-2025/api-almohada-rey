@@ -1,52 +1,16 @@
-import {
-  Controller,
-  Get,
-  //   Post,
-  //   Body,
-  //   Patch,
-  //   Param,
-  //   Delete,
-  Query,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { LandingReservationService } from './reservation.service';
-// import { CreateReservationDto } from './dto/create-reservation.dto';
-// import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { DetailedRoom } from 'src/modules/admin/room/entities/room.entity';
 import { CheckAvailableRoomsQueryDto } from './dto/landing-check-available-rooms.dto';
+import { defaultLocale, SupportedLocales } from '../i18n/translations';
+import { Reservation } from 'src/modules/admin/reservation/entities/reservation.entity';
+import { CreateLandingReservationDto } from './dto/create-reservation.dto';
 
 @ApiTags('Landing Reservations')
 @Controller({ path: 'landing-reservation', version: '1' })
 export class ReservationController {
   constructor(private readonly reservationService: LandingReservationService) {}
-
-  //   @Post()
-  //   create(@Body() createReservationDto: CreateReservationDto) {
-  //     return this.reservationService.create(createReservationDto);
-  //   }
-
-  //   @Get()
-  //   findAll() {
-  //     return this.reservationService.findAll();
-  //   }
-
-  //   @Get(':id')
-  //   findOne(@Param('id') id: string) {
-  //     return this.reservationService.findOne(+id);
-  //   }
-
-  //   @Patch(':id')
-  //   update(
-  //     @Param('id') id: string,
-  //     @Body() updateReservationDto: UpdateReservationDto,
-  //   ) {
-  //     return this.reservationService.update(+id, updateReservationDto);
-  //   }
-
-  //   @Delete(':id')
-  //   remove(@Param('id') id: string) {
-  //     return this.reservationService.remove(+id);
-  //   }
 
   /**
    * Checks for available rooms based on the given criteria.
@@ -106,5 +70,41 @@ export class ReservationController {
       guestNumber,
       roomId,
     });
+  }
+
+  @Get('check-reservation-exists/:id')
+  @ApiOperation({ summary: 'Check if a reservation exists' })
+  @ApiQuery({
+    name: 'reservationId',
+    required: true,
+    type: String,
+    description: 'ID of the reservation to check',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Reservation exists',
+  })
+  @ApiResponse({ status: 404, description: 'Reservation not found' })
+  checkReservationExists(@Param('id') reservationId: string) {
+    return this.reservationService.checkReservationExists(reservationId);
+  }
+
+  @Post('create-reservation')
+  @ApiOperation({ summary: 'Create a reservation' })
+  @ApiResponse({
+    status: 201,
+    description: 'Reservation created successfully',
+    type: Reservation,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid input parameters' })
+  @ApiResponse({ status: 404, description: 'Room not found' })
+  createLandingReservation(
+    @Query('locale') locale: SupportedLocales = defaultLocale,
+    @Body() createReservationDto: CreateLandingReservationDto,
+  ) {
+    return this.reservationService.createLandingReservation(
+      createReservationDto,
+      locale,
+    );
   }
 }

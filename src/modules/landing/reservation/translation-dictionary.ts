@@ -1,6 +1,11 @@
 import { Dictionary } from '../i18n/translations';
 
 export const errorDictionary: Dictionary = {
+  reservationNotFound: {
+    es: 'Reserva no encontrada',
+    en: 'Reservation not found',
+  },
+
   reservation_RoomNotFound: {
     es: 'Habitación no encontrada',
     en: 'Room not found',

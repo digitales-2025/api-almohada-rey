@@ -1,6 +1,7 @@
 import { ReactivateReservationsUseCase } from './use-cases/reactivateReservations.use-case';
 import { DeactivateReservationsUseCase } from './use-cases/deactivateReservations.use-case';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { CreateLandingReservationDto } from 'src/modules/landing/reservation/dto/create-reservation.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
 import {
@@ -29,6 +30,11 @@ import { ReservationStatus } from '@prisma/client';
 import { ReservationStateFactory } from './states';
 import { ReservationStatusAvailableActions } from './entities/reservation.status-actions';
 import { UpdateManyDto, UpdateManyResponseDto } from './dto/update-many.dto';
+import {
+  defaultLocale,
+  SupportedLocales,
+} from 'src/modules/landing/i18n/translations';
+import { CreateReservationUseCaseForLanding } from './use-cases/createReservationForLanding.use-case';
 
 @Injectable()
 export class ReservationService {
@@ -38,6 +44,7 @@ export class ReservationService {
   constructor(
     private readonly reservationRepository: ReservationRepository,
     private readonly createReservationUseCase: CreateReservationUseCase,
+    private readonly createReservationUseCaseForLanding: CreateReservationUseCaseForLanding,
     private readonly updateReservationUseCase: UpdateReservationUseCase,
     private readonly roomRepository: RoomRepository,
     private readonly changeReservationStatusUseCase: ChangeReservationStatusUseCase,
@@ -70,6 +77,37 @@ export class ReservationService {
       const reservation = this.createReservationUseCase.execute(
         createReservationDto,
         userData,
+      );
+      return reservation;
+    } catch (error) {
+      this.errorHandler.handleError(error, 'creating');
+    }
+  }
+
+  async createForLanding(
+    createReservationDto: CreateLandingReservationDto,
+    userData: UserData,
+    locale: SupportedLocales = defaultLocale,
+  ): Promise<BaseApiResponse<Reservation>> {
+    try {
+      const roomAvailability = await this.checkAvailability({
+        roomId: createReservationDto.roomId,
+        checkInDate: createReservationDto.checkInDate,
+        checkOutDate: createReservationDto.checkOutDate,
+      });
+
+      if (!roomAvailability.isAvailable) {
+        throw new BadRequestException(
+          locale == defaultLocale
+            ? 'Habitación no disponible'
+            : 'Room not available',
+        );
+      }
+
+      const reservation = await this.createReservationUseCaseForLanding.execute(
+        createReservationDto,
+        userData,
+        locale,
       );
       return reservation;
     } catch (error) {

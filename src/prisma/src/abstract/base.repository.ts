@@ -60,8 +60,8 @@ export abstract class BaseRepository<T extends BaseEntity> {
    * @param tx - Contexto de transacción opcional
    * @returns - La entidad creada con el tipo especificado
    */
-  async createWithTx<V = T>(
-    createDto: CreateDto<T>,
+  async createWithTx<V = T, W = CreateDto<T>>(
+    createDto: W,
     tx?: PrismaTransaction,
   ): Promise<V> {
     const client = this.getClient(tx);
