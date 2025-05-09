@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ReportsRepository } from '../repositories/reports.repository';
 import { ProfitReportUseCase } from '../use-cases/profit-report.use-case';
 import { ExpenseReportUseCase } from '../use-cases/expense-report.use-case';
-import { BalanceReportUseCase } from '../use-cases/balance-report.use-case copy';
+import { BalanceReportUseCase } from '../use-cases/balance-report.use-case';
 // Si tienes un use case para unificar ambos, lo importas también
 
 @Injectable()
@@ -21,6 +21,7 @@ export class ReportsService {
    * @returns ExcelJS.Workbook con los datos de profit
    */
   async getProfitExcel({ month, year }: { month: number; year: number }) {
+    console.log('llego data pa ganacias getProfitExcel', month, year);
     const data = await this.reportsRepository.getProfit(month, year);
     return this.profitReportUseCase.execute(data, { month, year });
   }
@@ -32,6 +33,7 @@ export class ReportsService {
    * @returns ExcelJS.Workbook con los datos de expense
    */
   async getExpenseExcel({ month, year }: { month: number; year: number }) {
+    console.log('llego data pa gastos getExpenseExcel', month, year);
     const data = await this.reportsRepository.getExpense(month, year);
     return this.expenseReportUseCase.execute(data, { month, year });
   }
@@ -43,6 +45,7 @@ export class ReportsService {
    * @returns ExcelJS.Workbook con los datos de balance
    */
   async getBalanceExcel({ month, year }: { month: number; year: number }) {
+    console.log('llego data pa balance getBalanceExcel', month, year);
     const balanceData = await this.reportsRepository.getBalance(month, year);
     return this.balanceReportUseCase.execute(balanceData, { month, year });
   }

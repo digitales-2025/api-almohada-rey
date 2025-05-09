@@ -26,6 +26,14 @@ const EXPENSE_FIELDS = {
 export class ReportsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  /*   HotelExpense+
+
+  Reservation =conf = checin+
+  
+  Payment + amountPaid = total general+
+  
+  PaymentDetail= fecha de reporte = paymentDate */
+
   /**
    * Obtiene los datos de profit (ganancias) de todas las tablas configuradas,
    * filtrando por mes y año.
