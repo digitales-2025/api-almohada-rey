@@ -119,7 +119,7 @@ export class ReportsController {
    * @param year Año (YYYY)
    * @param res Respuesta HTTP para enviar el archivo
    */
-  @Get('balance')
+  /*   @Get('balance')
   @ApiOperation({
     summary: 'Descargar Excel de balance mensual',
     description:
@@ -160,5 +160,5 @@ export class ReportsController {
     );
     await workbook.xlsx.write(res);
     res.end();
-  }
+  } */
 }

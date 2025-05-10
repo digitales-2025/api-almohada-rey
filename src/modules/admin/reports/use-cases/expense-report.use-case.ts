@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
-import { ExpenseData } from '../interfaces/expense-fields';
+import { DailyExpensesByDay, DailyExpense } from '../interfaces/expense-fields';
 
 @Injectable()
 export class ExpenseReportUseCase {
   async execute(
-    data: ExpenseData[],
+    data: DailyExpensesByDay,
     { month, year }: { month: number; year: number },
   ): Promise<ExcelJS.Workbook> {
     const workbook = new ExcelJS.Workbook();
@@ -28,14 +28,22 @@ export class ExpenseReportUseCase {
       'Diciembre',
     ];
     const title = `Reporte de Gastos - ${monthNames[month]} ${year}`;
-    sheet.mergeCells('A1:C1');
+    sheet.mergeCells('A1:G1');
     const titleCell = sheet.getCell('A1');
     titleCell.value = title;
     titleCell.font = { bold: true, size: 14 };
     titleCell.alignment = { horizontal: 'center' };
 
     // -- Encabezados de columnas --
-    const headers = ['ID', 'Monto', 'Fecha'];
+    const headers = [
+      'Fecha',
+      'Tipo',
+      'Descripción',
+      'Categoría',
+      'Método de Pago',
+      'Monto',
+      'Productos/Documento',
+    ];
     sheet.addRow([]);
     sheet.addRow(headers);
 
@@ -55,19 +63,41 @@ export class ExpenseReportUseCase {
       };
     });
 
+    // -- Transformar DailyExpensesByDay a un array plano --
+    const flatData: (DailyExpense & { date: string })[] = [];
+    Object.entries(data).forEach(([date, expenses]) => {
+      expenses.forEach((item) => {
+        flatData.push({ ...item, date });
+      });
+    });
+
     // -- Agregar los datos --
-    data.forEach((item) => {
-      sheet.addRow([
-        item.id,
-        item.amount,
-        item.date instanceof Date
-          ? item.date.toISOString().split('T')[0]
-          : item.date,
-      ]);
+    flatData.forEach((item) => {
+      if (item.type === 'INVENTORY_INPUT') {
+        sheet.addRow([
+          item.date,
+          'Inventario',
+          item.description,
+          '', // categoría no aplica
+          '', // método de pago no aplica
+          item.total,
+          item.products.map((p) => `${p.name}: ${p.subtotal}`).join('; '),
+        ]);
+      } else if (item.type === 'HOTEL_EXPENSE') {
+        sheet.addRow([
+          item.date,
+          'Gasto Hotel',
+          item.description,
+          item.category,
+          item.paymentMethod,
+          item.amount,
+          `${item.documentType ?? ''} ${item.documentNumber ?? ''}`,
+        ]);
+      }
     });
 
     // -- Ajustar ancho de columnas --
-    sheet.columns = headers.map(() => ({ width: 20 }));
+    sheet.columns = headers.map(() => ({ width: 22 }));
 
     return workbook;
   }
