@@ -12,7 +12,7 @@ pipeline {
         //
         // VPS setup
         //
-        REMOTE_USER = "docker_admin"
+        REMOTE_USER = "fernando"
         REMOTE_IP = credentials("fernando-hetzner-hel-01-ip")
         REMOTE_FOLDER = "/home/fernando/services/acide/almohada/"
 
