@@ -47,7 +47,7 @@ pipeline {
             steps {
                 script {
                     def config = readYaml file: 'deploy/env.yaml'
-                    def env = config.prod.backend
+                    def env = config.develop.backend
 
                     def nonSensitiveVars = env.nonsensitive.collect { k, v -> "${k}=${v}" }
                     def sensitiveVars = env.sensitive
