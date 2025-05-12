@@ -1,6 +1,6 @@
 services:
   almohada-backend-develop:
-    image: docker.io/digitalesacide/almohada-backend-develop:0
+    image: docker.io/digitalesacide/almohada-backend-develop:{$ALMOHADA_BACKEND_VERSION:-latest}
     container_name: almohada-backend-develop
     restart: unless-stopped
     depends_on:
@@ -41,7 +41,7 @@ services:
       - almohada-network-develop
 
   almohada-frontend-develop:
-    image: docker.io/digitalesacide/almohada-frontend-develop:0
+    image: docker.io/digitalesacide/almohada-frontend-develop:{$ALMOHADA_FRONTEND_VERSION:-latest}
     container_name: almohada-frontend-develop
     restart: unless-stopped
     depends_on:
