@@ -36,13 +36,13 @@ export class ExpenseReportUseCase {
 
     // -- Encabezados de columnas --
     const headers = [
-      'Fecha',
-      'Tipo',
+      'Fecha Gasto',
+      'Tipo Gasto',
       'Descripción',
-      'Categoría',
+      'Categoría Gasto',
       'Método de Pago',
-      'Monto',
-      'Documento',
+      'Monto S/',
+      'Nro.Documento',
     ];
     sheet.addRow([]);
     sheet.addRow(headers);

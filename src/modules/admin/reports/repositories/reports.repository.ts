@@ -66,32 +66,6 @@ export class ReportsRepository {
   }
 
   /**
-   * Obtiene los datos de expense (gastos) de todas las tablas configuradas,
-   * filtrando por mes y año.
-   * @param month Mes numérico (1-12)
-   * @param year Año (YYYY)
-   * @returns Arreglo de objetos ExpenseData
-   */
-  /*   async getExpense(month: number, year: number): Promise<ExpenseData[]> {
-    const results = await Promise.all(
-      EXPENSE_TABLES.map((table) =>
-        this.prisma[table].findMany({
-          where: {
-            date: {
-              gte: new Date(`${year}-${month.toString().padStart(2, '0')}-01`),
-              lt: new Date(
-                `${year}-${(month + 1).toString().padStart(2, '0')}-01`,
-              ),
-            },
-          },
-          select: EXPENSE_FIELDS,
-        }),
-      ),
-    );
-    return results.flat();
-  } */
-
-  /**
    * Obtiene los datos de profit y expense para el balance,
    * retornando ambos arreglos en un solo objeto.
    * @param month Mes numérico (1-12)
@@ -164,6 +138,12 @@ export class ReportsRepository {
       orderBy: { date: 'asc' },
     });
 
+    const paymentMethodMap: Record<string, string> = {
+      CASH: 'Efectivo',
+      TRANSFER: 'Transferencia',
+      CARD: 'Tarjeta',
+    };
+
     // Unifica ambos en un solo array plano
     const expenses: ExpenseData[] = [
       ...inputMovements.map(
@@ -188,8 +168,10 @@ export class ReportsRepository {
           amount: exp.amount,
           date: exp.date,
           description: exp.description ?? null,
-          category: exp.category ?? null,
-          paymentMethod: exp.paymentMethod ?? null,
+          category: exp.category === 'FIXED' ? 'FIJO' : (exp.category ?? null),
+          paymentMethod: exp.paymentMethod
+            ? (paymentMethodMap[exp.paymentMethod] ?? exp.paymentMethod)
+            : null,
           documentType: exp.documentType ?? null,
           documentNumber: exp.documentNumber ?? null,
           type: 'HOTEL_EXPENSE',
@@ -199,4 +181,5 @@ export class ReportsRepository {
 
     return expenses;
   }
+  /* Fin reporte gastos  */
 }
