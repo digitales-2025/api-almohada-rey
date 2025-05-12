@@ -134,11 +134,18 @@ export class WarehouseController {
     enumName: 'ProductType',
     description: 'Tipo de almacén (COMMERCIAL o INTERNAL_USE)',
   })
+  @ApiQuery({
+    name: 'paymentDetailId',
+    description: 'Payment detail ID to filter the stock data',
+    type: String,
+    required: false,
+  })
   @ApiOkResponse({ description: 'Get stock of products by warehouse type' })
   @Get('stock/product/:type')
   findProductsStockByType(
     @Param('type') type: ProductType,
+    @Query('paymentDetailId') paymentDetailId?: string,
   ): Promise<StockData[]> {
-    return this.warehouseService.findProductsStockByType(type);
+    return this.warehouseService.findProductsStockByType(type, paymentDetailId);
   }
 }

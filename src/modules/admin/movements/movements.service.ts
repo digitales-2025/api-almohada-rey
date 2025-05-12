@@ -24,6 +24,8 @@ import {
 import { handleException } from 'src/utils';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 import { PaginationService } from 'src/pagination/pagination.service';
+import { UpdateMovementDetailDto } from './dto/update-movement-detail.dto';
+import { UpdatePaymentDetailDto } from '../payments/dto/update-payment-detail.dto';
 
 @Injectable()
 export class MovementsService {
@@ -597,6 +599,16 @@ export class MovementsService {
           },
           typePurchaseOrder: true,
           documentNumber: true,
+          movementsDetail: {
+            select: {
+              id: true,
+              paymentDetail: {
+                select: {
+                  id: true,
+                },
+              },
+            },
+          },
         },
         orderBy: {
           createdAt: 'desc',
@@ -609,6 +621,9 @@ export class MovementsService {
           type: movement.type,
           description: movement.description,
           warehouse: movement.warehouse,
+          hasPaymentAssigned: movement.movementsDetail.some(
+            (detail) => detail.paymentDetail && detail.paymentDetail.length > 0,
+          ),
           ...(movement.type === TypeMovements.INPUT && {
             ...(movement.typePurchaseOrder && {
               typePurchaseOrder: movement.typePurchaseOrder,
@@ -692,6 +707,7 @@ export class MovementsService {
               select: {
                 id: true,
                 name: true,
+                code: true,
               },
             },
           },
@@ -886,6 +902,401 @@ export class MovementsService {
         throw error;
       }
       handleException(error, 'Error updating a movement');
+    }
+  }
+
+  /**
+   * Actualiza un detalle de movimiento específico
+   * @param id ID del detalle de movimiento a actualizar
+   * @param updateDetailDto Datos para la actualización del detalle
+   * @param user Usuario que realiza la acción
+   * @param movementDate Fecha opcional para actualizar el movimiento principal
+   * @returns HttpResponse con los datos del detalle actualizado
+   */
+  async updateMovementDetail(
+    id: string,
+    updateDetailDto: UpdateMovementDetailDto,
+    user: UserData,
+    movementDate?: string,
+  ): Promise<HttpResponse<MovementsDetailData>> {
+    try {
+      // 1. Buscar el detalle de movimiento actual
+      const currentDetail = await this.prisma.movementsDetail.findUnique({
+        where: { id },
+        include: {
+          movements: {
+            select: {
+              id: true,
+              type: true,
+              warehouseId: true,
+              dateMovement: true,
+            },
+          },
+          product: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          paymentDetail: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      });
+
+      if (!currentDetail) {
+        throw new NotFoundException('Movement detail not found');
+      }
+
+      // 2. Extraer datos actuales y comprobar si hay cambios
+      const { quantity: currentQuantity, unitCost: currentUnitCost } =
+        currentDetail;
+      const {
+        quantity = currentQuantity,
+        unitCost = currentUnitCost,
+        productId,
+      } = updateDetailDto;
+
+      const isQuantityChanged = quantity !== currentQuantity;
+      const isUnitCostChanged = unitCost !== currentUnitCost;
+      const isProductChanged =
+        productId && productId !== currentDetail.productId;
+      const isMovementDateChanged =
+        movementDate && movementDate !== currentDetail.movements.dateMovement;
+
+      // Si no hay cambios en el detalle ni en la fecha, retornar los datos actuales
+      if (
+        !isQuantityChanged &&
+        !isUnitCostChanged &&
+        !isProductChanged &&
+        !isMovementDateChanged
+      ) {
+        const responseData: MovementsDetailData = {
+          id: currentDetail.id,
+          quantity: currentDetail.quantity,
+          unitCost: currentDetail.unitCost,
+          subtotal: currentDetail.subtotal,
+          product: {
+            id: currentDetail.product.id,
+            name: currentDetail.product.name,
+          },
+          paymentDetail: currentDetail.paymentDetail?.[0],
+        };
+
+        return {
+          statusCode: HttpStatus.OK,
+          message: 'No changes detected in movement detail or movement',
+          data: responseData,
+        };
+      }
+
+      // 3. Si hay cambio de producto, verificar que el nuevo producto existe
+      if (isProductChanged) {
+        await this.productService.findById(productId);
+      }
+
+      // 4. Actualizar la fecha del movimiento principal si se proporciona
+      if (isMovementDateChanged) {
+        await this.prisma.movements.update({
+          where: { id: currentDetail.movements.id },
+          data: { dateMovement: movementDate },
+        });
+
+        // Registrar auditoría para la actualización del movimiento
+        await this.prisma.audit.create({
+          data: {
+            action: AuditActionType.UPDATE,
+            entityId: currentDetail.movements.id,
+            entityType: 'movements',
+            performedById: user.id,
+          },
+        });
+      }
+
+      // Si solo se cambió la fecha y no hay cambios en el detalle, retornar
+      if (!isQuantityChanged && !isUnitCostChanged && !isProductChanged) {
+        const responseData: MovementsDetailData = {
+          id: currentDetail.id,
+          quantity: currentDetail.quantity,
+          unitCost: currentDetail.unitCost,
+          subtotal: currentDetail.subtotal,
+          product: {
+            id: currentDetail.product.id,
+            name: currentDetail.product.name,
+          },
+          paymentDetail: currentDetail.paymentDetail?.[0],
+        };
+
+        return {
+          statusCode: HttpStatus.OK,
+          message: 'Only movement date was updated',
+          data: responseData,
+        };
+      }
+
+      // 5. Revertir el efecto del detalle actual en el stock
+      await this.revertStockChanges(
+        [
+          {
+            productId: currentDetail.productId,
+            quantity: currentQuantity,
+            unitCost: currentUnitCost,
+          },
+        ],
+        currentDetail.movements.type,
+        currentDetail.movements.warehouseId,
+      );
+
+      // 6. Actualizar el detalle de movimiento
+      const updatedDetailRaw = await this.prisma.movementsDetail.update({
+        where: { id },
+        data: {
+          quantity,
+          unitCost,
+          subtotal: quantity * unitCost,
+          ...(isProductChanged && { productId }),
+        },
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          movements: {
+            select: {
+              id: true,
+              codeUnique: true,
+              type: true,
+              dateMovement: true,
+            },
+          },
+          paymentDetail: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      });
+
+      // Transformar la respuesta al tipo correcto
+      const updatedDetail: MovementsDetailData = {
+        id: updatedDetailRaw.id,
+        quantity: updatedDetailRaw.quantity,
+        unitCost: updatedDetailRaw.unitCost,
+        subtotal: updatedDetailRaw.subtotal,
+        product: {
+          id: updatedDetailRaw.product.id,
+          name: updatedDetailRaw.product.name,
+        },
+        paymentDetail: updatedDetailRaw.paymentDetail?.[0],
+      };
+
+      // 7. Aplicar el nuevo efecto en el stock
+      await this.processMovementDetail(
+        [
+          {
+            productId: isProductChanged ? productId : currentDetail.productId,
+            quantity,
+            unitCost,
+          },
+        ],
+        currentDetail.movements.type,
+        currentDetail.movements.warehouseId,
+        user,
+      );
+
+      // 8. Registrar la auditoría para el detalle
+      await this.prisma.audit.create({
+        data: {
+          action: AuditActionType.UPDATE,
+          entityId: id,
+          entityType: 'movementsDetail',
+          performedById: user.id,
+        },
+      });
+
+      return {
+        statusCode: HttpStatus.OK,
+        message: isMovementDateChanged
+          ? 'Movement detail and movement date successfully updated'
+          : 'Movement detail successfully updated',
+        data: updatedDetail,
+      };
+    } catch (error) {
+      this.logger.error('Error updating movement detail', error.stack);
+
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+
+      handleException(error, 'Error updating movement detail');
+    }
+  }
+
+  /**
+   * Gestiona la actualización de un detalle de pago con su detalle de movimiento asociado
+   * @param movementDetailId ID del detalle de movimiento asociado al detalle de pago
+   * @param updatePaymentDetailDto Datos de actualización del detalle de pago
+   * @param user Usuario que realiza la acción
+   * @returns El ID del detalle de movimiento resultante (puede ser el mismo u otro nuevo)
+   */
+  async handlePaymentDetailUpdate(
+    movementDetailId: string,
+    updatePaymentDetailDto: UpdatePaymentDetailDto,
+    user: UserData,
+  ): Promise<{ movementDetailId: string }> {
+    try {
+      // 1. Obtener el detalle de movimiento actual con su movimiento padre
+      const currentMovementDetail =
+        await this.prisma.movementsDetail.findUnique({
+          where: { id: movementDetailId },
+          include: {
+            movements: {
+              select: {
+                id: true,
+                dateMovement: true,
+                type: true,
+                warehouseId: true,
+                description: true,
+              },
+            },
+            product: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        });
+
+      if (!currentMovementDetail) {
+        throw new NotFoundException('Movement detail not found');
+      }
+
+      const currentMovement = currentMovementDetail.movements;
+      const newPaymentDate = updatePaymentDetailDto.paymentDate;
+
+      // Verificar si hay cambios en la fecha o en los detalles
+      const isDateChanged =
+        newPaymentDate && currentMovement.dateMovement !== newPaymentDate;
+
+      // Preparar los datos para actualizar el detalle del movimiento
+      const updateMovementDetailDto: UpdateMovementDetailDto = {};
+
+      // Verificar cambios en el detalle del pago para mapearlos al detalle de movimiento
+      if (updatePaymentDetailDto.quantity !== undefined) {
+        updateMovementDetailDto.quantity = updatePaymentDetailDto.quantity;
+      }
+
+      if (updatePaymentDetailDto.unitPrice !== undefined) {
+        updateMovementDetailDto.unitCost = updatePaymentDetailDto.unitPrice;
+      }
+
+      if (updatePaymentDetailDto.productId !== undefined) {
+        updateMovementDetailDto.productId = updatePaymentDetailDto.productId;
+      }
+
+      const hasDetailChanges = Object.keys(updateMovementDetailDto).length > 0;
+
+      // Si no hay cambios en la fecha ni en los detalles, simplemente retornamos el mismo ID
+      if (!isDateChanged && !hasDetailChanges) {
+        return { movementDetailId };
+      }
+
+      // 2. Verificar si el detalle de movimiento es el único en su movimiento
+      const hasMoreDetails = await this.hasMoreDetails(movementDetailId);
+
+      // 3. Casos de actualización
+
+      // Caso 1: Solo hay cambios en los detalles (no en la fecha)
+      if (!isDateChanged && hasDetailChanges) {
+        // Actualizar el detalle del movimiento con los nuevos valores
+        await this.updateMovementDetail(
+          movementDetailId,
+          updateMovementDetailDto,
+          user,
+        );
+        return { movementDetailId };
+      }
+
+      // Caso 2: Hay cambio de fecha pero es el único detalle
+      if (isDateChanged && !hasMoreDetails) {
+        // Actualizar el detalle del movimiento y la fecha del movimiento
+        await this.updateMovementDetail(
+          movementDetailId,
+          updateMovementDetailDto,
+          user,
+          newPaymentDate,
+        );
+        return { movementDetailId };
+      }
+
+      // Caso 3: Hay cambio de fecha y hay más detalles
+      // En este caso necesitamos crear un nuevo movimiento y trasladar el detalle
+
+      // 3.1 Guardar los datos necesarios antes de eliminar
+      const { quantity, unitCost, productId } = currentMovementDetail;
+      const { type, warehouseId, description } = currentMovement;
+
+      // 3.2 Eliminar el detalle original usando removeMovementDetail para gestionar el stock
+      await this.removeMovementDetail(movementDetailId, user);
+
+      // 3.3 Crear un nuevo movimiento con la nueva fecha y su detalle
+      // Aplicar los cambios de detalle si existen
+      const newQuantity =
+        updateMovementDetailDto.quantity !== undefined
+          ? updateMovementDetailDto.quantity
+          : quantity;
+      const newUnitCost =
+        updateMovementDetailDto.unitCost !== undefined
+          ? updateMovementDetailDto.unitCost
+          : unitCost;
+      const newProductId =
+        updateMovementDetailDto.productId !== undefined
+          ? updateMovementDetailDto.productId
+          : productId;
+
+      const createMovementDto: CreateMovementDto = {
+        dateMovement: newPaymentDate,
+        type,
+        warehouseId,
+        description: `${description || 'Movimiento'} (Trasladado)`,
+        movementDetail: [
+          {
+            quantity: newQuantity,
+            unitCost: newUnitCost,
+            productId: newProductId,
+          },
+        ],
+      };
+
+      const createdMovement = await this.create(createMovementDto, user);
+
+      // 3.4 Obtener el ID del nuevo detalle de movimiento creado
+      const newMovementDetailId = createdMovement.data.movementsDetail[0].id;
+
+      // 3.5 Retornar el ID del nuevo detalle de movimiento
+      return { movementDetailId: newMovementDetailId };
+    } catch (error) {
+      this.logger.error(
+        `Error handling payment detail update: ${error.message}`,
+        error.stack,
+      );
+
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+
+      handleException(error, 'Error handling payment detail update');
     }
   }
 
@@ -1264,6 +1675,129 @@ export class MovementsService {
       }
 
       handleException(error, 'Error deleting movement detail');
+    }
+  }
+
+  /**
+   * Verifica si un movimiento tiene más detalles además del detalle especificado
+   * @param detailId ID del detalle de movimiento a evaluar
+   * @returns Promesa de un booleano: true si hay más detalles, false si es el único
+   */
+  async hasMoreDetails(detailId: string): Promise<boolean> {
+    try {
+      // 1. Obtener el detalle de movimiento para identificar a qué movimiento pertenece
+      const detail = await this.prisma.movementsDetail.findUnique({
+        where: { id: detailId },
+        select: {
+          movementsId: true,
+        },
+      });
+
+      if (!detail) {
+        throw new NotFoundException('Movement detail not found');
+      }
+
+      // 2. Contar cuántos detalles tiene el movimiento excluyendo el detalle actual
+      const count = await this.prisma.movementsDetail.count({
+        where: {
+          movementsId: detail.movementsId,
+          id: { not: detailId }, // Excluir el detalle actual
+        },
+      });
+
+      // 3. Retornar true si hay más detalles (count > 0), o false si es el único (count === 0)
+      return count > 0;
+    } catch (error) {
+      this.logger.error(
+        `Error checking if movement has more details: ${error.message}`,
+        error.stack,
+      );
+
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      handleException(error, 'Error checking if movement has more details');
+    }
+  }
+
+  /**
+   * Actualiza la fecha de un movimiento usando el ID de un detalle de movimiento
+   * @param movementDetailId ID del detalle de movimiento
+   * @param movementDate Nueva fecha para el movimiento
+   * @param user Usuario que realiza la acción
+   * @returns HttpResponse con mensaje de confirmación
+   */
+  async updateMovementDateByDetail(
+    movementDetailId: string,
+    movementDate: string,
+    user: UserData,
+  ): Promise<HttpResponse<{ dateMovement: string }>> {
+    try {
+      // 1. Encontrar el detalle para obtener el ID del movimiento padre
+      const movementDetail = await this.prisma.movementsDetail.findUnique({
+        where: { id: movementDetailId },
+        select: {
+          movements: {
+            select: {
+              id: true,
+              dateMovement: true,
+            },
+          },
+        },
+      });
+
+      if (!movementDetail) {
+        throw new NotFoundException('Movement detail not found');
+      }
+
+      const movementId = movementDetail.movements.id;
+      const currentDate = movementDetail.movements.dateMovement;
+
+      // 2. Verificar si la fecha actual es igual a la nueva fecha
+      if (currentDate === movementDate) {
+        return {
+          statusCode: HttpStatus.OK,
+          message: 'No changes in movement date',
+          data: { dateMovement: currentDate },
+        };
+      }
+
+      // 3. Actualizar la fecha del movimiento
+      await this.prisma.movements.update({
+        where: { id: movementId },
+        data: { dateMovement: movementDate },
+      });
+
+      // 4. Registrar la auditoría
+      await this.prisma.audit.create({
+        data: {
+          action: AuditActionType.UPDATE,
+          entityId: movementId,
+          entityType: 'movements',
+          performedById: user.id,
+        },
+      });
+
+      return {
+        statusCode: HttpStatus.OK,
+        message: 'Movement date successfully updated',
+        data: { dateMovement: movementDate },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error updating movement date: ${error.message}`,
+        error.stack,
+      );
+
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+
+      handleException(error, 'Error updating movement date');
     }
   }
 }
