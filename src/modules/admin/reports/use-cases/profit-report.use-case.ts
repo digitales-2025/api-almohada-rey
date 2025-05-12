@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
-import { ExpenseData } from '../interfaces/expense-fields';
+import { ProfitData } from '../interfaces/profit-fields';
 
 @Injectable()
 export class ProfitReportUseCase {
   async execute(
-    data: ExpenseData[],
+    data: ProfitData[],
     { month, year }: { month: number; year: number },
   ): Promise<ExcelJS.Workbook> {
     const workbook = new ExcelJS.Workbook();

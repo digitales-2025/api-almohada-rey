@@ -1,8 +1,13 @@
 export interface ExpenseData {
-  id: string;
-  amount: number;
-  date: Date | string;
-  // otros campos relevantes...
+  id: string; // ID único del gasto o movimiento
+  amount: number; // Monto total del gasto
+  date: string; // Fecha del gasto (formato YYYY-MM-DD)
+  description: string | null; // Descripción del gasto
+  category: string | null; // Categoría (por ejemplo, 'INVENTARIO', 'SERVICIOS', etc.)
+  paymentMethod: string | null; // Método de pago (efectivo, tarjeta, etc.)
+  documentType: string | null; // Tipo de documento (boleta, factura, etc.)
+  documentNumber: string | null; // Número de documento
+  type: 'INVENTORY_INPUT' | 'HOTEL_EXPENSE'; // Tipo de gasto
 }
 
 export interface DailyInventoryInput {

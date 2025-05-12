@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ReportsRepository } from '../repositories/reports.repository';
 import { ProfitReportUseCase } from '../use-cases/profit-report.use-case';
 import { ExpenseReportUseCase } from '../use-cases/expense-report.use-case';
-import { BalanceReportUseCase } from '../use-cases/balance-report.use-case';
+/* import { BalanceReportUseCase } from '../use-cases/balance-report.use-case'; */
 // Si tienes un use case para unificar ambos, lo importas también
 
 @Injectable()
@@ -11,7 +11,7 @@ export class ReportsService {
     private readonly reportsRepository: ReportsRepository,
     private readonly profitReportUseCase: ProfitReportUseCase,
     private readonly expenseReportUseCase: ExpenseReportUseCase,
-    private readonly balanceReportUseCase: BalanceReportUseCase, // si lo necesitas
+    /*    private readonly balanceReportUseCase: BalanceReportUseCase, // si lo necesitas */
   ) {}
 
   /**

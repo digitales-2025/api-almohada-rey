@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ProfitData } from '../interfaces/profit-fields';
-import {
-  DailyExpensesByDay /* , ExpenseData */,
-} from '../interfaces/expense-fields';
+/* import {
+  DailyExpensesByDay , ExpenseData,
+} from '../interfaces/expense-fields'; */
 /* import { BalanceData } from '../interfaces/balance'; */
+import { ExpenseData } from '../interfaces/expense-fields';
 
 // Puedes agregar todas las tablas relevantes para el profit
 const PROFIT_TABLES = ['reservation', 'movements', 'otro'];
@@ -111,7 +112,8 @@ export class ReportsRepository {
    * @param year Año (YYYY)
    * @returns Objeto con los gastos diarios agrupados por día
    */
-  async getExpense(month: number, year: number): Promise<DailyExpensesByDay> {
+
+  async getExpense(month: number, year: number): Promise<ExpenseData[]> {
     const startDate = new Date(
       `${year}-${month.toString().padStart(2, '0')}-01`,
     );
@@ -135,10 +137,7 @@ export class ReportsRepository {
         dateMovement: true,
         description: true,
         movementsDetail: {
-          select: {
-            subtotal: true,
-            product: { select: { name: true } },
-          },
+          select: { subtotal: true },
         },
       },
       orderBy: { dateMovement: 'asc' },
@@ -165,47 +164,39 @@ export class ReportsRepository {
       orderBy: { date: 'asc' },
     });
 
-    // Agrupar por día
-    const dailyExpenses: DailyExpensesByDay = {};
+    // Unifica ambos en un solo array plano
+    const expenses: ExpenseData[] = [
+      ...inputMovements.map(
+        (mov): ExpenseData => ({
+          id: mov.id,
+          amount: mov.movementsDetail.reduce(
+            (sum, det) => sum + det.subtotal,
+            0,
+          ),
+          date: mov.dateMovement,
+          description: mov.description ?? null,
+          category: 'INVENTARIO',
+          paymentMethod: null,
+          documentType: null,
+          documentNumber: null,
+          type: 'INVENTORY_INPUT',
+        }),
+      ),
+      ...hotelExpenses.map(
+        (exp): ExpenseData => ({
+          id: exp.id,
+          amount: exp.amount,
+          date: exp.date,
+          description: exp.description ?? null,
+          category: exp.category ?? null,
+          paymentMethod: exp.paymentMethod ?? null,
+          documentType: exp.documentType ?? null,
+          documentNumber: exp.documentNumber ?? null,
+          type: 'HOTEL_EXPENSE',
+        }),
+      ),
+    ];
 
-    // Procesar movimientos INPUT
-    inputMovements.forEach((mov) => {
-      const day = mov.dateMovement;
-      if (!dailyExpenses[day]) dailyExpenses[day] = [];
-      const totalInput = mov.movementsDetail.reduce(
-        (sum, det) => sum + det.subtotal,
-        0,
-      );
-      dailyExpenses[day].push({
-        type: 'INVENTORY_INPUT',
-        description: mov.description,
-        products: mov.movementsDetail.map((det) => ({
-          name: det.product?.name ?? null,
-          subtotal: det.subtotal,
-        })),
-        total: totalInput,
-      });
-    });
-
-    // Procesar gastos directos
-    hotelExpenses.forEach((exp) => {
-      const day = exp.date;
-      if (!dailyExpenses[day]) dailyExpenses[day] = [];
-      dailyExpenses[day].push({
-        type: 'HOTEL_EXPENSE',
-        description: exp.description,
-        category: exp.category,
-        paymentMethod: exp.paymentMethod,
-        amount: exp.amount,
-        documentType: exp.documentType,
-        documentNumber: exp.documentNumber,
-        total: exp.amount,
-      });
-    });
-
-    // Mostrar por consola el resultado agrupado por día
-    console.log(dailyExpenses);
-
-    return dailyExpenses;
+    return expenses;
   }
 }

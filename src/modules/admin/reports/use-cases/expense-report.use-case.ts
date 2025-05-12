@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
-import { DailyExpensesByDay, DailyExpense } from '../interfaces/expense-fields';
+import { ExpenseData } from '../interfaces/expense-fields';
 
 @Injectable()
 export class ExpenseReportUseCase {
   async execute(
-    data: DailyExpensesByDay,
+    data: ExpenseData[],
     { month, year }: { month: number; year: number },
   ): Promise<ExcelJS.Workbook> {
     const workbook = new ExcelJS.Workbook();
@@ -42,7 +42,7 @@ export class ExpenseReportUseCase {
       'Categoría',
       'Método de Pago',
       'Monto',
-      'Productos/Documento',
+      'Documento',
     ];
     sheet.addRow([]);
     sheet.addRow(headers);
@@ -63,38 +63,24 @@ export class ExpenseReportUseCase {
       };
     });
 
-    // -- Transformar DailyExpensesByDay a un array plano --
-    const flatData: (DailyExpense & { date: string })[] = [];
-    Object.entries(data).forEach(([date, expenses]) => {
-      expenses.forEach((item) => {
-        flatData.push({ ...item, date });
-      });
+    // -- Agregar los datos --
+    let total = 0;
+    data.forEach((item) => {
+      sheet.addRow([
+        item.date,
+        item.type === 'INVENTORY_INPUT' ? 'Inventario' : 'Gasto Hotel',
+        item.description,
+        item.category,
+        item.paymentMethod,
+        item.amount,
+        `${item.documentType ?? ''} ${item.documentNumber ?? ''}`,
+      ]);
+      total += item.amount;
     });
 
-    // -- Agregar los datos --
-    flatData.forEach((item) => {
-      if (item.type === 'INVENTORY_INPUT') {
-        sheet.addRow([
-          item.date,
-          'Inventario',
-          item.description,
-          '', // categoría no aplica
-          '', // método de pago no aplica
-          item.total,
-          item.products.map((p) => `${p.name}: ${p.subtotal}`).join('; '),
-        ]);
-      } else if (item.type === 'HOTEL_EXPENSE') {
-        sheet.addRow([
-          item.date,
-          'Gasto Hotel',
-          item.description,
-          item.category,
-          item.paymentMethod,
-          item.amount,
-          `${item.documentType ?? ''} ${item.documentNumber ?? ''}`,
-        ]);
-      }
-    });
+    // -- Fila de total --
+    const totalRow = sheet.addRow(['', '', '', '', 'TOTAL', total, '']);
+    totalRow.font = { bold: true };
 
     // -- Ajustar ancho de columnas --
     sheet.columns = headers.map(() => ({ width: 22 }));
