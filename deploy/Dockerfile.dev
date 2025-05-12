@@ -21,7 +21,14 @@ COPY package.json .
 RUN pnpm i --ignore-scripts
 
 # Build binary
-COPY . .
+COPY prisma ./prisma
+COPY src ./src
+COPY test ./test
+COPY nest-cli.json .
+COPY package.json .
+COPY pnpm-lock.yaml .
+COPY tsconfig.build.json .
+COPY tsconfig.json .
 RUN pnpx prisma generate
 RUN pnpm run build
 
