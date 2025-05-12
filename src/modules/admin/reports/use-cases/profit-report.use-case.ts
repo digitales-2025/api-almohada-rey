@@ -9,7 +9,7 @@ export class ProfitReportUseCase {
     { month, year }: { month: number; year: number },
   ): Promise<ExcelJS.Workbook> {
     const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Expense');
+    const sheet = workbook.addWorksheet('Ganancias');
 
     // -- Cabecera/Título con mes y año --
     const monthNames = [
@@ -27,15 +27,20 @@ export class ProfitReportUseCase {
       'Noviembre',
       'Diciembre',
     ];
-    const title = `Reporte de Gastos - ${monthNames[month]} ${year}`;
-    sheet.mergeCells('A1:C1');
+    const title = `Reporte de Ganancias - ${monthNames[month]} ${year}`;
+    sheet.mergeCells('A1:E1');
     const titleCell = sheet.getCell('A1');
     titleCell.value = title;
     titleCell.font = { bold: true, size: 14 };
     titleCell.alignment = { horizontal: 'center' };
 
     // -- Encabezados de columnas --
-    const headers = ['ID', 'Monto', 'Fecha'];
+    const headers = [
+      'Fecha',
+      'Tipo de Ingreso',
+      'Habitación/Extra',
+      'Monto S/',
+    ];
     sheet.addRow([]);
     sheet.addRow(headers);
 
@@ -56,18 +61,23 @@ export class ProfitReportUseCase {
     });
 
     // -- Agregar los datos --
+    let total = 0;
     data.forEach((item) => {
       sheet.addRow([
-        item.id,
+        item.date,
+        item.type === 'ROOM' ? 'Habitación' : 'Extra',
+        item.type === 'ROOM' ? item.roomTypeName : item.extraName,
         item.amount,
-        item.date instanceof Date
-          ? item.date.toISOString().split('T')[0]
-          : item.date,
       ]);
+      total += item.amount;
     });
 
+    // -- Fila de total --
+    const totalRow = sheet.addRow(['', '', 'TOTAL', total]);
+    totalRow.font = { bold: true };
+
     // -- Ajustar ancho de columnas --
-    sheet.columns = headers.map(() => ({ width: 20 }));
+    sheet.columns = headers.map(() => ({ width: 22 }));
 
     return workbook;
   }

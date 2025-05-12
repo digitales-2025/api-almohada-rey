@@ -1,37 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ProfitData } from '../interfaces/profit-fields';
-/* import {
-  DailyExpensesByDay , ExpenseData,
-} from '../interfaces/expense-fields'; */
-/* import { BalanceData } from '../interfaces/balance'; */
 import { ExpenseData } from '../interfaces/expense-fields';
-
-// Puedes agregar todas las tablas relevantes para el profit
-const PROFIT_TABLES = ['reservation', 'movements', 'otro'];
-/* const EXPENSE_TABLES = ['expense', 'otro_expense']; */
-
-const PROFIT_FIELDS = {
-  id: true,
-  amount: true,
-  date: true,
-  // otros campos relevantes...
-};
-
-/* const EXPENSE_FIELDS = {
-  id: true,
-  amount: true,
-  date: true,
-  // otros campos relevantes...
-}; */
 
 @Injectable()
 export class ReportsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  /*   HotelExpense+
+  /*   pautas del como obtener las ganancias
 
-  Reservation =conf = checin+
+  Reservation =conf = checin
   
   Payment + amountPaid = total general+
   
@@ -45,24 +23,92 @@ export class ReportsRepository {
    * @returns Arreglo de objetos ProfitData
    */
   async getProfit(month: number, year: number): Promise<ProfitData[]> {
-    // Consultar todas las tablas de profit y combinar los resultados
-    const results = await Promise.all(
-      PROFIT_TABLES.map((table) =>
-        this.prisma[table].findMany({
-          where: {
-            date: {
-              gte: new Date(`${year}-${month.toString().padStart(2, '0')}-01`),
-              lt: new Date(
-                `${year}-${(month + 1).toString().padStart(2, '0')}-01`,
-              ),
-            },
+    const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
+    const endDate =
+      month === 12
+        ? `${year + 1}-01-01`
+        : `${year}-${(month + 1).toString().padStart(2, '0')}-01`;
+
+    // 1. Ganancias por reservas de habitaciones
+    const roomDetails = await this.prisma.paymentDetail.findMany({
+      where: {
+        type: 'ROOM_RESERVATION',
+        status: 'PAID',
+        paymentDate: {
+          gte: startDate,
+          lt: endDate,
+        },
+      },
+      select: {
+        id: true,
+        paymentDate: true,
+        subtotal: true,
+        room: {
+          select: {
+            roomTypeId: true,
+            RoomTypes: { select: { name: true } },
           },
-          select: PROFIT_FIELDS,
-        }),
-      ),
-    );
-    // Combinar todos los resultados en un solo array
-    return results.flat();
+        },
+      },
+      orderBy: { paymentDate: 'asc' },
+    });
+
+    // 2. Ganancias por extras (productos y servicios)
+    const extraDetails = await this.prisma.paymentDetail.findMany({
+      where: {
+        type: 'EXTRA_SERVICE',
+        status: 'PAID',
+        paymentDate: {
+          gte: startDate,
+          lt: endDate,
+        },
+      },
+      select: {
+        id: true,
+        paymentDate: true,
+        subtotal: true,
+        product: { select: { name: true } },
+        service: { select: { name: true } },
+      },
+      orderBy: { paymentDate: 'asc' },
+    });
+
+    // Agrupar y sumar ganancias por fecha y tipo
+    const profitsMap: Record<string, ProfitData> = {};
+
+    // Habitaciones
+    roomDetails.forEach((d) => {
+      const key = `${d.paymentDate}-room-${d.room?.roomTypeId ?? 'SIN_TIPO'}`;
+      if (!profitsMap[key]) {
+        profitsMap[key] = {
+          id: d.id,
+          amount: 0,
+          date: d.paymentDate,
+          type: 'ROOM',
+          roomTypeName: d.room?.RoomTypes?.name ?? 'Sin tipo',
+        };
+      }
+      profitsMap[key].amount += d.subtotal;
+    });
+
+    // Extras (productos y servicios)
+    extraDetails.forEach((d) => {
+      const extraName = d.product?.name || d.service?.name || 'Extra';
+      const key = `${d.paymentDate}-extra-${extraName}`;
+      if (!profitsMap[key]) {
+        profitsMap[key] = {
+          id: d.id,
+          amount: 0,
+          date: d.paymentDate,
+          type: 'EXTRA',
+          extraName,
+        };
+      }
+      profitsMap[key].amount += d.subtotal;
+    });
+
+    // Convertir a array
+    return Object.values(profitsMap);
   }
 
   /**
