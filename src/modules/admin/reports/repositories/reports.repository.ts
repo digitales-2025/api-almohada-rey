@@ -135,6 +135,7 @@ export class ReportsRepository {
         id: true,
         dateMovement: true,
         description: true,
+        typePurchaseOrder: true, // Campo correcto según el esquema
         movementsDetail: {
           select: { subtotal: true },
         },
@@ -158,58 +159,126 @@ export class ReportsRepository {
         paymentMethod: true,
         amount: true,
         documentType: true,
-        documentNumber: true,
       },
       orderBy: { date: 'asc' },
     });
 
-    const paymentMethodMap: Record<string, string> = {
-      CASH: 'Efectivo',
-      TRANSFER: 'Transferencia',
-      CARD: 'Tarjeta',
-    };
+    // Agrupa y suma por fecha
+    const resumenPorFecha: Record<
+      string,
+      {
+        id: string;
+        amount: number;
+        date: string;
+        description: string | null;
+        category: string | null;
+        paymentMethod: string | null;
+        movimientosBoleta: number;
+        movimientosFactura: number;
+        movimientosOtro: number;
+        totalMovimientos: number; // Nuevo campo
+        gastosBoleta: number;
+        gastosFactura: number;
+        gastosOtro: number;
+        totalGastos: number; // Nuevo campo
+        type: 'INVENTORY_INPUT' | 'HOTEL_EXPENSE';
+      }
+    > = {};
 
-    // Unifica ambos en un solo array plano
-    const expenses: ExpenseData[] = [
-      ...inputMovements.map(
-        (mov): ExpenseData => ({
-          id: mov.id,
-          amount: mov.movementsDetail.reduce(
-            (sum, det) => sum + det.subtotal,
-            0,
-          ),
-          date: mov.dateMovement,
-          description: mov.description ?? null,
-          category: 'INVENTARIO',
+    // Procesar movimientos (INVENTORY_INPUT)
+    inputMovements.forEach((mov) => {
+      const fecha = mov.dateMovement;
+      const amount = mov.movementsDetail.reduce(
+        (sum, det) => sum + det.subtotal,
+        0,
+      );
+
+      if (!resumenPorFecha[fecha]) {
+        resumenPorFecha[fecha] = {
+          id: fecha,
+          amount: 0,
+          date: fecha,
+          description: null,
+          category: null,
           paymentMethod: null,
-          documentType: null,
-          documentNumber: null,
+          movimientosBoleta: 0,
+          movimientosFactura: 0,
+          movimientosOtro: 0,
+          totalMovimientos: 0, // Nuevo campo
+          gastosBoleta: 0,
+          gastosFactura: 0,
+          gastosOtro: 0,
+          totalGastos: 0, // Nuevo campo
           type: 'INVENTORY_INPUT',
-        }),
-      ),
-      ...hotelExpenses.map(
-        (exp): ExpenseData => ({
-          id: exp.id,
-          amount: exp.amount,
-          date: exp.date,
-          description: exp.description ?? null,
-          category:
-            exp.category === 'FIXED'
-              ? 'FIJO'
-              : exp.category === 'VARIABLE'
-                ? 'VARIABLE'
-                : exp.category === 'OTHER'
-                  ? 'OTRO'
-                  : (exp.category ?? null),
-          paymentMethod: exp.paymentMethod
-            ? (paymentMethodMap[exp.paymentMethod] ?? exp.paymentMethod)
-            : null,
-          documentType: exp.documentType ?? null,
-          documentNumber: exp.documentNumber ?? null,
+        };
+      }
+
+      // Sumar al total general
+      resumenPorFecha[fecha].amount += amount;
+
+      // Sumar al total por tipo de documento para movimientos
+      if (mov.typePurchaseOrder === 'RECEIPT') {
+        resumenPorFecha[fecha].movimientosBoleta += amount;
+      } else if (mov.typePurchaseOrder === 'INVOICE') {
+        resumenPorFecha[fecha].movimientosFactura += amount;
+      } else {
+        resumenPorFecha[fecha].movimientosOtro += amount;
+      }
+
+      // Actualizar totalMovimientos
+      resumenPorFecha[fecha].totalMovimientos =
+        resumenPorFecha[fecha].movimientosBoleta +
+        resumenPorFecha[fecha].movimientosFactura +
+        resumenPorFecha[fecha].movimientosOtro;
+    });
+
+    // Procesar gastos directos (HOTEL_EXPENSE)
+    hotelExpenses.forEach((exp) => {
+      const fecha = exp.date;
+
+      if (!resumenPorFecha[fecha]) {
+        resumenPorFecha[fecha] = {
+          id: fecha,
+          amount: 0,
+          date: fecha,
+          description: null,
+          category: null,
+          paymentMethod: null,
+          movimientosBoleta: 0,
+          movimientosFactura: 0,
+          movimientosOtro: 0,
+          totalMovimientos: 0, // Nuevo campo
+          gastosBoleta: 0,
+          gastosFactura: 0,
+          gastosOtro: 0,
+          totalGastos: 0, // Nuevo campo
           type: 'HOTEL_EXPENSE',
-        }),
-      ),
-    ];
+        };
+      }
+
+      // Sumar al total general
+      resumenPorFecha[fecha].amount += exp.amount;
+
+      // Sumar al total por tipo de documento para gastos
+      if (exp.documentType === 'RECEIPT') {
+        resumenPorFecha[fecha].gastosBoleta += exp.amount;
+      } else if (exp.documentType === 'INVOICE') {
+        resumenPorFecha[fecha].gastosFactura += exp.amount;
+      } else {
+        resumenPorFecha[fecha].gastosOtro += exp.amount;
+      }
+
+      // Actualizar totalGastos
+      resumenPorFecha[fecha].totalGastos =
+        resumenPorFecha[fecha].gastosBoleta +
+        resumenPorFecha[fecha].gastosFactura +
+        resumenPorFecha[fecha].gastosOtro;
+    });
+
+    // Convertir a array y ordenar por fecha
+    const expenses: ExpenseData[] = Object.values(resumenPorFecha).sort(
+      (a, b) => a.date.localeCompare(b.date),
+    );
 
     return expenses;
   }

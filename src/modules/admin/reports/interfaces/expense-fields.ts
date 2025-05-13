@@ -5,8 +5,20 @@ export interface ExpenseData {
   description: string | null; // Descripción del gasto
   category: string | null; // Categoría (por ejemplo, 'INVENTARIO', 'SERVICIOS', etc.)
   paymentMethod: string | null; // Método de pago (efectivo, tarjeta, etc.)
-  documentType: string | null; // Tipo de documento (boleta, factura, etc.)
-  documentNumber: string | null; // Número de documento
+
+  // Campos para movimientos
+  movimientosBoleta: number; // Total INVENTORY_INPUT con documentType=RECEIPT
+  movimientosFactura: number; // Total INVENTORY_INPUT con documentType=INVOICE
+  movimientosOtro: number; // Total INVENTORY_INPUT con documentType=OTHER o null
+  totalMovimientos: number; // Nuevo campo
+
+  // Campos para gastos
+  gastosBoleta: number; // Total HOTEL_EXPENSE con documentType=RECEIPT
+  gastosFactura: number; // Total HOTEL_EXPENSE con documentType=INVOICE
+  gastosOtro: number; // Total HOTEL_EXPENSE con documentType=OTHER o null
+  totalGastos: number; // Nuevo campo
+
+  // Mantenemos el tipo para informativo
   type: 'INVENTORY_INPUT' | 'HOTEL_EXPENSE'; // Tipo de gasto
 }
 
