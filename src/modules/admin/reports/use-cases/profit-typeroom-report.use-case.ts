@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
-import { ProfitData } from '../interfaces/profit-fields';
+import { ProfitRoomTypeData } from '../interfaces/profit-roomtype-fields';
 
 @Injectable()
-export class ProfitReportUseCase {
+export class ProfitTypeRoomReportUseCase {
   async execute(
-    data: ProfitData[],
+    data: ProfitRoomTypeData[],
     { month, year }: { month: number; year: number },
   ): Promise<ExcelJS.Workbook> {
     const workbook = new ExcelJS.Workbook();
@@ -28,7 +28,7 @@ export class ProfitReportUseCase {
       'Diciembre',
     ];
     const title = `Reporte de Ganancias - ${monthNames[month]} ${year}`;
-    sheet.mergeCells('A1:D1');
+    sheet.mergeCells('A1:F1');
     const titleCell = sheet.getCell('A1');
     titleCell.value = title;
     titleCell.font = { bold: true, size: 14 };
@@ -37,9 +37,11 @@ export class ProfitReportUseCase {
     // -- Encabezados de columnas --
     const headers = [
       'Fecha',
-      'Total Reservas S/',
-      'Total Extra Service S/',
-      'Total S/',
+      'Tipo de Ingreso',
+      'Habitación',
+      'Total Habitación S/',
+      'Total Extras S/',
+      'Total General S/',
     ];
     sheet.addRow([]);
     sheet.addRow(headers);
@@ -67,17 +69,21 @@ export class ProfitReportUseCase {
     data.forEach((item) => {
       sheet.addRow([
         item.date,
-        item.totalReservas,
+        item.tipoIngreso,
+        item.habitacion,
+        item.totalHabitacion,
         item.totalExtras,
-        item.total,
+        item.totalGeneral,
       ]);
-      totalHabitacion += item.totalReservas;
+      totalHabitacion += item.totalHabitacion;
       totalExtras += item.totalExtras;
-      totalGeneral += item.total;
+      totalGeneral += item.totalGeneral;
     });
 
     // -- Fila de total --
     const totalRow = sheet.addRow([
+      '',
+      '',
       'TOTAL',
       totalHabitacion,
       totalExtras,

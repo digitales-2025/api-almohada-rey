@@ -119,7 +119,7 @@ export class ReportsController {
    * @param year Año (YYYY)
    * @param res Respuesta HTTP para enviar el archivo
    */
-  /*   @Get('balance')
+  @Get('balance')
   @ApiOperation({
     summary: 'Descargar Excel de balance mensual',
     description:
@@ -160,5 +160,59 @@ export class ReportsController {
     );
     await workbook.xlsx.write(res);
     res.end();
-  } */
+  }
+
+  @Get('profitRoomType')
+  @ApiOperation({
+    summary: 'Descargar Excel de ganancias por tipo de habitación',
+    description:
+      'Genera y descarga un archivo Excel con el profit para un mes, año y tipo de habitación específicos.',
+  })
+  @ApiQuery({
+    name: 'month',
+    description: 'Mes numérico (1-12)',
+    type: Number,
+    example: 5,
+    required: true,
+  })
+  @ApiQuery({
+    name: 'year',
+    description: 'Año en formato YYYY',
+    type: Number,
+    example: 2024,
+    required: true,
+  })
+  @ApiQuery({
+    name: 'typeRoomId',
+    description: 'ID del tipo de habitación',
+    type: String,
+    example: 'uuid-del-tipo-habitacion',
+    required: true,
+  })
+  @ApiOkResponse({
+    description: 'Archivo Excel con el profit por tipo de habitación',
+    schema: { type: 'string', format: 'binary' },
+  })
+  async downloadProfitTypeRoomExcel(
+    @Query('month') month: number,
+    @Query('year') year: number,
+    @Query('typeRoomId') typeRoomId: string,
+    @Res() res: Response,
+  ) {
+    const workbook = await this.reportsService.getProfitTypeRoomExcel({
+      month,
+      year,
+      typeRoomId,
+    });
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=profit_roomtype_${year}_${month}.xlsx`,
+    );
+    await workbook.xlsx.write(res);
+    res.end();
+  }
 }

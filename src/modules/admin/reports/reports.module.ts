@@ -3,9 +3,10 @@ import { ReportsController } from './controllers/reports.controller';
 import { ReportsService } from './services/reports.service';
 import { ReportsRepository } from './repositories/reports.repository';
 import { PrismaModule } from 'src/prisma/prisma.module';
-/* import { BalanceReportUseCase } from './use-cases/balance-report.use-case'; */
+import { BalanceReportUseCase } from './use-cases/balance-report.use-case';
 import { ExpenseReportUseCase } from './use-cases/expense-report.use-case';
 import { ProfitReportUseCase } from './use-cases/profit-report.use-case';
+import { ProfitTypeRoomReportUseCase } from './use-cases/profit-typeroom-report.use-case';
 
 @Module({
   imports: [PrismaModule],
@@ -13,9 +14,10 @@ import { ProfitReportUseCase } from './use-cases/profit-report.use-case';
   providers: [
     ReportsService,
     ReportsRepository,
-    /*   BalanceReportUseCase, */
+    BalanceReportUseCase,
     ExpenseReportUseCase,
     ProfitReportUseCase,
+    ProfitTypeRoomReportUseCase,
   ],
 })
 export class ReportsModule {}
