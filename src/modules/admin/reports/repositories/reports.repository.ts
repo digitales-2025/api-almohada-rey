@@ -191,7 +191,14 @@ export class ReportsRepository {
           amount: exp.amount,
           date: exp.date,
           description: exp.description ?? null,
-          category: exp.category === 'FIXED' ? 'FIJO' : (exp.category ?? null),
+          category:
+            exp.category === 'FIXED'
+              ? 'FIJO'
+              : exp.category === 'VARIABLE'
+                ? 'VARIABLE'
+                : exp.category === 'OTHER'
+                  ? 'OTRO'
+                  : (exp.category ?? null),
           paymentMethod: exp.paymentMethod
             ? (paymentMethodMap[exp.paymentMethod] ?? exp.paymentMethod)
             : null,
