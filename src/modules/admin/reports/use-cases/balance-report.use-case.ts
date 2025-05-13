@@ -37,6 +37,7 @@ export class BalanceReportUseCase {
     // -- Encabezados --
     const headers = [
       'Fecha Ganancia',
+      'Conteo Reservas', // Nuevo encabezado
       'Total Reservas S/',
       'Total Extra Service S/',
       'Total Ganancia S/',
@@ -72,6 +73,7 @@ export class BalanceReportUseCase {
     let totalExtras = 0;
     let totalGananciaGeneral = 0;
     let totalGasto = 0;
+    let totalConteo = 0; // Acumulador para conteo
 
     for (let i = 0; i < maxRows; i++) {
       const profit = data.profit[i];
@@ -79,6 +81,7 @@ export class BalanceReportUseCase {
 
       sheet.addRow([
         profit?.date ?? '',
+        profit?.conteo ?? '', // Nuevo dato
         profit?.totalReservas ?? '',
         profit?.totalExtras ?? '',
         profit?.total ?? '',
@@ -92,6 +95,7 @@ export class BalanceReportUseCase {
         totalGanancia += profit.totalReservas;
         totalExtras += profit.totalExtras;
         totalGananciaGeneral += profit.total;
+        totalConteo += profit.conteo ?? 0; // Sumar conteo
       }
       if (expense) {
         totalGasto += expense.amount;
@@ -101,6 +105,7 @@ export class BalanceReportUseCase {
     // -- Fila de totales --
     const totalRow = sheet.addRow([
       'TOTALES',
+      totalConteo, // Total de conteo
       totalGanancia,
       totalExtras,
       totalGananciaGeneral,

@@ -73,16 +73,17 @@ export class ReportsRepository {
     // 4. Agrupar por fecha y sumar
     const resumenMap: Record<
       string,
-      { totalReservas: number; totalExtras: number }
+      { totalReservas: number; totalExtras: number; conteo: number }
     > = {};
 
     detalles.forEach((d) => {
       const fecha = d.paymentDate;
       if (!resumenMap[fecha]) {
-        resumenMap[fecha] = { totalReservas: 0, totalExtras: 0 };
+        resumenMap[fecha] = { totalReservas: 0, totalExtras: 0, conteo: 0 };
       }
       if (d.type === 'ROOM_RESERVATION') {
         resumenMap[fecha].totalReservas += d.subtotal;
+        resumenMap[fecha].conteo += 1; // Suma 1 por cada movimiento de habitación
       } else if (d.type === 'EXTRA_SERVICE') {
         resumenMap[fecha].totalExtras += d.subtotal;
       }
@@ -92,6 +93,7 @@ export class ReportsRepository {
     const resumen: ProfitData[] = Object.entries(resumenMap).map(
       ([date, vals]) => ({
         date,
+        conteo: vals.conteo, // <-- Nuevo campo
         totalReservas: vals.totalReservas,
         totalExtras: vals.totalExtras,
         total: vals.totalReservas + vals.totalExtras,

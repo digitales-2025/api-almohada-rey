@@ -37,6 +37,7 @@ export class ProfitReportUseCase {
     // -- Encabezados de columnas --
     const headers = [
       'Fecha',
+      'Conteo Reservas', // Nueva columna
       'Total Reservas S/',
       'Total Extra Service S/',
       'Total S/',
@@ -64,9 +65,12 @@ export class ProfitReportUseCase {
     let totalHabitacion = 0;
     let totalExtras = 0;
     let totalGeneral = 0;
+    let totalConteo = 0; // Acumulador para conteo
+
     data.forEach((item) => {
       sheet.addRow([
         item.date,
+        item.conteo, // Nuevo dato
         item.totalReservas,
         item.totalExtras,
         item.total,
@@ -74,11 +78,13 @@ export class ProfitReportUseCase {
       totalHabitacion += item.totalReservas;
       totalExtras += item.totalExtras;
       totalGeneral += item.total;
+      totalConteo += item.conteo;
     });
 
     // -- Fila de total --
     const totalRow = sheet.addRow([
       'TOTAL',
+      totalConteo, // Total de conteo
       totalHabitacion,
       totalExtras,
       totalGeneral,
