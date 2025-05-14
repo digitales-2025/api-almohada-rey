@@ -76,6 +76,10 @@ async function bootstrap() {
         'Devuelve tipos de habitaciones activas con imagen principal',
     },
     {
+      name: 'Landing Reservations',
+      description: 'Gestión de reservaciones de habitaciones',
+    },
+    {
       name: 'Admin Expenses',
       description: 'Todos los Gastos',
     },

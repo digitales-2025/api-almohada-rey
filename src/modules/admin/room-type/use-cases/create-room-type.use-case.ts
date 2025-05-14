@@ -22,10 +22,13 @@ export class CreateRoomTypeUseCase {
       // Crear tipo de habitación
       const roomType = await this.roomTypeRepository.create({
         name: createRoomTypeDto.name,
+        nameEn: createRoomTypeDto.nameEn,
         guests: createRoomTypeDto.guests,
         price: createRoomTypeDto.price,
         description: createRoomTypeDto.description,
+        descriptionEn: createRoomTypeDto.descriptionEn,
         bed: createRoomTypeDto.bed,
+        bedEn: createRoomTypeDto.bedEn,
       });
 
       // Registrar auditoría
