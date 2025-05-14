@@ -19,6 +19,7 @@ import { LandRoomTypeModule } from './modules/landing/room-type/land-room-type.m
 import { ReservationModule as LandingReservationModule } from './modules/landing/reservation/reservation.module';
 import { ExpenseModule } from './modules/admin/expense/expense.module';
 import { WarehouseModule } from './modules/admin/warehouse/warehouse.module';
+import { ReportsModule } from './modules/admin/reports/reports.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { WarehouseModule } from './modules/admin/warehouse/warehouse.module';
     LandingReservationModule,
     ExpenseModule,
     WarehouseModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
