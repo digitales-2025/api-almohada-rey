@@ -359,7 +359,7 @@ export class BalanceReportUseCase {
 
     // Definición de tasas impositivas
     const igvRate = 0.18; // 18% de IGV
-    const impuestoRentaRate = 0.15; // 15% de Impuesto a la Renta
+    const impuestoRentaRate = 0.015; // 0.015% de Impuesto a la Renta
     const igvDivisor = 1 + igvRate; // Para extraer el IGV (1.18)
 
     // SECCIÓN DE INGRESOS
@@ -476,24 +476,88 @@ export class BalanceReportUseCase {
     ]);
     currentRow++;
 
+    // --- DETALLE DE IGV ---
     // IGV a pagar (diferencia entre IGV por ingresos e IGV por gastos)
     const igvAPagar = igvReservas - igvGastos;
+
+    // Mostrar IGV de ingresos
+    sheet.addRow(['IGV de Ingresos', igvReservas]);
+    currentRow++;
+
+    // Mostrar IGV de gastos (como valor negativo para la resta)
+    const igvGastosRow = sheet.addRow([
+      'IGV de Gastos (a deducir)',
+      -igvGastos,
+    ]);
+    igvGastosRow.getCell(2).font = { color: { argb: 'FF008000' } }; // Verde para valores a favor
+    currentRow++;
+
+    // Subtotal IGV a pagar
     const igvAPagarRow = sheet.addRow(['IGV a Pagar/Favor', igvAPagar]);
     if (igvAPagar < 0) {
       igvAPagarRow.getCell(2).font = { color: { argb: 'FF008000' } }; // Verde si es a favor
     } else {
       igvAPagarRow.getCell(2).font = { color: { argb: 'FFFF0000' } }; // Rojo si es a pagar
     }
+    igvAPagarRow.getCell(1).font = { bold: true };
+    igvAPagarRow.getCell(2).font = {
+      bold: true,
+      color: { argb: igvAPagar < 0 ? 'FF008000' : 'FFFF0000' },
+    };
     currentRow++;
 
-    // Impuesto a la renta (aplica sobre el balance positivo sin IGV)
+    sheet.addRow([]);
+    currentRow++;
+
+    // --- IMPUESTO A LA RENTA ---
+    // Mostrar el cálculo del impuesto a la renta
+    sheet.addRow([
+      'Base imponible para IR',
+      balanceAntesImpuestos > 0 ? balanceAntesImpuestos : 0,
+    ]);
+    currentRow++;
+
+    sheet.addRow(['Tasa de Impuesto a la Renta', '0.015%']);
+    currentRow++;
+
+    // Impuesto a la renta (aplica solo sobre el balance positivo sin IGV)
     const impuestoRenta =
       balanceAntesImpuestos > 0 ? balanceAntesImpuestos * impuestoRentaRate : 0;
-    sheet.addRow(['Impuesto a la Renta (15%)', impuestoRenta]);
+    const impuestoRentaRow = sheet.addRow([
+      'Impuesto a la Renta (0.015%)',
+      impuestoRenta,
+    ]);
+    impuestoRentaRow.getCell(1).font = { bold: true };
+    impuestoRentaRow.getCell(2).font = {
+      bold: true,
+      color: { argb: 'FFFF0000' }, // Rojo para impuestos a pagar
+    };
     currentRow++;
 
-    // Total impuestos a pagar
-    const totalImpuestos = (igvAPagar > 0 ? igvAPagar : 0) + impuestoRenta;
+    sheet.addRow([]);
+    currentRow++;
+
+    // --- TOTAL IMPUESTOS A PAGAR ---
+    // Solo se considera IGV a pagar cuando es positivo
+    const igvAPagarPositivo = igvAPagar > 0 ? igvAPagar : 0;
+
+    // Mostrar IGV a pagar (solo si es positivo)
+    if (igvAPagar > 0) {
+      sheet.addRow(['IGV a pagar', igvAPagarPositivo]);
+      currentRow++;
+    } else {
+      sheet.addRow(['IGV a pagar', 0]);
+      currentRow++;
+      sheet.addRow(['IGV a favor (crédito fiscal)', Math.abs(igvAPagar)]);
+      currentRow++;
+    }
+
+    // Mostrar Impuesto a la Renta
+    sheet.addRow(['Impuesto a la Renta a pagar', impuestoRenta]);
+    currentRow++;
+
+    // Total impuestos a pagar (sumando IGV positivo e IR)
+    const totalImpuestos = igvAPagarPositivo + impuestoRenta;
     const impuestosTotalRow = sheet.addRow([
       'Total Impuestos a Pagar',
       totalImpuestos,
@@ -502,6 +566,11 @@ export class BalanceReportUseCase {
     impuestosTotalRow.getCell(2).font = {
       bold: true,
       color: { argb: 'FFFF0000' }, // Rojo para impuestos a pagar
+    };
+    impuestosTotalRow.getCell(2).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFEEEEFF' }, // Fondo más intenso para destacar
     };
     currentRow++;
 
