@@ -71,6 +71,7 @@ export class ConfirmPaymentLandingUseCase {
               documentType: dto.customer.documentType,
               documentNumber: dto.customer.documentNumber,
               createdByLandingPage: true,
+              mustCompleteData: true,
             },
           });
 
@@ -86,6 +87,7 @@ export class ConfirmPaymentLandingUseCase {
             {
               status: 'CONFIRMED',
               createdByLandingPage: true,
+              customerId: newCustomer.id,
               didAcceptExtraServices: dto.didAcceptExtraServices,
               didAcceptTerms: dto.didAcceptTermsAndConditions,
               observations: dto.observations,

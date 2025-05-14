@@ -70,7 +70,7 @@ model Customer {
   occupation     String? //Admin is required, landing is not
   documentType   CustomerDocumentType
   documentNumber String                @unique
-  email          String?               @unique
+  email          String?               //@unique
   maritalStatus  CustomerMaritalStatus? //Admin is required, landing is not
   companyName    String?
   ruc            String?               @unique
@@ -80,7 +80,7 @@ model Customer {
   updatedAt      DateTime              @updatedAt
 
   createdByLandingPage Boolean?        @default(false) // Indicates if the customer was created through the landing page and if that's the case, notify the admin to complete the missing data
-
+  mustCompleteData    Boolean?        @default(false) // Indicates if the admin was created by the landing page and if that's the case, notify the admin to complete the missing data
   reservations Reservation[]
 }
 
