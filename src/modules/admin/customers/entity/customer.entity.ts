@@ -11,6 +11,9 @@ export class Customer extends BaseEntity {
   @ApiProperty({ description: 'Customer birth place' })
   birthPlace: string;
 
+  @ApiProperty({ description: 'Customer birth date', required: false })
+  birthDate?: string;
+
   @ApiProperty({ description: 'Customer country' })
   country: string;
 

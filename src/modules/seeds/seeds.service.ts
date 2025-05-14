@@ -9,17 +9,15 @@ import { superAdminSeed } from './data/superadmin.seed';
 import { handleException } from 'src/utils';
 import * as bcrypt from 'bcrypt';
 import { HttpResponse, UserData } from 'src/interfaces';
-import {
-  service,
-  serviceSeedComercial,
-  /*   serviceSeedInternal, */
-} from './data/services.seed';
+import { service, serviceSeedComercial } from './data/services.seed';
 import { landingDefaultUserSeed } from './data/landinguser.seed';
+import { warehouseSeedData, warehousesSeed } from './data/warehouse.seed';
 
 export interface InitResult {
   admin?: UserData;
   services?: service[];
   landingUser?: UserData;
+  warehouses?: warehouseSeedData[];
 }
 
 @Injectable()
@@ -51,6 +49,12 @@ export class SeedsService {
       const landingUserResult = await this.generateLandingDefaultUser();
       if (landingUserResult) {
         initResults.landingUser = landingUserResult.data;
+      }
+
+      // Generar almacenes iniciales
+      const warehousesResult = await this.generateWarehouses();
+      if (warehousesResult) {
+        initResults.warehouses = warehousesResult.data;
       }
 
       return {
@@ -203,21 +207,6 @@ export class SeedsService {
         });
         createdServices.push(commercialService as service);
 
-        //Temporalmente comentado: Servicio interno
-        // Crear servicio interno
-        /*    const internalCode = await this.generateCodeForService('INTERNAL');
-        const internalService = await prisma.service.upsert({
-          where: {
-            name: serviceSeedInternal.name,
-          },
-          update: {},
-          create: {
-            ...serviceSeedInternal,
-            code: internalCode,
-          },
-        });
-        createdServices.push(internalService as service); */
-        //fin
         return {
           message: 'Services created successfully',
           statusCode: HttpStatus.CREATED,
@@ -272,5 +261,50 @@ export class SeedsService {
 
     // Generar el nuevo código con formato SRV-TYPE-000
     return `${prefix}-${String(lastIncrement + 1).padStart(3, '0')}`;
+  }
+
+  /**
+   * Genera almacenes iniciales para productos comerciales e internos
+   * @returns Almacenes creados
+   */
+  async generateWarehouses(): Promise<HttpResponse<any[]>> {
+    try {
+      // Iniciar una transacción
+      const result = await this.prisma.$transaction(async (prisma) => {
+        const createdWarehouses = [];
+
+        // Crear almacenes para cada tipo de producto
+        for (const warehouseSeed of warehousesSeed) {
+          // Verificar si ya existe un almacén del mismo tipo
+          const existingWarehouse = await prisma.warehouse.findFirst({
+            where: { type: warehouseSeed.type },
+          });
+
+          if (!existingWarehouse) {
+            const warehouse = await prisma.warehouse.create({
+              data: warehouseSeed,
+            });
+            createdWarehouses.push(warehouse);
+          } else {
+            // Si ya existe, lo incluimos en la lista de resultados
+            createdWarehouses.push(existingWarehouse);
+          }
+        }
+
+        return {
+          message: 'Warehouses created successfully',
+          statusCode: HttpStatus.CREATED,
+          data: createdWarehouses,
+        };
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error('Error generating warehouses', error.stack);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      handleException(error, 'Error generating warehouses');
+    }
   }
 }

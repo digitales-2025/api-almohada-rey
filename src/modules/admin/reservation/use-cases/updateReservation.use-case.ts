@@ -31,12 +31,45 @@ export class UpdateReservationUseCase {
     try {
       const updatedReservation = await this.reservationRepository.transaction(
         async (tx) => {
-          // 0. Check if reservation exists
+          // 0. Check if reservation exists - usar findWithTx que deberías tener en BaseRepository
           const existingReservation =
-            await this.reservationRepository.findById(id);
+            await this.reservationRepository.findByIdWithTx(id, tx);
 
           if (!existingReservation) {
             throw new NotFoundException(`Reservation with ID ${id} not found`);
+          }
+
+          // Verificar disponibilidad si hay cambio de habitación o fechas
+          if (
+            possibleUpdatedReservation.roomId ||
+            possibleUpdatedReservation.checkInDate ||
+            possibleUpdatedReservation.checkOutDate
+          ) {
+            const roomId =
+              possibleUpdatedReservation.roomId || existingReservation.roomId;
+            const checkInDate = possibleUpdatedReservation.checkInDate
+              ? new Date(possibleUpdatedReservation.checkInDate)
+              : new Date(existingReservation.checkInDate);
+            const checkOutDate = possibleUpdatedReservation.checkOutDate
+              ? new Date(possibleUpdatedReservation.checkOutDate)
+              : new Date(existingReservation.checkOutDate);
+
+            // Verificar disponibilidad con bloqueo pesimista, excluyendo la reserva actual
+            const isAvailable =
+              await this.reservationRepository.checkRoomAvailability(
+                roomId,
+                checkInDate,
+                checkOutDate,
+                true, // usar forUpdate para bloqueo pesimista
+                id, // excluir la reserva actual del chequeo
+                tx, // pasar la transacción
+              );
+
+            if (!isAvailable) {
+              throw new BadRequestException(
+                'La habitación no está disponible en las fechas seleccionadas',
+              );
+            }
           }
 
           // 1. Update guests if provided

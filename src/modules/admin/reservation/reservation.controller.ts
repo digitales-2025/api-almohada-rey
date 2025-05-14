@@ -10,7 +10,6 @@ import {
 } from '@nestjs/common';
 import { ReservationService } from './reservation.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
-// import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { Auth, GetUser } from '../auth/decorators';
 import { UserData, UserPayload } from 'src/interfaces';
 import {
@@ -317,12 +316,6 @@ export class ReservationController {
     @Query('forUpdate') forUpdate: boolean = false,
     @Query('reservationId') reservationId?: string,
   ): Promise<DetailedRoom[]> {
-    // const checkAvailabilityDto: CheckAvailabilityDto = {
-    //   roomId: '',
-    //   checkInDate,
-    //   checkOutDate,
-    // };
-
     return this.reservationService.getAllAvailableRooms(
       checkInDate,
       checkOutDate,

@@ -30,29 +30,37 @@ export class CreateReservationUseCase {
     try {
       const newReservation = await this.reservationRepository.transaction(
         async (tx) => {
-          // 1. Construir los objetos huéspedes
-          const guests = createReservationDto.guests.map((guest) => {
-            return new GuestBuilder()
-              .withName(guest.name)
-              .withAge(guest?.age)
-              .withDocumentType(guest?.documentType)
-              .withDocumentId(guest?.documentId)
-              .withPhone(guest?.phone)
-              .withEmail(guest?.email)
-              .withBirthDate(guest?.birthDate)
-              .withAdditionalInfo(guest?.additionalInfo)
-              .build();
-          });
+          // 1. Verificar disponibilidad dentro de la transacción con bloqueo
+          const isAvailable =
+            await this.reservationRepository.checkRoomAvailability(
+              createReservationDto.roomId,
+              new Date(createReservationDto.checkInDate),
+              new Date(createReservationDto.checkOutDate),
+              true, // usar forUpdate para bloqueo pesimista es correcto
+              null,
+              tx, // pasar la transacción
+            );
 
-          // // 2. Actualizar estado de la habitación
-          // await this.roomRepository.updateWithTx(
-          //   createReservationDto.roomId,
-          //   { status: 'RESERVED' },
-          //   tx,
-          // );
+          if (!isAvailable) {
+            throw new BadRequestException('Habitación no disponible');
+          }
 
-          // Logger.log('Ckeckin date ' + createReservationDto.checkInDate);
-          // Logger.log('Checkout date ' + createReservationDto.checkOutDate);
+          // Eliminar el if duplicado
+
+          // 2. Construir los objetos huéspedes
+          const guests =
+            createReservationDto.guests?.map((guest) => {
+              return new GuestBuilder()
+                .withName(guest.name)
+                .withAge(guest?.age)
+                .withDocumentType(guest?.documentType)
+                .withDocumentId(guest?.documentId)
+                .withPhone(guest?.phone)
+                .withEmail(guest?.email)
+                .withBirthDate(guest?.birthDate)
+                .withAdditionalInfo(guest?.additionalInfo)
+                .build();
+            }) || [];
 
           // 3. Crear reserva
           const reservation = await this.reservationRepository.createWithTx(
@@ -95,6 +103,7 @@ export class CreateReservationUseCase {
 
           return reservation;
         },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
 
       return {
@@ -110,7 +119,17 @@ export class CreateReservationUseCase {
         userId: user.id,
       });
 
-      // Transformar errores de Prisma en mensajes amigables
+      // Detectar error específico de concurrencia
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        (error.code === 'P2034' || error.code === 'P2002')
+      ) {
+        throw new BadRequestException(
+          'La habitación ya fue reservada por otro usuario. Por favor, intente nuevamente.',
+        );
+      }
+
+      // Transformar otros errores de Prisma en mensajes amigables
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         const userMessage = this.getPrismaErrorMessage(error);
         throw new BadRequestException(userMessage);

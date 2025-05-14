@@ -8,6 +8,7 @@ type NODE_ENV = 'development' | 'production' | 'test';
 type GeneralEnvVars = {
   NODE_ENV: NODE_ENV;
   PORT: string;
+  WEBSOCKET_PORT: string;
   DATABASE_URL: string;
   WEB_URL: string;
   JWT_SECRET: string;
@@ -29,6 +30,7 @@ const schema = z
   .object({
     NODE_ENV: z.enum(['development', 'production', 'test']),
     PORT: z.string(),
+    WEBSOCKET_PORT: z.string(),
     DATABASE_URL: z.string(),
     WEB_URL: z.string(),
     JWT_SECRET: z.string(),
@@ -54,6 +56,7 @@ const envVars = result.data;
 export const generalEnvs: GeneralEnvVars = {
   NODE_ENV: envVars.NODE_ENV,
   PORT: envVars.PORT,
+  WEBSOCKET_PORT: envVars.WEBSOCKET_PORT,
   DATABASE_URL: envVars.DATABASE_URL,
   WEB_URL: envVars.WEB_URL,
   JWT_SECRET: envVars.JWT_SECRET,

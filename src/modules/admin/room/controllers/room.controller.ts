@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { RoomService } from '../services/room.service';
 
@@ -18,6 +19,7 @@ import {
   ApiParam,
   ApiOkResponse,
   ApiNotFoundResponse,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { UserData, UserPayload } from 'src/interfaces';
 import { CreateRoomDto, UpdateRoomDto, DeleteRoomDto } from '../dto';
@@ -25,6 +27,7 @@ import { FindAllRoom, Room } from '../entities/room.entity';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { Auth, GetUser } from '../../auth/decorators';
 import { StatusRoomDto } from '../dto/status.dto';
+import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 
 /**
  * Controlador REST para gestionar habitaciones.
@@ -75,6 +78,102 @@ export class RoomController {
   })
   findAll(@GetUser() user: UserPayload): Promise<FindAllRoom[]> {
     return this.roomService.findAll(user);
+  }
+
+  /**
+   * Obtiene habitaciones paginadas
+   */
+  @Get('paginated')
+  @ApiOperation({
+    summary: 'Obtener habitaciones paginadas con información detallada',
+    description:
+      'Devuelve una lista paginada de habitaciones con sus tipos e imagen principal',
+  })
+  @ApiQuery({
+    name: 'page',
+    description: 'Número de página',
+    type: Number,
+    example: 1,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'pageSize',
+    description: 'Cantidad de elementos por página',
+    type: Number,
+    example: 10,
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista paginada de habitaciones',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              number: { type: 'number' },
+              status: {
+                type: 'string',
+                enum: ['AVAILABLE', 'OCCUPIED', 'CLEANING', 'MAINTENANCE'],
+              },
+              tv: { type: 'boolean' },
+              area: { type: 'number' },
+              floorType: { type: 'string' },
+              isActive: { type: 'boolean' },
+              RoomTypes: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  name: { type: 'string' },
+                  ImageRoomType: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      imageUrl: { type: 'string' },
+                      isMain: { type: 'boolean' },
+                    },
+                  },
+                },
+              },
+              trashBin: { type: 'boolean' },
+              towel: { type: 'boolean' },
+              toiletPaper: { type: 'boolean' },
+              showerSoap: { type: 'boolean' },
+              handSoap: { type: 'boolean' },
+              lamp: { type: 'boolean' },
+            },
+          },
+        },
+        meta: {
+          type: 'object',
+          properties: {
+            total: { type: 'number' },
+            page: { type: 'number' },
+            pageSize: { type: 'number' },
+            totalPages: { type: 'number' },
+            hasNext: { type: 'boolean' },
+            hasPrevious: { type: 'boolean' },
+          },
+        },
+      },
+    },
+  })
+  findAllPaginated(
+    @GetUser() user: UserPayload,
+    @Query('page') page: string = '1',
+    @Query('pageSize') pageSize: string = '10',
+  ): Promise<PaginatedResponse<FindAllRoom>> {
+    const pageNumber = parseInt(page, 10) || 1;
+    const pageSizeNumber = parseInt(pageSize, 10) || 10;
+
+    return this.roomService.findAllPaginated(user, {
+      page: pageNumber,
+      pageSize: pageSizeNumber,
+    });
   }
 
   /**

@@ -4,10 +4,11 @@ import { CustomersController } from './customers.controller';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { AuditModule } from 'src/modules/admin/audit/audit.module';
 import { CustomerRepository } from './repository/customer.repository';
+import { PaginationModule } from 'src/pagination/pagination.module';
 
 @Module({
   controllers: [CustomersController],
   providers: [CustomersService, CustomerRepository],
-  imports: [PrismaModule, AuditModule],
+  imports: [PrismaModule, AuditModule, PaginationModule],
 })
 export class CustomersModule {}

@@ -4,9 +4,13 @@ import { AppModule } from './app.module';
 import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { generalEnvs } from './config';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Configurar el adaptador WebSocket
+  app.useWebSocketAdapter(new IoAdapter(app)); // Añadido para WebSockets
   app.enableCors({
     origin: [generalEnvs.WEB_URL],
     credentials: true,
@@ -59,10 +63,12 @@ async function bootstrap() {
     },
     { name: 'Admin Rooms', description: 'Gestión de habitaciones' },
 
-    { name: 'Room Cleaning', description: 'Gestión de limpiezas' },
+    { name: 'Admin Room Cleaning', description: 'Gestión de limpiezas' },
 
     { name: 'Admin Services', description: 'Gestión de servicios' },
     { name: 'Admin Payments', description: 'Gestión de pagos' },
+    { name: 'Admin Movements', description: 'Gestión de movimientos' },
+    { name: 'Admin Warehouse', description: 'Gestión de almacenes' },
 
     {
       name: 'Landing Room Types',
@@ -72,6 +78,10 @@ async function bootstrap() {
     {
       name: 'Landing Reservations',
       description: 'Gestión de reservaciones de habitaciones',
+    },
+    {
+      name: 'Admin Expenses',
+      description: 'Todos los Gastos',
     },
   ];
 

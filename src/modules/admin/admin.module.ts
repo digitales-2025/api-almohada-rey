@@ -8,6 +8,8 @@ import { PrismaModule } from 'src/prisma/prisma.module';
 import { ProductModule } from './product/product.module';
 import { ReservationModule } from './reservation/reservation.module';
 import { PaymentsModule } from './payments/payments.module';
+import { WarehouseModule } from './warehouse/warehouse.module';
+import { MovementsModule } from './movements/movements.module';
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import { PaymentsModule } from './payments/payments.module';
     ProductModule,
     ReservationModule,
     PaymentsModule,
+    WarehouseModule,
+    MovementsModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],

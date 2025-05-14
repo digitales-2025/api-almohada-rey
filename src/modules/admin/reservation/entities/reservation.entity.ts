@@ -116,6 +116,13 @@ export class Reservation extends BaseEntity {
   isActive?: boolean;
 
   @ApiProperty({
+    description: 'Whether the reservation is pending payment deletion',
+    required: false,
+    default: false,
+  })
+  isPendingDeletePayment?: boolean;
+
+  @ApiProperty({
     description: 'Timestamp when the reservation was created',
     required: false,
     type: Date,

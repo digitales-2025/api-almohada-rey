@@ -17,6 +17,8 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { TypedEventEmitter } from 'src/event-emitter/typed-event-emitter.class';
 import { HttpResponse, UserData, UserPayload } from 'src/interfaces';
 import { handleException } from 'src/utils';
+import { PaginationService } from 'src/pagination/pagination.service';
+import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 
 @Injectable()
 export class UsersService {
@@ -25,6 +27,7 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: TypedEventEmitter,
     private readonly audit: AuditService,
+    private readonly paginationService: PaginationService,
   ) {}
 
   /**
@@ -626,6 +629,65 @@ export class UsersService {
         userRol: user.userRol,
       };
     });
+  }
+
+  /**
+   * Obtiene todos los usuarios paginados
+   * @param user Usuario que realiza la consulta
+   * @param options Opciones de paginación (página y tamaño de página)
+   * @returns Lista paginada de usuarios
+   */
+  async findAllPaginated(
+    user: UserPayload,
+    options: { page: number; pageSize: number },
+  ): Promise<PaginatedResponse<Omit<UserPayload, 'claims'>>> {
+    try {
+      const { page, pageSize } = options;
+
+      // Definir el filtro según el rol del usuario
+      const filter =
+        user.userRol === UserRolType.ADMIN
+          ? {} // Admin puede ver todos los usuarios
+          : { isActive: true }; // Otros solo ven usuarios activos
+
+      return await this.paginationService.paginate<
+        any,
+        Omit<UserPayload, 'claims'>
+      >({
+        model: 'user',
+        page,
+        pageSize,
+        where: filter,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          lastLogin: true,
+          isActive: true,
+          isSuperAdmin: true,
+          mustChangePassword: true,
+          userRol: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        transformer: (user) => ({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          lastLogin: user.lastLogin,
+          isActive: user.isActive,
+          isSuperAdmin: user.isSuperAdmin,
+          mustChangePassword: user.mustChangePassword,
+          userRol: user.userRol,
+        }),
+      });
+    } catch (error) {
+      this.logger.error('Error getting paginated users', error.stack);
+      handleException(error, 'Error getting paginated users');
+    }
   }
 
   /**

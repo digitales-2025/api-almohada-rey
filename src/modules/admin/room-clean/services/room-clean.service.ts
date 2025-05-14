@@ -1,6 +1,9 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { CleaningChecklistRepository } from '../repositories/room-clean.repository';
-import { CleaningChecklist } from '../entities/room-clean.entity';
+import {
+  CleaningChecklist,
+  CleaningChecklistWithRoom,
+} from '../entities/room-clean.entity';
 import { CreateCleaningChecklistDto, UpdateCleaningChecklistDto } from '../dto';
 import { UserData } from 'src/interfaces';
 import { validateChanges } from 'src/prisma/src/utils';
@@ -168,24 +171,14 @@ export class CleaningChecklistService {
         };
       }
 
-      // Si se está actualizando la habitación, validar que exista
-      if (updateCleaningDto.roomId) {
-        await this.validateRoomExists(updateCleaningDto.roomId);
-      }
-
-      // Si se está actualizando la fecha o habitación, verificar que no exista otro registro similar
+      // Si se está actualizando la fecha, verificar que no exista otro registro similar
       if (
-        (updateCleaningDto.date &&
-          updateCleaningDto.date !== currentRecord.date) ||
-        (updateCleaningDto.roomId &&
-          updateCleaningDto.roomId !== currentRecord.roomId)
+        updateCleaningDto.date &&
+        updateCleaningDto.date !== currentRecord.date
       ) {
-        const newDate = updateCleaningDto.date || currentRecord.date;
-        const newRoomId = updateCleaningDto.roomId || currentRecord.roomId;
-
         const existingRecord = await this.cleaningRepository.findByRoomAndDate(
-          newRoomId,
-          newDate,
+          currentRecord.roomId,
+          updateCleaningDto.date,
         );
 
         if (existingRecord && existingRecord.id !== id) {
@@ -194,6 +187,8 @@ export class CleaningChecklistService {
           );
         }
       }
+
+      // Nota: No necesitamos validar roomId ya que no se permite modificarlo en el DTO
 
       return await this.updateCleaningUseCase.execute(
         id,
@@ -231,14 +226,53 @@ export class CleaningChecklistService {
   }
 
   /**
-   * Busca registros de limpieza por habitación
+   * Busca registros de limpieza por habitación con paginación y filtros
+   * @param roomId ID de la habitación
+   * @param page Número de página (opcional)
+   * @param month Mes en formato string (opcional)
+   * @param year Año en formato string (opcional)
+   * @returns Registros de limpieza paginados y filtrados
    */
-  async findByRoom(roomId: string): Promise<CleaningChecklist[]> {
+  async findByRoom(
+    roomId: string,
+    filters?: {
+      page?: number;
+      month?: string;
+      year?: string;
+    },
+  ): Promise<{
+    data: CleaningChecklistWithRoom;
+    pagination?: {
+      totalItems: number;
+      totalPages: number;
+      currentPage: number;
+    };
+  }> {
     try {
       // Validar que la habitación exista
       await this.validateRoomExists(roomId);
 
-      return this.cleaningRepository.findByRoom(roomId);
+      // Obtener registros de limpieza con información detallada y paginación
+      const result = await this.cleaningRepository.findByRoom(roomId, filters);
+
+      // Transformar los datos para ajustar la casing de Room a room
+      // y también convertir Room a room dentro de cada cleaningChecklist
+      const transformedData = {
+        room: result.data.Room,
+        cleaningChecklist: result.data.cleaningChecklist.map((item) => {
+          // Para cada elemento en cleaningChecklist, transformar Room a room
+          const { Room, ...rest } = item;
+          return {
+            ...rest,
+            room: Room,
+          };
+        }),
+      };
+
+      return {
+        data: transformedData,
+        pagination: result.pagination,
+      };
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
       throw error;

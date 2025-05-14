@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { ReservationService } from './reservation.service';
 import { ReservationController } from './reservation.controller';
 import { ReservationRepository } from './repository/reservation.repository';
@@ -19,9 +19,16 @@ import { DeactivateReservationsUseCase } from './use-cases/deactivateReservation
 import { ReactivateReservationsUseCase } from './use-cases/reactivateReservations.use-case';
 import { CreateReservationUseCaseForLanding } from './use-cases/createReservationForLanding.use-case';
 import { ConfirmPaymentLandingUseCase } from './use-cases/confirm-payment-landing.use-case';
+import { WebsocketsModule } from 'src/modules/websockets/websockets.module';
+import { PaymentsModule } from '../payments/payments.module';
 
 @Module({
-  imports: [AuditModule, RoomModule],
+  imports: [
+    AuditModule,
+    RoomModule,
+    forwardRef(() => WebsocketsModule),
+    forwardRef(() => PaymentsModule),
+  ],
   controllers: [ReservationController],
   providers: [
     ReservationService,
