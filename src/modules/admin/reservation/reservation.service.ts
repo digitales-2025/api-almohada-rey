@@ -66,16 +66,8 @@ export class ReservationService {
     userData: UserData,
   ): Promise<BaseApiResponse<Reservation>> {
     try {
-      const roomAvailability = await this.checkAvailability({
-        roomId: createReservationDto.roomId,
-        checkInDate: createReservationDto.checkInDate,
-        checkOutDate: createReservationDto.checkOutDate,
-      });
-
-      if (!roomAvailability.isAvailable) {
-        throw new BadRequestException('Habitación no disponible');
-      }
-
+      // La verificación ahora se hace dentro de createReservationUseCase.execute
+      // que ya la implementa dentro de una transacción con bloqueo pesimista
       const reservation = await this.createReservationUseCase.execute(
         createReservationDto,
         userData,
@@ -99,7 +91,7 @@ export class ReservationService {
       }
       return reservation;
     } catch (error) {
-      this.errorHandler.handleError(error, 'creating');
+      return this.errorHandler.handleError(error, 'creating');
     }
   }
 
@@ -109,12 +101,14 @@ export class ReservationService {
     userData: UserData,
   ): Promise<BaseApiResponse<Reservation>> {
     try {
+      // Mantener esta parte - Verificar si existe la reservación
       const originalReservation = await this.findOne(id);
 
       if (!originalReservation) {
         throw new BadRequestException(`No se encontró la reserva con ID ${id}`);
       }
 
+      // Mantener esta parte - Mapear el DTO a la entidad
       const updatedReservation: Reservation = {
         customerId: updateReservationDto.customerId,
         roomId: updateReservationDto.roomId,
@@ -129,6 +123,7 @@ export class ReservationService {
         observations: updateReservationDto.observations,
       };
 
+      // Mantener esta parte - Verificar si hay cambios
       const dtoHasNoChanges = hasNoChanges(
         updatedReservation,
         originalReservation,
@@ -142,35 +137,8 @@ export class ReservationService {
         };
       }
 
-      // Logger.log(`Updated Reservation: ${JSON.stringify(updatedReservation)}`);
-
-      //check chekin-out collisions
-      const checkInDate = new Date(updatedReservation.checkInDate);
-      const checkOutDate = new Date(updatedReservation.checkOutDate);
-
-      // Logger.log(
-      //   `CheckIn: ${checkInDate.toISOString()} - CheckOut: ${checkOutDate.toISOString()}`,
-      // );
-
-      const reservations = await this.getAllReservationsInTimeInterval(
-        checkInDate.toISOString(),
-        checkOutDate.toISOString(),
-        true,
-        id,
-      );
-
-      if (
-        reservations.some(
-          (reservation) =>
-            reservation.id !== id &&
-            reservation.roomId === updatedReservation.roomId,
-        )
-      ) {
-        throw new BadRequestException(
-          'La habitación no está disponible en las fechas seleccionadas',
-        );
-      }
-
+      // La verificación de disponibilidad ahora se hace dentro del caso de uso
+      // con bloqueo pesimista para evitar condiciones de carrera
       const reservation = await this.updateReservationUseCase.execute(
         id,
         updatedReservation,
@@ -203,7 +171,7 @@ export class ReservationService {
 
       return reservation;
     } catch (error) {
-      this.errorHandler.handleError(error, 'updating');
+      return this.errorHandler.handleError(error, 'updating');
     }
   }
 
