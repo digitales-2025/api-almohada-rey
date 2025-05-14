@@ -45,7 +45,6 @@ export class ReportsService {
    * @returns ExcelJS.Workbook con los datos de balance
    */
   async getBalanceExcel({ month, year }: { month: number; year: number }) {
-    console.log('llego data pa balance getBalanceExcel', month, year);
     const balanceData = await this.reportsRepository.getBalance(month, year);
     return this.balanceReportUseCase.execute(balanceData, { month, year });
   }

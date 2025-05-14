@@ -28,7 +28,7 @@ export class BalanceReportUseCase {
       'Diciembre',
     ];
     const title = `Balance de Ganancias y Gastos - ${monthNames[month]} ${year}`;
-    sheet.mergeCells('A1:N1');
+    sheet.mergeCells('A1:M1');
     const titleCell = sheet.getCell('A1');
     titleCell.value = title;
     titleCell.font = { bold: true, size: 14 };
@@ -52,9 +52,9 @@ export class BalanceReportUseCase {
       '',
       '',
       '',
+      '',
       // Balance
       'BALANCE',
-      '',
     ]);
 
     // Formato para los subtítulos
@@ -85,7 +85,6 @@ export class BalanceReportUseCase {
           pattern: 'solid',
           fgColor: { argb: 'FFDADAFF' },
         };
-        sheet.mergeCells(`M${subtituloRow.number}:N${subtituloRow.number}`);
       }
       cell.alignment = { horizontal: 'center' };
     });
@@ -110,7 +109,6 @@ export class BalanceReportUseCase {
       'Total Gastos S/',
       // Balance
       'Balance Diario S/',
-      'Balance Acumulado S/',
     ];
     sheet.addRow(headers);
 
@@ -173,8 +171,6 @@ export class BalanceReportUseCase {
     let totalGastOtro = 0;
     let totalGastos = 0;
 
-    let balanceAcumulado = 0;
-
     for (let dia = 1; dia <= diasEnMes; dia++) {
       const fechaStr = `${year}-${month.toString().padStart(2, '0')}-${dia.toString().padStart(2, '0')}`;
 
@@ -203,7 +199,6 @@ export class BalanceReportUseCase {
 
       // Calcular balance diario
       const balanceDiario = profit.total - expense.amount;
-      balanceAcumulado += balanceDiario;
 
       // Agregar fila con todos los datos
       const dataRow = sheet.addRow([
@@ -225,7 +220,6 @@ export class BalanceReportUseCase {
         expense.amount,
         // Balance
         balanceDiario,
-        balanceAcumulado,
       ]);
 
       // Colorear el balance diario según sea positivo o negativo
@@ -268,13 +262,12 @@ export class BalanceReportUseCase {
       totalGastOtro,
       totalGastos,
       totalGanancias - totalGastos,
-      '',
     ]);
     totalRow.font = { bold: true };
 
     // Aplicar formato a las celdas de totales
     totalRow.eachCell((cell, colNumber) => {
-      if (colNumber !== 6 && colNumber !== 15) {
+      if (colNumber !== 6) {
         // Saltar separadores
         cell.fill = {
           type: 'pattern',
@@ -317,6 +310,7 @@ export class BalanceReportUseCase {
     resumenCell.alignment = { horizontal: 'center' };
 
     // -- Sección de totales detallados --
+    const inicioResumen = sheet.lastRow.number + 1;
     sheet.addRow(['GANANCIAS', 'Valor']);
     sheet.addRow(['Total Reservas', totalReservas]);
     sheet.addRow(['Total Servicios Extra', totalExtras]);
@@ -349,7 +343,202 @@ export class BalanceReportUseCase {
       fgColor: { argb: 'FFEFEFEF' },
     };
 
-    // -- Formato de moneda para valores monetarios --
+    // -- SECCIÓN DE BALANCE NETO --
+    sheet.addRow([]);
+    sheet.addRow([]);
+    const balanceNetoTitle = `BALANCE NETO FISCAL - ${monthNames[month]} ${year}`;
+    sheet.mergeCells(
+      `A${sheet.lastRow.number + 1}:E${sheet.lastRow.number + 1}`,
+    );
+    const balanceNetoTitleRow = sheet.addRow([balanceNetoTitle]);
+    const balanceNetoTitleCell = sheet.getCell(
+      `A${balanceNetoTitleRow.number}`,
+    );
+    balanceNetoTitleCell.font = { bold: true, size: 14 };
+    balanceNetoTitleCell.alignment = { horizontal: 'center' };
+
+    // Definición de tasas impositivas
+    const igvRate = 0.18; // 18% de IGV
+    const impuestoRentaRate = 0.15; // 15% de Impuesto a la Renta
+
+    // SECCIÓN DE INGRESOS
+    let currentRow = sheet.lastRow.number + 1;
+    const ingresosTitleRow = sheet.addRow([
+      'DETALLE DE INGRESOS CON IMPUESTOS',
+      'Valor',
+    ]);
+    ingresosTitleRow.getCell(1).font = { bold: true };
+    ingresosTitleRow.getCell(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE6FFE6' }, // Verde claro para ingresos
+    };
+    ingresosTitleRow.getCell(2).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE6FFE6' },
+    };
+    currentRow++;
+
+    // Ingresos brutos
+    sheet.addRow(['Ingresos Brutos (sin IGV)', totalGanancias]);
+    currentRow++;
+
+    // Cálculo del IGV sobre ingresos (18% adicional)
+    const igvIngresos = totalGanancias * igvRate;
+    sheet.addRow(['IGV sobre Ingresos (18%)', igvIngresos]);
+    currentRow++;
+
+    // Ingresos con IGV
+    const ingresosConIGV = totalGanancias + igvIngresos;
+    const ingresosIGVRow = sheet.addRow([
+      'Total Ingresos con IGV',
+      ingresosConIGV,
+    ]);
+    ingresosIGVRow.getCell(1).font = { bold: true };
+    ingresosIGVRow.getCell(2).font = { bold: true };
+    currentRow++;
+
+    sheet.addRow([]);
+    currentRow++;
+
+    // SECCIÓN DE GASTOS
+    const gastosTitleRow = sheet.addRow([
+      'DETALLE DE GASTOS CON IMPUESTOS',
+      'Valor',
+    ]);
+    gastosTitleRow.getCell(1).font = { bold: true };
+    gastosTitleRow.getCell(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFFFE6E6' }, // Rojo claro para gastos
+    };
+    gastosTitleRow.getCell(2).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFFFE6E6' },
+    };
+    currentRow++;
+
+    // Gastos brutos
+    sheet.addRow(['Gastos Brutos (sin IGV)', totalGastos]);
+    currentRow++;
+
+    // Cálculo del IGV sobre gastos
+    const igvGastos = totalGastos * igvRate;
+    sheet.addRow(['IGV sobre Gastos (18%)', igvGastos]);
+    currentRow++;
+
+    // Gastos con IGV
+    const gastosConIGV = totalGastos + igvGastos;
+    const gastosIGVRow = sheet.addRow(['Total Gastos con IGV', gastosConIGV]);
+    gastosIGVRow.getCell(1).font = { bold: true };
+    gastosIGVRow.getCell(2).font = { bold: true };
+    currentRow++;
+
+    sheet.addRow([]);
+    currentRow++;
+
+    // SECCIÓN DE CÁLCULOS FISCALES
+    const fiscalTitleRow = sheet.addRow(['CÁLCULO DE IMPUESTOS', 'Valor']);
+    fiscalTitleRow.getCell(1).font = { bold: true };
+    fiscalTitleRow.getCell(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE6E6FF' }, // Azul claro para impuestos
+    };
+    fiscalTitleRow.getCell(2).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE6E6FF' },
+    };
+    currentRow++;
+
+    // Balance antes de impuestos (utilidad bruta)
+    const balanceAntesImpuestos = totalGanancias - totalGastos;
+    sheet.addRow(['Balance antes de impuestos', balanceAntesImpuestos]);
+    currentRow++;
+
+    // IGV a pagar (diferencia entre IGV por ingresos e IGV por gastos)
+    const igvAPagar = igvIngresos - igvGastos;
+    const igvAPagarRow = sheet.addRow(['IGV a Pagar/Favor', igvAPagar]);
+    if (igvAPagar < 0) {
+      igvAPagarRow.getCell(2).font = { color: { argb: 'FF008000' } }; // Verde si es a favor
+    } else {
+      igvAPagarRow.getCell(2).font = { color: { argb: 'FFFF0000' } }; // Rojo si es a pagar
+    }
+    currentRow++;
+
+    // Impuesto a la renta (aplica sobre el balance positivo)
+    const impuestoRenta =
+      balanceAntesImpuestos > 0 ? balanceAntesImpuestos * impuestoRentaRate : 0;
+    sheet.addRow(['Impuesto a la Renta (15%)', impuestoRenta]);
+    currentRow++;
+
+    // Total impuestos a pagar
+    const totalImpuestos = (igvAPagar > 0 ? igvAPagar : 0) + impuestoRenta;
+    const impuestosTotalRow = sheet.addRow([
+      'Total Impuestos a Pagar',
+      totalImpuestos,
+    ]);
+    impuestosTotalRow.getCell(1).font = { bold: true };
+    impuestosTotalRow.getCell(2).font = {
+      bold: true,
+      color: { argb: 'FFFF0000' }, // Rojo para impuestos a pagar
+    };
+    currentRow++;
+
+    sheet.addRow([]);
+    currentRow++;
+
+    // RESULTADO FINAL CON IMPUESTOS
+    const resultadoFinalRow = sheet.addRow(['BALANCE NETO FINAL', '']);
+    resultadoFinalRow.getCell(1).font = { bold: true, size: 12 };
+    resultadoFinalRow.getCell(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFDADAFF' }, // Púrpura claro para resultado
+    };
+    resultadoFinalRow.getCell(2).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFDADAFF' },
+    };
+    currentRow++;
+
+    // Balance neto final (después de impuestos)
+    const balanceNetoFinal = balanceAntesImpuestos - totalImpuestos;
+    const netoFinalRow = sheet.addRow([
+      'Balance Neto (después de impuestos)',
+      balanceNetoFinal,
+    ]);
+    netoFinalRow.getCell(1).font = { bold: true };
+    netoFinalRow.getCell(2).font = {
+      bold: true,
+      size: 12,
+      color: { argb: balanceNetoFinal >= 0 ? 'FF008000' : 'FFFF0000' },
+    };
+    netoFinalRow.getCell(2).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFEEEEFF' }, // Fondo más intenso para destacar
+    };
+    currentRow++;
+
+    // Balance con IGV
+    const balanceConIGV = ingresosConIGV - gastosConIGV;
+    sheet.addRow(['Balance con IGV incluido', balanceConIGV]);
+    currentRow++;
+
+    // Aplicar formato de moneda a todos los valores numéricos del resumen
+    for (let row = inicioResumen + 1; row <= currentRow; row++) {
+      const cell = sheet.getCell(`B${row}`);
+      if (typeof cell.value === 'number') {
+        cell.numFmt = '"S/ "#,##0.00';
+      }
+    }
+
+    // -- Formato de moneda para valores monetarios en la tabla principal --
     for (let i = 5; i <= diasEnMes + 5; i++) {
       // Solo filas de datos
       [3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14].forEach((j) => {
@@ -361,31 +550,18 @@ export class BalanceReportUseCase {
       });
     }
 
-    // Formato moneda para totales y resumen
-    [
-      totalRow.number,
-      ...Array.from(
-        { length: sheet.rowCount - totalRow.number },
-        (_, i) => totalRow.number + i + 1,
-      ),
-    ].forEach((row) => {
-      [2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14].forEach((col) => {
-        const cell = sheet.getCell(row, col);
-        if (typeof cell.value === 'number') {
-          cell.numFmt = '"S/ "#,##0.00';
-        }
-      });
-    });
-
     // -- Ajustar ancho de columnas --
     sheet.columns.forEach((column, index) => {
       if (index === 0) {
         // Columna de fecha
-        column.width = 15;
-        column.alignment = { horizontal: 'center' };
+        column.width = 30;
+        column.alignment = { horizontal: 'left' };
       } else if (index === 5) {
         // Columna separadora
         column.width = 4;
+      } else if (index === 1) {
+        // Columna de descripción en el resumen
+        column.width = 40;
       } else {
         column.width = 16;
       }
