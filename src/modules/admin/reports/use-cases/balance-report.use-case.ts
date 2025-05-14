@@ -360,6 +360,7 @@ export class BalanceReportUseCase {
     // Definición de tasas impositivas
     const igvRate = 0.18; // 18% de IGV
     const impuestoRentaRate = 0.15; // 15% de Impuesto a la Renta
+    const igvDivisor = 1 + igvRate; // Para extraer el IGV (1.18)
 
     // SECCIÓN DE INGRESOS
     let currentRow = sheet.lastRow.number + 1;
@@ -380,19 +381,31 @@ export class BalanceReportUseCase {
     };
     currentRow++;
 
-    // Ingresos brutos
-    sheet.addRow(['Ingresos Brutos (sin IGV)', totalGanancias]);
+    // Cálculo del IGV para las reservas (extrayendo el IGV)
+    const reservasSinIGV = totalReservas / igvDivisor;
+    const igvReservas = totalReservas - reservasSinIGV;
+
+    // Total Reservas con desglose
+    sheet.addRow(['Total Reservas (con IGV)', totalReservas]);
+    currentRow++;
+    sheet.addRow(['IGV de Reservas', igvReservas]);
+    currentRow++;
+    sheet.addRow(['Total Reservas (sin IGV)', reservasSinIGV]);
     currentRow++;
 
-    // Cálculo del IGV sobre ingresos (18% adicional)
-    const igvIngresos = totalGanancias * igvRate;
-    sheet.addRow(['IGV sobre Ingresos (18%)', igvIngresos]);
+    // Total Servicios Extra (no tienen IGV)
+    sheet.addRow(['Total Servicios Extra', totalExtras]);
     currentRow++;
 
-    // Ingresos con IGV
-    const ingresosConIGV = totalGanancias + igvIngresos;
+    // Total Ingresos sin IGV
+    const ingresosSinIGV = reservasSinIGV + totalExtras;
+    sheet.addRow(['Total Ingresos (sin IGV)', ingresosSinIGV]);
+    currentRow++;
+
+    // Total Ingresos con IGV
+    const ingresosConIGV = totalReservas + totalExtras;
     const ingresosIGVRow = sheet.addRow([
-      'Total Ingresos con IGV',
+      'Total Ingresos (con IGV)',
       ingresosConIGV,
     ]);
     ingresosIGVRow.getCell(1).font = { bold: true };
@@ -420,18 +433,19 @@ export class BalanceReportUseCase {
     };
     currentRow++;
 
-    // Gastos brutos
-    sheet.addRow(['Gastos Brutos (sin IGV)', totalGastos]);
+    // Extracción del IGV de los gastos totales
+    const gastosSinIGV = totalGastos / igvDivisor;
+    const igvGastos = totalGastos - gastosSinIGV;
+
+    // Desglose de gastos
+    sheet.addRow(['Total Gastos (con IGV)', totalGastos]);
+    currentRow++;
+    sheet.addRow(['IGV de Gastos', igvGastos]);
+    currentRow++;
+    sheet.addRow(['Total Gastos (sin IGV)', gastosSinIGV]);
     currentRow++;
 
-    // Cálculo del IGV sobre gastos
-    const igvGastos = totalGastos * igvRate;
-    sheet.addRow(['IGV sobre Gastos (18%)', igvGastos]);
-    currentRow++;
-
-    // Gastos con IGV
-    const gastosConIGV = totalGastos + igvGastos;
-    const gastosIGVRow = sheet.addRow(['Total Gastos con IGV', gastosConIGV]);
+    const gastosIGVRow = sheet.addRow(['Total Gastos (con IGV)', totalGastos]);
     gastosIGVRow.getCell(1).font = { bold: true };
     gastosIGVRow.getCell(2).font = { bold: true };
     currentRow++;
@@ -454,13 +468,16 @@ export class BalanceReportUseCase {
     };
     currentRow++;
 
-    // Balance antes de impuestos (utilidad bruta)
-    const balanceAntesImpuestos = totalGanancias - totalGastos;
-    sheet.addRow(['Balance antes de impuestos', balanceAntesImpuestos]);
+    // Balance antes de impuestos (utilidad bruta sin IGV)
+    const balanceAntesImpuestos = ingresosSinIGV - gastosSinIGV;
+    sheet.addRow([
+      'Balance antes de impuestos (sin IGV)',
+      balanceAntesImpuestos,
+    ]);
     currentRow++;
 
     // IGV a pagar (diferencia entre IGV por ingresos e IGV por gastos)
-    const igvAPagar = igvIngresos - igvGastos;
+    const igvAPagar = igvReservas - igvGastos;
     const igvAPagarRow = sheet.addRow(['IGV a Pagar/Favor', igvAPagar]);
     if (igvAPagar < 0) {
       igvAPagarRow.getCell(2).font = { color: { argb: 'FF008000' } }; // Verde si es a favor
@@ -469,7 +486,7 @@ export class BalanceReportUseCase {
     }
     currentRow++;
 
-    // Impuesto a la renta (aplica sobre el balance positivo)
+    // Impuesto a la renta (aplica sobre el balance positivo sin IGV)
     const impuestoRenta =
       balanceAntesImpuestos > 0 ? balanceAntesImpuestos * impuestoRentaRate : 0;
     sheet.addRow(['Impuesto a la Renta (15%)', impuestoRenta]);
@@ -526,7 +543,7 @@ export class BalanceReportUseCase {
     currentRow++;
 
     // Balance con IGV
-    const balanceConIGV = ingresosConIGV - gastosConIGV;
+    const balanceConIGV = ingresosConIGV - totalGastos;
     sheet.addRow(['Balance con IGV incluido', balanceConIGV]);
     currentRow++;
 
