@@ -23,10 +23,14 @@ export class ReservationRepository extends BaseRepository<Reservation> {
     checkOutDate: Date,
     forUpdate: boolean = false,
     reservationId?: string,
+    tx?: any, // Añadir parámetro para transacción
   ): Promise<boolean> {
+    // Usar el cliente de transacción o el cliente normal
+    const prismaClient = tx || this.prisma;
+
     // Buscamos reservaciones existentes que se superpongan con las fechas solicitadas
     // y que estén en estados que impliquen que la habitación está ocupada
-    const overlappingReservations = await this.prisma.reservation.count({
+    const overlappingReservations = await prismaClient.reservation.count({
       where: {
         roomId,
         isActive: true,
@@ -59,26 +63,9 @@ export class ReservationRepository extends BaseRepository<Reservation> {
           },
         ],
       },
+      // Usar FOR UPDATE para bloqueo pesimista si estamos en una transacción y forUpdate es true
+      ...(tx && forUpdate ? { lockMode: 'pessimistic_write' } : {}),
     });
-
-    // if (forUpdate && reservationId) {
-    //   // Si estamos actualizando una reservación, excluimos esa reservación de la verificación
-    //   const reservation = await this.prisma.reservation.findUnique({
-    //     where: { id: reservationId },
-    //     select: { roomId: true },
-    //   });
-
-    //   if (reservation && reservation.roomId === roomId) {
-    //     // Logger.log(
-    //     //   `Reservation room ID: ${reservation.roomId} - Room ID: ${roomId} - Overlapping Reservations: ${overlappingReservations}`,
-    //     //   'ReservationRepository',
-    //     // );
-    //     // Logger.log(
-    //     //   'Validation overlapping' + `${overlappingReservations === 0}`,
-    //     // );
-    //     return overlappingReservations === 1;
-    //   }
-    // }
 
     // Si no hay reservaciones superpuestas, la habitación está disponible
     return overlappingReservations === 0;
