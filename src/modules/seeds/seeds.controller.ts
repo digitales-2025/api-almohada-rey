@@ -12,4 +12,9 @@ export class SeedsController {
   initSeed() {
     return this.seedsService.generateInit();
   }
+
+  // @Post('generate-landing-user')
+  // generateLandingUser() {
+  //   return this.seedsService.generateLandingDefaultUser();
+  // }
 }
