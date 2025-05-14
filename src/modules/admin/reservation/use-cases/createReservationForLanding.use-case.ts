@@ -15,6 +15,7 @@ import {
   defaultLocale,
   SupportedLocales,
 } from 'src/modules/landing/i18n/translations';
+import { Guests } from '../entities/guest.entity';
 // import { RoomRepository } from 'src/modules/admin/room/repositories/room.repository';
 
 @Injectable()
@@ -64,8 +65,10 @@ export class CreateReservationUseCaseForLanding {
               checkOutDate: new Date(
                 createReservationDto.checkOutDate,
               ).toISOString(),
+              requestedGuestNumber: createReservationDto.guestNumber,
               status: ReservationStatus.PENDING,
               createdByLandingPage: true,
+              guests: new Guests([]).stringify(),
               //   origin: createReservationDto.origin,
               //   reason: createReservationDto.reason,
               //   status: createReservationDto.status,

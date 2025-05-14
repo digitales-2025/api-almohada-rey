@@ -18,6 +18,7 @@ import { ChangeReservationStatusUseCase } from './use-cases/changeReservationSta
 import { DeactivateReservationsUseCase } from './use-cases/deactivateReservations.use-case';
 import { ReactivateReservationsUseCase } from './use-cases/reactivateReservations.use-case';
 import { CreateReservationUseCaseForLanding } from './use-cases/createReservationForLanding.use-case';
+import { ConfirmPaymentLandingUseCase } from './use-cases/confirm-payment-landing.use-case';
 
 @Module({
   imports: [AuditModule, RoomModule],
@@ -37,7 +38,13 @@ import { CreateReservationUseCaseForLanding } from './use-cases/createReservatio
     DeactivateReservationsUseCase,
     ReactivateReservationsUseCase,
     CreateReservationUseCaseForLanding,
+    ConfirmPaymentLandingUseCase,
   ],
-  exports: [ReservationService, ReservationRepository, ReservationStateFactory],
+  exports: [
+    ReservationService,
+    ReservationRepository,
+    ReservationStateFactory,
+    ConfirmPaymentLandingUseCase,
+  ],
 })
 export class ReservationModule {}

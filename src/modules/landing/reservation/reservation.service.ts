@@ -13,6 +13,10 @@ import { ReservationStatus } from '@prisma/client';
 import { UsersService } from 'src/modules/admin/users/users.service';
 import { defaultLocale, SupportedLocales } from '../i18n/translations';
 import { CreateLandingReservationDto } from './dto/create-reservation.dto';
+import { ConfirmBookingDto } from './dto/confirm-reservation.dto';
+import { ConfirmPaymentLandingUseCase } from 'src/modules/admin/reservation/use-cases/confirm-payment-landing.use-case';
+import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
+import { Reservation } from 'src/modules/admin/reservation/entities/reservation.entity';
 
 @Injectable()
 export class LandingReservationService {
@@ -25,6 +29,7 @@ export class LandingReservationService {
     private readonly translation: Translation,
     private readonly reservationService: ReservationService,
     private readonly userService: UsersService,
+    private readonly confirmUseCase: ConfirmPaymentLandingUseCase,
   ) {
     this.errorHandler = new BaseErrorHandler(
       this.logger,
@@ -198,6 +203,30 @@ export class LandingReservationService {
     }
   }
 
+  async CheckDetailedReservationExists(
+    reservationId: string,
+    externalRequest: boolean = false,
+  ) {
+    try {
+      const reservation =
+        await this.reservationService.findOneDetailed(reservationId);
+      if (!reservation) {
+        throw new BadRequestException(
+          this.translation.getTranslations(
+            'reservationNotFound',
+            'es',
+            errorDictionary,
+          ),
+        );
+      }
+      return reservation;
+    } catch (error) {
+      Logger.error(error);
+      if (externalRequest) this.errorHandler.handleError(error, 'getting');
+      return undefined;
+    }
+  }
+
   async createLandingReservation(
     dto: CreateLandingReservationDto,
     locale: SupportedLocales = defaultLocale,
@@ -250,6 +279,35 @@ export class LandingReservationService {
           locale,
           errorDictionary,
         ),
+      );
+    }
+  }
+
+  async confirmReservationForController(
+    id: string,
+    locale: SupportedLocales = defaultLocale,
+    dto: ConfirmBookingDto,
+  ): Promise<BaseApiResponse<Reservation>> {
+    try {
+      const landingUser = await this.userService.findLandingUser();
+      const updatedReservation = await this.confirmUseCase.execute(
+        id,
+        dto,
+        landingUser,
+      );
+      return {
+        data: updatedReservation.data,
+        message:
+          locale === defaultLocale
+            ? 'Pago exitoso, reserva guardada'
+            : 'Successful payment, booking saved',
+        success: true,
+      };
+    } catch {
+      throw new BadRequestException(
+        locale === defaultLocale
+          ? 'Lo sentimos, no se pudo confirmar la reserva. Intente nuevamente.'
+          : 'Sorry, we could not confirm the reservation. Please try again.',
       );
     }
   }

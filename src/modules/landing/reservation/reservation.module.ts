@@ -6,10 +6,16 @@ import { ReservationController } from './reservation.controller';
 import { Translation } from '../i18n/translation';
 import { ReservationGateway } from './websockets/reservation.gateway';
 import { UsersModule } from 'src/modules/admin/users/users.module';
+import { HeartbeatService } from './websockets/reservation.heartbeat.service';
 
 @Module({
   imports: [AdminReservationModule, RoomModule, UsersModule],
   controllers: [ReservationController],
-  providers: [LandingReservationService, Translation, ReservationGateway],
+  providers: [
+    LandingReservationService,
+    Translation,
+    ReservationGateway,
+    HeartbeatService,
+  ],
 })
 export class ReservationModule {}

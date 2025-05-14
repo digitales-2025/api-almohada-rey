@@ -5,6 +5,18 @@ type BookingMessages = SendingEvents;
 
 export const reservationWsMessagesDictionary: GenericDictionary<BookingMessages> =
   {
+    ping: {
+      en: 'ping',
+      es: 'ping',
+    },
+    onPong: {
+      en: 'onPong',
+      es: 'onPong',
+    },
+    onNoPing: {
+      en: 'Unstable connection',
+      es: 'Conexión inestable',
+    },
     onStartBookingPayment: {
       en: 'Proceed',
       es: 'Proceder',
@@ -44,6 +56,14 @@ export const validationMessagesDictionary: GenericDictionary<ValidationMessages>
     noReservationFound: {
       en: 'No reservation found',
       es: 'No se encontró ninguna reserva',
+    },
+    unstableConnection: {
+      en: 'Unstable connection',
+      es: 'Conexión inestable',
+    },
+    reservationAlreadyInUse: {
+      en: 'It is not possible to make the reservation',
+      es: 'No se puede realizar la reservación',
     },
     noValidReservationStatus: {
       en: 'No valid reservation status',

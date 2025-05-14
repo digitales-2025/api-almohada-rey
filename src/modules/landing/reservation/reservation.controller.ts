@@ -1,13 +1,36 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { LandingReservationService } from './reservation.service';
-import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiExtraModels,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { DetailedRoom } from 'src/modules/admin/room/entities/room.entity';
 import { CheckAvailableRoomsQueryDto } from './dto/landing-check-available-rooms.dto';
 import { defaultLocale, SupportedLocales } from '../i18n/translations';
 import { Reservation } from 'src/modules/admin/reservation/entities/reservation.entity';
 import { CreateLandingReservationDto } from './dto/create-reservation.dto';
+import { BaseReservationWsActionsDto } from './dto/reservation-ws.dto';
+import {
+  BaseWsErrorResponse,
+  BaseWsResponse,
+} from 'src/websockets/dto/base-response.dto';
+import {
+  OnConnectionResponse,
+  StartBookingReservationResponseDto,
+} from './websockets/reservation.ws.dto';
+import { ConfirmBookingDto } from './dto/confirm-reservation.dto';
 
 @ApiTags('Landing Reservations')
+@ApiExtraModels(
+  BaseReservationWsActionsDto,
+  BaseWsResponse,
+  StartBookingReservationResponseDto,
+  BaseWsErrorResponse,
+  OnConnectionResponse,
+)
 @Controller({ path: 'landing-reservation', version: '1' })
 export class ReservationController {
   constructor(private readonly reservationService: LandingReservationService) {}
@@ -105,6 +128,26 @@ export class ReservationController {
     return this.reservationService.createLandingReservation(
       createReservationDto,
       locale,
+    );
+  }
+
+  @Post('confirm-reservation')
+  @ApiOperation({ summary: 'Confirm a reservation' })
+  @ApiResponse({
+    status: 200,
+    description: 'Reservation confirmed successfully',
+    type: Reservation,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid input parameters' })
+  confirmReservation(
+    @Query('locale') locale: SupportedLocales = defaultLocale,
+    @Query('reservationId') reservationId: string,
+    @Body() confirmReservationDto: ConfirmBookingDto,
+  ) {
+    return this.reservationService.confirmReservationForController(
+      reservationId,
+      locale,
+      confirmReservationDto,
     );
   }
 }
