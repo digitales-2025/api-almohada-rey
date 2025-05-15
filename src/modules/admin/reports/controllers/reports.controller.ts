@@ -162,6 +162,7 @@ export class ReportsController {
     res.end();
   }
 
+  //reportes por tipo de habitación
   @Get('profitRoomType')
   @ApiOperation({
     summary: 'Descargar Excel de ganancias por tipo de habitación',
@@ -211,6 +212,57 @@ export class ReportsController {
     res.setHeader(
       'Content-Disposition',
       `attachment; filename=profit_roomtype_${year}_${month}.xlsx`,
+    );
+    await workbook.xlsx.write(res);
+    res.end();
+  }
+  /**
+   * Descarga un Excel con estadísticas de ocupación por tipo de habitación del mes y año indicados.
+   * @param month Mes numérico (1-12)
+   * @param year Año (YYYY)
+   * @param res Respuesta HTTP para enviar el archivo
+   */
+  @Get('occupancy')
+  @ApiOperation({
+    summary: 'Descargar Excel de estadísticas de ocupación',
+    description:
+      'Genera y descarga un archivo Excel con estadísticas de ocupación por tipo de habitación para un mes y año específicos.',
+  })
+  @ApiQuery({
+    name: 'month',
+    description: 'Mes numérico (1-12)',
+    type: Number,
+    example: 5,
+    required: true,
+  })
+  @ApiQuery({
+    name: 'year',
+    description: 'Año en formato YYYY',
+    type: Number,
+    example: 2024,
+    required: true,
+  })
+  @ApiOkResponse({
+    description: 'Archivo Excel con estadísticas de ocupación',
+    schema: { type: 'string', format: 'binary' },
+  })
+  async downloadOccupancyExcel(
+    @Query('month') month: number,
+    @Query('year') year: number,
+    @Res() res: Response,
+  ) {
+    // Llama al service para obtener el Excel y lo envía como archivo
+    const workbook = await this.reportsService.getOccupancyExcel({
+      month,
+      year,
+    });
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=occupancy_${year}_${month}.xlsx`,
     );
     await workbook.xlsx.write(res);
     res.end();
