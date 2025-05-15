@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-export class LandRoomTypeMainImg {
+export class BaseRoomTypeMainImg {
   @ApiProperty()
   id: string;
 
@@ -17,9 +17,22 @@ export class LandRoomTypeMainImg {
   guests: number;
 
   @ApiProperty()
+  bed: string;
+
+  @ApiProperty()
   mainImageUrl: string;
 }
 
+export class LandRoomTypeMainImg extends BaseRoomTypeMainImg {
+  @ApiProperty()
+  nameEn?: string;
+
+  @ApiProperty()
+  descriptionEn: string;
+
+  @ApiProperty()
+  bedEn?: string;
+}
 export class LandImageRoomType {
   @ApiProperty()
   id?: string;

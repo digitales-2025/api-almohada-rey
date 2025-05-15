@@ -60,8 +60,8 @@ export abstract class BaseRepository<T extends BaseEntity> {
    * @param tx - Contexto de transacción opcional
    * @returns - La entidad creada con el tipo especificado
    */
-  async createWithTx<V = T>(
-    createDto: CreateDto<T>,
+  async createWithTx<V = T, W = CreateDto<T>>(
+    createDto: W,
     tx?: PrismaTransaction,
   ): Promise<V> {
     const client = this.getClient(tx);
@@ -242,6 +242,21 @@ export abstract class BaseRepository<T extends BaseEntity> {
     const result = await this.prisma.measureQuery(
       `findOne${String(this.modelName)}`,
       () => (this.prisma[this.modelName] as any).findFirst(params),
+    );
+    return result as unknown as V | null;
+  }
+
+  /**
+   * Busca un registro por su ID y lo incluye en la respuesta.
+   * @template V - Tipo opcional para el retorno, por defecto es T
+   * @param id - ID del registro a buscar.
+   * @param include - Relaciones a incluir.
+   * @returns El registro encontrado o null si no se encuentra.
+   */
+  async findUnique<V = T>(params: QueryParams): Promise<V | null> {
+    const result = await this.prisma.measureQuery(
+      `findUnique${String(this.modelName)}`,
+      () => (this.prisma[this.modelName] as any).findUnique(params),
     );
     return result as unknown as V | null;
   }
@@ -687,12 +702,24 @@ export abstract class BaseRepository<T extends BaseEntity> {
   /**
    * Ejecuta una transacción con la base de datos.
    * @param operation - Función que contiene las operaciones a ejecutar dentro de la transacción.
+   * @param options - Opciones de la transacción, como nivel de aislamiento
    * @returns El resultado de la transacción.
    */
   async transaction<R>(
     operation: (transaction: PrismaTransaction) => Promise<R>,
+    options?: {
+      isolationLevel?:
+        | 'ReadUncommitted'
+        | 'ReadCommitted'
+        | 'RepeatableRead'
+        | 'Serializable';
+    },
   ): Promise<R> {
-    return this.prisma.withTransaction(operation);
+    if (options) {
+      return this.prisma.$transaction(operation, options);
+    } else {
+      return this.prisma.withTransaction(operation);
+    }
   }
 
   /**
@@ -730,6 +757,28 @@ export abstract class BaseRepository<T extends BaseEntity> {
     const client = this.getClient(tx);
     const result = await (client[this.modelName] as any).findMany(params);
     return result as unknown as V[];
+  }
+
+  /**
+   * Busca un registro por su ID dentro de una transacción
+   * @template V - Tipo opcional para el retorno, por defecto es T
+   * @param id - ID del registro a buscar
+   * @param tx - Contexto de transacción
+   * @param include - Relaciones a incluir (opcional)
+   * @returns El registro encontrado o null si no existe
+   */
+  async findByIdWithTx<V = T>(
+    id: string,
+    tx?: PrismaTransaction,
+    include?: Record<string, boolean>,
+  ): Promise<V | null> {
+    const client = this.getClient(tx);
+    const result = await (client[this.modelName] as any).findUnique({
+      where: { id },
+      include,
+    });
+
+    return result as unknown as V | null;
   }
 
   /**

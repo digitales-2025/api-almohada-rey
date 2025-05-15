@@ -7,6 +7,7 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
+import { CreateLandingReservationDto } from 'src/modules/landing/reservation/dto/create-reservation.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
 import {
@@ -35,6 +36,11 @@ import { ReservationStatus } from '@prisma/client';
 import { ReservationStateFactory } from './states';
 import { ReservationStatusAvailableActions } from './entities/reservation.status-actions';
 import { UpdateManyDto, UpdateManyResponseDto } from './dto/update-many.dto';
+import {
+  defaultLocale,
+  SupportedLocales,
+} from 'src/modules/landing/i18n/translations';
+import { CreateReservationUseCaseForLanding } from './use-cases/createReservationForLanding.use-case';
 import { ReservationGateway } from 'src/modules/websockets/reservation.gateway';
 
 @Injectable()
@@ -45,6 +51,7 @@ export class ReservationService {
   constructor(
     private readonly reservationRepository: ReservationRepository,
     private readonly createReservationUseCase: CreateReservationUseCase,
+    private readonly createReservationUseCaseForLanding: CreateReservationUseCaseForLanding,
     private readonly updateReservationUseCase: UpdateReservationUseCase,
     private readonly roomRepository: RoomRepository,
     private readonly changeReservationStatusUseCase: ChangeReservationStatusUseCase,
@@ -66,16 +73,8 @@ export class ReservationService {
     userData: UserData,
   ): Promise<BaseApiResponse<Reservation>> {
     try {
-      const roomAvailability = await this.checkAvailability({
-        roomId: createReservationDto.roomId,
-        checkInDate: createReservationDto.checkInDate,
-        checkOutDate: createReservationDto.checkOutDate,
-      });
-
-      if (!roomAvailability.isAvailable) {
-        throw new BadRequestException('Habitación no disponible');
-      }
-
+      // La verificación ahora se hace dentro de createReservationUseCase.execute
+      // que ya la implementa dentro de una transacción con bloqueo pesimista
       const reservation = await this.createReservationUseCase.execute(
         createReservationDto,
         userData,
@@ -99,7 +98,55 @@ export class ReservationService {
       }
       return reservation;
     } catch (error) {
-      this.errorHandler.handleError(error, 'creating');
+      return this.errorHandler.handleError(error, 'creating');
+    }
+  }
+
+  async createForLanding(
+    createReservationDto: CreateLandingReservationDto,
+    userData: UserData,
+    locale: SupportedLocales = defaultLocale,
+  ): Promise<BaseApiResponse<Reservation>> {
+    try {
+      const roomAvailability = await this.checkAvailability({
+        roomId: createReservationDto.roomId,
+        checkInDate: createReservationDto.checkInDate,
+        checkOutDate: createReservationDto.checkOutDate,
+      });
+
+      if (!roomAvailability.isAvailable) {
+        throw new BadRequestException(
+          locale == defaultLocale
+            ? 'Habitación no disponible'
+            : 'Room not available',
+        );
+      }
+
+      const reservation = await this.createReservationUseCaseForLanding.execute(
+        createReservationDto,
+        userData,
+        locale,
+      );
+
+      // Emitir evento de nueva reservación por WebSocket
+      if (reservation.success && reservation.data) {
+        // Obtén los detalles completos de la reserva para emitirlos
+        const detailedReservation = await this.findOneDetailed(
+          reservation.data.id,
+        );
+        if (detailedReservation) {
+          this.reservationGateway.emitNewReservation(detailedReservation);
+
+          // Notificar cambio en la disponibilidad de habitaciones
+          this.reservationGateway.emitAvailabilityChange(
+            createReservationDto.checkInDate,
+            createReservationDto.checkOutDate,
+          );
+        }
+      }
+      return reservation;
+    } catch (error) {
+      return this.errorHandler.handleError(error, 'creating');
     }
   }
 
@@ -109,12 +156,14 @@ export class ReservationService {
     userData: UserData,
   ): Promise<BaseApiResponse<Reservation>> {
     try {
+      // Mantener esta parte - Verificar si existe la reservación
       const originalReservation = await this.findOne(id);
 
       if (!originalReservation) {
         throw new BadRequestException(`No se encontró la reserva con ID ${id}`);
       }
 
+      // Mantener esta parte - Mapear el DTO a la entidad
       const updatedReservation: Reservation = {
         customerId: updateReservationDto.customerId,
         roomId: updateReservationDto.roomId,
@@ -129,6 +178,7 @@ export class ReservationService {
         observations: updateReservationDto.observations,
       };
 
+      // Mantener esta parte - Verificar si hay cambios
       const dtoHasNoChanges = hasNoChanges(
         updatedReservation,
         originalReservation,
@@ -142,35 +192,8 @@ export class ReservationService {
         };
       }
 
-      // Logger.log(`Updated Reservation: ${JSON.stringify(updatedReservation)}`);
-
-      //check chekin-out collisions
-      const checkInDate = new Date(updatedReservation.checkInDate);
-      const checkOutDate = new Date(updatedReservation.checkOutDate);
-
-      // Logger.log(
-      //   `CheckIn: ${checkInDate.toISOString()} - CheckOut: ${checkOutDate.toISOString()}`,
-      // );
-
-      const reservations = await this.getAllReservationsInTimeInterval(
-        checkInDate.toISOString(),
-        checkOutDate.toISOString(),
-        true,
-        id,
-      );
-
-      if (
-        reservations.some(
-          (reservation) =>
-            reservation.id !== id &&
-            reservation.roomId === updatedReservation.roomId,
-        )
-      ) {
-        throw new BadRequestException(
-          'La habitación no está disponible en las fechas seleccionadas',
-        );
-      }
-
+      // La verificación de disponibilidad ahora se hace dentro del caso de uso
+      // con bloqueo pesimista para evitar condiciones de carrera
       const reservation = await this.updateReservationUseCase.execute(
         id,
         updatedReservation,
@@ -203,7 +226,7 @@ export class ReservationService {
 
       return reservation;
     } catch (error) {
-      this.errorHandler.handleError(error, 'updating');
+      return this.errorHandler.handleError(error, 'updating');
     }
   }
 

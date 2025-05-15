@@ -22,6 +22,16 @@ export class UpdateRoomTypeDto {
   name: string;
 
   @ApiProperty({
+    description: 'Nombre del tipo de habitación en inglés',
+    example: 'Double Room',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  @Transform(({ value }) => value?.trim().toLowerCase())
+  nameEn?: string;
+
+  @ApiProperty({
     description: 'Capacidad máxima de huéspedes',
     example: 2,
     required: false,
@@ -52,6 +62,16 @@ export class UpdateRoomTypeDto {
   description?: string;
 
   @ApiProperty({
+    description: 'Descripción del tipo de habitación en inglés',
+    example: 'Room with private balcony',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  @Transform(({ value }) => value?.trim())
+  descriptionEn?: string;
+
+  @ApiProperty({
     description: 'Descripción de la cama',
     example: 'Cama matrimonial king size',
     required: false,
@@ -60,4 +80,14 @@ export class UpdateRoomTypeDto {
   @IsOptional()
   @Transform(({ value }) => value?.trim())
   bed?: string;
+
+  @ApiProperty({
+    description: 'Descripción de la cama en inglés',
+    example: 'King size bed',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  @Transform(({ value }) => value?.trim())
+  bedEn?: string;
 }

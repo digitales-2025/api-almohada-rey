@@ -16,8 +16,10 @@ import { RoomModule } from './modules/admin/room/room.module';
 import { RoomCleanModule } from './modules/admin/room-clean/room-clean.module';
 import { ServiceModule } from './modules/admin/service/service.module';
 import { LandRoomTypeModule } from './modules/landing/room-type/land-room-type.module';
+import { ReservationModule as LandingReservationModule } from './modules/landing/reservation/reservation.module';
 import { ExpenseModule } from './modules/admin/expense/expense.module';
 import { WarehouseModule } from './modules/admin/warehouse/warehouse.module';
+import { ReportsModule } from './modules/admin/reports/reports.module';
 
 @Module({
   imports: [
@@ -38,8 +40,10 @@ import { WarehouseModule } from './modules/admin/warehouse/warehouse.module';
     RoomCleanModule,
     ServiceModule,
     LandRoomTypeModule,
+    LandingReservationModule,
     ExpenseModule,
     WarehouseModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
