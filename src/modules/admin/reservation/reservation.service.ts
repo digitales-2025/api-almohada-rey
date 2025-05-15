@@ -740,38 +740,76 @@ export class ReservationService {
           parsedCheckOutDate,
         );
 
+      let originalReservation: Reservation | null = null;
+      let sameRoomTypeFilter = {}; // Inicializar filtro vacío por defecto
+
       if (forUpdate && reservationId) {
-        Logger.log('Entrando a las ras reservaciones para update REservation');
-        // If we're updating a reservation, we need to exclude the current reservation
-        // from the list of reserved room IDs
-        const originalReservation =
+        Logger.log('Procesando actualización de reservación');
+        // Buscar la reserva original
+        originalReservation =
           await this.reservationRepository.findOne<Reservation>({
             where: {
               id: reservationId,
               isActive: true,
             },
+            include: { room: true }, // Incluir la habitación para obtener su tipo
           });
 
         if (originalReservation) {
+          // Excluir la habitación actual de las reservadas para permitir mantenerla
           reservedRoomIds = reservedRoomIds.filter(
             (id) => id !== originalReservation.roomId,
           );
+
+          // Si la reserva está CONFIRMED, solo permitir habitaciones del mismo tipo
+          if (originalReservation.status === ReservationStatus.CONFIRMED) {
+            Logger.log(
+              'Reservación CONFIRMED: filtrando por mismo tipo de habitación',
+            );
+
+            // Buscar la habitación original para obtener su tipo
+            const originalRoom = await this.roomRepository.findById(
+              originalReservation.roomId,
+              {
+                RoomTypes: true,
+              },
+            );
+
+            if (originalRoom) {
+              // Crear filtro para buscar solo habitaciones del mismo tipo
+              sameRoomTypeFilter = {
+                roomTypeId: originalRoom.roomTypeId,
+              };
+
+              Logger.log(
+                `Filtrando por tipo de habitación: ${originalRoom.roomTypeId}`,
+              );
+            }
+          }
         }
       }
 
       // Find all available rooms (those not in the reserved list)
+      // Si la reserva está CONFIRMED, aplicamos el filtro adicional de roomTypeId
       const availableRooms = await this.roomRepository.findMany<DetailedRoom>({
         where: {
           isActive: true,
           id: {
             notIn: reservedRoomIds,
           },
+          ...sameRoomTypeFilter, // Aplicar filtro de tipo de habitación si es necesario
         },
         include: { RoomTypes: true },
       });
 
       // Emitir evento de cambio de disponibilidad para mantener a los clientes actualizados
       this.reservationGateway.emitAvailabilityChange(checkInDate, checkOutDate);
+
+      if (originalReservation?.status === ReservationStatus.CONFIRMED) {
+        Logger.log(
+          `Habitaciones disponibles del mismo tipo: ${availableRooms.length}`,
+        );
+      }
 
       return availableRooms;
     } catch (error) {

@@ -1875,6 +1875,314 @@ export class PaymentsService {
   }
 
   /**
+   * Actualiza los montos y días de los detalles de pago cuando cambian las fechas de una reserva.
+   * @param reservationId ID de la reservación cuyas fechas han cambiado
+   * @param oldCheckInDate Fecha de check-in anterior
+   * @param oldCheckOutDate Fecha de check-out anterior
+   * @param newCheckInDate Nueva fecha de check-in
+   * @param newCheckOutDate Nueva fecha de check-out
+   * @param user Usuario que realiza la acción
+   * @returns Detalles actualizados
+   */
+  async updatePaymentDetailsForDateChange(
+    reservationId: string,
+    oldCheckInDate: string,
+    oldCheckOutDate: string,
+    newCheckInDate: string,
+    newCheckOutDate: string,
+    user: UserData,
+  ): Promise<HttpResponse<any>> {
+    try {
+      // 1. Calcular las noches de estancia anterior y nueva
+      const oldNights = calculateStayNights(oldCheckInDate, oldCheckOutDate);
+      const newNights = calculateStayNights(newCheckInDate, newCheckOutDate);
+
+      this.logger.log(
+        `Actualizando pagos para reserva ${reservationId}: noches anteriores ${oldNights}, nuevas noches ${newNights}`,
+      );
+
+      // 2. Si no hay cambios en la cantidad de días, no es necesario hacer nada
+      if (oldNights === newNights) {
+        return {
+          statusCode: HttpStatus.OK,
+          message:
+            'No hay cambios en la cantidad de días, los pagos se mantienen igual',
+          data: { reservationId, oldNights, newNights },
+        };
+      }
+
+      // 3. Obtener el pago relacionado con la reserva y todos sus detalles
+      const payment = await this.prisma.payment.findFirst({
+        where: { reservationId },
+        include: {
+          paymentDetail: {
+            include: {
+              room: {
+                select: {
+                  id: true,
+                  number: true,
+                  RoomTypes: { select: { id: true, name: true, price: true } },
+                },
+              },
+              service: { select: { id: true, name: true } },
+              product: { select: { id: true, name: true } },
+            },
+          },
+          reservation: {
+            include: {
+              room: {
+                select: {
+                  id: true,
+                  number: true,
+                  RoomTypes: { select: { id: true, name: true, price: true } },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!payment) {
+        return {
+          statusCode: HttpStatus.OK,
+          message:
+            'No hay pagos asociados a esta reserva que requieran actualización',
+          data: { reservationId },
+        };
+      }
+
+      // 4. Iniciar transacción para actualizar todos los detalles y el pago principal
+      const result = await this.prisma.$transaction(async (prisma) => {
+        // Separamos los detalles por tipo
+        const roomDetails = payment.paymentDetail.filter(
+          (detail) =>
+            detail.type === 'ROOM_RESERVATION' && detail.status === 'PAID',
+        );
+
+        const extraServiceDetails = payment.paymentDetail.filter(
+          (detail) => detail.type === 'EXTRA_SERVICE',
+        );
+
+        const updatedDetails = [];
+
+        // Calcular el monto actual pagado de habitaciones antes de actualizaciones
+        const currentRoomAmountPaid = roomDetails.reduce(
+          (sum, detail) => sum + detail.subtotal,
+          0,
+        );
+
+        // 5. Calcular el precio por noche (unitPrice)
+        const roomPrice =
+          roomDetails.length > 0
+            ? roomDetails[0].unitPrice
+            : payment.reservation.room?.RoomTypes?.price || 0;
+
+        // 6. Calcular el monto total de servicios extra (no cambiará)
+        const extraServicesAmount = extraServiceDetails.reduce(
+          (sum, detail) => sum + detail.subtotal,
+          0,
+        );
+
+        // 7. Calcular el NUEVO monto total de la habitación
+        const newRoomAmount = roomPrice * newNights;
+
+        // 8. Si hay detalles de habitación pagados, actualizarlos
+        if (roomDetails.length > 0) {
+          // Si tenemos más de un detalle de pago para la misma habitación
+          if (roomDetails.length > 1) {
+            // Ordenar los detalles por días para procesarlos primero los más grandes
+            const sortedDetails = [...roomDetails].sort(
+              (a, b) => (b.days || 0) - (a.days || 0),
+            );
+            let remainingNights = newNights;
+
+            for (let i = 0; i < sortedDetails.length; i++) {
+              const detail = sortedDetails[i];
+              const isLast = i === sortedDetails.length - 1;
+              const currentDays = detail.days || 1;
+
+              // Para el último detalle, asignar todos los días restantes
+              // Para los anteriores, asignar proporcionalmente o eliminar si no quedan días
+              const newDays = isLast
+                ? remainingNights
+                : Math.min(
+                    Math.ceil((newNights * currentDays) / oldNights),
+                    remainingNights,
+                  );
+
+              if (newDays <= 0 && !isLast) {
+                // Si este detalle ya no tiene días asignados y no es el último, eliminarlo
+                await prisma.paymentDetail.delete({ where: { id: detail.id } });
+
+                await this.audit.create({
+                  entityId: detail.id,
+                  entityType: 'paymentDetail',
+                  action: AuditActionType.DELETE,
+                  performedById: user.id,
+                  createdAt: new Date(),
+                });
+                continue;
+              }
+
+              // Actualizar el detalle con los nuevos días
+              const newSubtotal = roomPrice * newDays;
+
+              const updatedDetail = await prisma.paymentDetail.update({
+                where: { id: detail.id },
+                data: {
+                  days: newDays,
+                  subtotal: newSubtotal,
+                },
+                include: {
+                  room: {
+                    select: {
+                      id: true,
+                      number: true,
+                      RoomTypes: { select: { id: true, name: true } },
+                    },
+                  },
+                },
+              });
+
+              updatedDetails.push(updatedDetail);
+              remainingNights -= newDays;
+
+              // Registrar auditoría
+              await this.audit.create({
+                entityId: detail.id,
+                entityType: 'paymentDetail',
+                action: AuditActionType.UPDATE,
+                performedById: user.id,
+                createdAt: new Date(),
+              });
+            }
+          }
+          // Si solo hay un detalle de habitación
+          else if (roomDetails.length === 1) {
+            const detail = roomDetails[0];
+            const currentDays = detail.days || 1;
+
+            // IMPORTANTE: Si los nuevos días son menos que los actuales, reducimos
+            // Si son más, mantenemos los actuales (no podemos aumentar días pagados sin un nuevo pago)
+            const newDays = Math.min(currentDays, newNights);
+            const newSubtotal = roomPrice * newDays;
+
+            const updatedDetail = await prisma.paymentDetail.update({
+              where: { id: detail.id },
+              data: {
+                days: newDays,
+                subtotal: newSubtotal,
+              },
+              include: {
+                room: {
+                  select: {
+                    id: true,
+                    number: true,
+                    RoomTypes: { select: { id: true, name: true } },
+                  },
+                },
+              },
+            });
+
+            updatedDetails.push(updatedDetail);
+
+            // Registrar auditoría
+            await this.audit.create({
+              entityId: detail.id,
+              entityType: 'paymentDetail',
+              action: AuditActionType.UPDATE,
+              performedById: user.id,
+              createdAt: new Date(),
+            });
+          }
+        }
+
+        // 9. Calcular el nuevo monto total incluyendo servicios extra
+        const newTotalAmount = newRoomAmount + extraServicesAmount;
+
+        // 10. Calcular el nuevo monto pagado
+        let newAmountPaid = 0;
+
+        if (updatedDetails.length > 0) {
+          // Si actualizamos detalles, calculamos el nuevo monto pagado sumando los subtotales actualizados
+          const updatedRoomAmountPaid = updatedDetails.reduce(
+            (sum, detail) => sum + detail.subtotal,
+            0,
+          );
+
+          // Añadir los montos pagados de servicios extras (que no cambian)
+          const extraServicesPaid = extraServiceDetails
+            .filter((detail) => detail.status === 'PAID')
+            .reduce((sum, detail) => sum + detail.subtotal, 0);
+
+          newAmountPaid = updatedRoomAmountPaid + extraServicesPaid;
+        } else {
+          // Si no hay detalles actualizados (caso raro), mantenemos el monto pagado original
+          // excepto si el nuevo total es menor que lo pagado, en ese caso ajustamos al nuevo total
+          newAmountPaid = Math.min(payment.amountPaid, newTotalAmount);
+        }
+
+        // 11. Determinar el estado del pago
+        const paymentStatus =
+          newAmountPaid >= newTotalAmount
+            ? PaymentDetailStatus.PAID
+            : PaymentDetailStatus.PENDING;
+
+        // 12. Actualizar el pago principal
+        const updatedPayment = await prisma.payment.update({
+          where: { id: payment.id },
+          data: {
+            amount: newTotalAmount,
+            amountPaid: newAmountPaid,
+            status: paymentStatus,
+          },
+        });
+
+        // Registrar auditoría del pago
+        await this.audit.create({
+          entityId: payment.id,
+          entityType: 'payment',
+          action: AuditActionType.UPDATE,
+          performedById: user.id,
+          createdAt: new Date(),
+        });
+
+        return {
+          updated: true,
+          paymentId: payment.id,
+          updatedDetails,
+          updatedPayment,
+          oldNights,
+          newNights,
+          newTotalAmount,
+          newAmountPaid,
+          currentRoomAmountPaid,
+        };
+      });
+
+      return {
+        statusCode: HttpStatus.OK,
+        message: `Detalles de pago actualizados correctamente para la nueva duración de ${newNights} noche(s)`,
+        data: result,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error actualizando detalles de pago por cambio de fechas: ${error.message}`,
+        error.stack,
+      );
+
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      handleException(
+        error,
+        'Error actualizando detalles de pago por cambio de fechas',
+      );
+    }
+  }
+
+  /**
    * Elimina un detalle de pago y actualiza el pago principal.
    * @param paymentDetailId ID del detalle de pago a eliminar
    * @param user Usuario que realiza la acción
