@@ -56,6 +56,13 @@ export class Customer extends BaseEntity {
   @ApiProperty({ description: 'Customer company address', required: false })
   companyAddress?: string;
 
+  @ApiProperty({
+    description: 'Customer created by landing page',
+    required: false,
+    default: false,
+  })
+  createdByLandingPage?: boolean;
+
   constructor(partial: Partial<Customer>) {
     super(partial);
     Object.assign(this, partial);

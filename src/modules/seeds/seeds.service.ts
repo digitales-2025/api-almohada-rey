@@ -10,11 +10,13 @@ import { handleException } from 'src/utils';
 import * as bcrypt from 'bcrypt';
 import { HttpResponse, UserData } from 'src/interfaces';
 import { service, serviceSeedComercial } from './data/services.seed';
+import { landingDefaultUserSeed } from './data/landinguser.seed';
 import { warehouseSeedData, warehousesSeed } from './data/warehouse.seed';
 
 export interface InitResult {
   admin?: UserData;
   services?: service[];
+  landingUser?: UserData;
   warehouses?: warehouseSeedData[];
 }
 
@@ -44,6 +46,11 @@ export class SeedsService {
         initResults.services = servicesResult.data;
       }
 
+      const landingUserResult = await this.generateLandingDefaultUser();
+      if (landingUserResult) {
+        initResults.landingUser = landingUserResult.data;
+      }
+
       // Generar almacenes iniciales
       const warehousesResult = await this.generateWarehouses();
       if (warehousesResult) {
@@ -54,6 +61,24 @@ export class SeedsService {
         message: 'System initialized successfully',
         statusCode: HttpStatus.CREATED,
         data: initResults,
+      };
+    } catch (error) {
+      this.logger.error('Error initializing system data', error.stack);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      handleException(error, 'Error initializing system data');
+    }
+  }
+
+  async onlyGenerateLandingUser(): Promise<HttpResponse<UserData>> {
+    try {
+      const landingUserResult = await this.generateLandingDefaultUser();
+
+      return {
+        message: 'System initialized successfully',
+        statusCode: HttpStatus.CREATED,
+        data: landingUserResult.data,
       };
     } catch (error) {
       this.logger.error('Error initializing system data', error.stack);
@@ -109,6 +134,52 @@ export class SeedsService {
         throw error;
       }
       handleException(error, 'Error generating super admin');
+    }
+  }
+
+  async generateLandingDefaultUser(): Promise<HttpResponse<UserData>> {
+    try {
+      // Iniciar una transacción
+      const result = await this.prisma.$transaction(async (prisma) => {
+        // Crear usuario landing y asignarle el rol si no existe
+        const landingUser = await prisma.user.upsert({
+          where: {
+            email_isActive: {
+              email: landingDefaultUserSeed.email,
+              isActive: true,
+            },
+          },
+          update: {},
+          create: {
+            ...landingDefaultUserSeed,
+            isLandingUser: true, //only use with this flag
+            password: await bcrypt.hash(landingDefaultUserSeed.password, 10),
+            isSuperAdmin: false,
+          },
+        });
+        return {
+          message: 'Landing User created successfully',
+          statusCode: HttpStatus.CREATED,
+          data: {
+            id: landingUser.id,
+            name: landingUser.name,
+            email: landingUser.email,
+            phone: landingUser.phone,
+            isSuperAdmin: landingUser.isSuperAdmin,
+            userRol: landingUser.userRol,
+          },
+        };
+      });
+      return result;
+    } catch (error) {
+      this.logger.error(
+        `Error generating landing default user ${superAdminSeed.email}`,
+        error.stack,
+      );
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      handleException(error, 'Error generating landing default user');
     }
   }
 

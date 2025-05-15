@@ -10,6 +10,12 @@ export class RoomType extends BaseEntity {
   name: string;
 
   @ApiProperty({
+    description: 'Nombre del tipo de habitación en inglés',
+    example: 'Double Room',
+  })
+  nameEn?: string;
+
+  @ApiProperty({
     description: 'Capacidad máxima de huéspedes',
     example: 2,
   })
@@ -28,10 +34,22 @@ export class RoomType extends BaseEntity {
   description: string;
 
   @ApiProperty({
+    description: 'Descripción del tipo de habitación en inglés',
+    example: 'Room with sea view and private balcony',
+  })
+  descriptionEn: string;
+
+  @ApiProperty({
     description: 'Descripción de la cama',
     example: 'Cama matrimonial king size',
   })
   bed: string;
+
+  @ApiProperty({
+    description: 'Descripción de la cama en inglés',
+    example: 'King size bed',
+  })
+  bedEn?: string;
 
   constructor(partial: Partial<RoomType> = {}) {
     super(partial);
