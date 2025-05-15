@@ -108,26 +108,26 @@ export class CustomersService {
    * @param email Email del cliente
    * @param id Id del cliente
    */
-  async findByEmail(email: string, id?: string) {
-    const customerDB = await this.prisma.customer.findUnique({
-      where: { email },
-      select: {
-        id: true,
-        email: true,
-        isActive: true,
-      },
-    });
-    if (!!customerDB && customerDB.id !== id) {
-      if (!!customerDB && !customerDB.isActive) {
-        throw new BadRequestException(
-          'This email is already in use but the customer is inactive',
-        );
-      }
-      if (customerDB) {
-        throw new BadRequestException('This email is already in use');
-      }
-    }
-  }
+  // async findByEmail(email: string, id?: string) {
+  //   const customerDB = await this.prisma.customer.findUnique({
+  //     where: { email },
+  //     select: {
+  //       id: true,
+  //       email: true,
+  //       isActive: true,
+  //     },
+  //   });
+  //   if (!!customerDB && customerDB.id !== id) {
+  //     if (!!customerDB && !customerDB.isActive) {
+  //       throw new BadRequestException(
+  //         'This email is already in use but the customer is inactive',
+  //       );
+  //     }
+  //     if (customerDB) {
+  //       throw new BadRequestException('This email is already in use');
+  //     }
+  //   }
+  // }
 
   /**
    * Buscar un cliente por su RUC
@@ -190,7 +190,7 @@ export class CustomersService {
     try {
       // Crear el cliente y registrar la auditoría
       await this.findByDocumentNumber(documentNumber);
-      if (email) await this.findByEmail(email);
+      // if (email) await this.findByEmail(email);
       if (ruc) await this.findByRuc(ruc);
 
       newCustomer = await this.prisma.$transaction(async () => {
@@ -743,7 +743,7 @@ export class CustomersService {
       const customerDB = await this.findById(id);
 
       if (updateData.ruc) await this.findByRuc(updateData.ruc, id);
-      if (updateData.email) await this.findByEmail(updateData.email, id);
+      // if (updateData.email) await this.findByEmail(updateData.email, id);
       if (updateData.documentNumber)
         await this.findByDocumentNumber(updateData.documentNumber, id);
 
@@ -1765,16 +1765,17 @@ export class CustomersService {
     }
 
     // Verificar email si existe
-    if (email) {
-      const existingByEmail = await this.prisma.customer.findUnique({
-        where: { email },
-        select: { id: true, isActive: true },
-      });
+    // This is no longer necessary because of landing automatic creation reasosns
+    // if (email) {
+    //   const existingByEmail = await this.prisma.customer.findUnique({
+    //     where: { email },
+    //     select: { id: true, isActive: true },
+    //   });
 
-      if (existingByEmail) {
-        return `Email ${email} ya existe${!existingByEmail.isActive ? ' (inactivo)' : ''}`;
-      }
-    }
+    //   if (existingByEmail) {
+    //     return `Email ${email} ya existe${!existingByEmail.isActive ? ' (inactivo)' : ''}`;
+    //   }
+    // }
 
     // Verificar ruc si existe
     if (ruc) {

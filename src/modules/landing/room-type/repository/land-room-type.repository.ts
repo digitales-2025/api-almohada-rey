@@ -22,7 +22,11 @@ export class LandRoomTypeRepository {
         select: {
           id: true,
           name: true,
+          nameEn: true,
           description: true,
+          descriptionEn: true,
+          bed: true,
+          bedEn: true,
           price: true,
           guests: true,
           // También incluimos las imágenes pero las filtraremos después
@@ -46,9 +50,13 @@ export class LandRoomTypeRepository {
       return roomTypes.map((roomType) => ({
         id: roomType.id,
         name: roomType.name,
+        nameEn: roomType.nameEn,
         description: roomType.description,
+        descriptionEn: roomType.descriptionEn,
         price: roomType.price,
         guests: roomType.guests,
+        bed: roomType.bed,
+        bedEn: roomType.bedEn,
         mainImageUrl:
           roomType.ImageRoomType.length > 0
             ? roomType.ImageRoomType[0].imageUrl

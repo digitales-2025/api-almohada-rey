@@ -1,9 +1,11 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { LandRoomTypeRepository } from '../repository/land-room-type.repository';
 import {
-  LandRoomTypeMainImg,
   LandRoomTypeAllImg,
+  BaseRoomTypeMainImg,
 } from '../entities/land-room-type.entity';
+import { BaseQueryDto } from '../../dto/base.query.dto';
+import { defaultLocale } from '../../i18n/translations';
 
 @Injectable()
 export class LandRoomTypeService {
@@ -16,7 +18,9 @@ export class LandRoomTypeService {
   /**
    * Obtiene todos los tipos de habitaciones activas con formato resumido para landing
    */
-  async findAllRoomTypesForLanding(): Promise<LandRoomTypeMainImg[]> {
+  async findAllRoomTypesForLanding({
+    locale,
+  }: BaseQueryDto): Promise<BaseRoomTypeMainImg[]> {
     try {
       // Obtener todos los tipos de habitación activos con sus imágenes principales
       const roomTypesWithImages =
@@ -25,11 +29,21 @@ export class LandRoomTypeService {
       // Transformar al formato DTO requerido
       return roomTypesWithImages.map((roomType) => ({
         id: roomType.id,
-        name: roomType.name,
-        description: roomType.description,
+        name:
+          locale === defaultLocale
+            ? roomType.name
+            : (roomType.nameEn ?? roomType.name),
+        description:
+          locale === defaultLocale
+            ? roomType.description
+            : (roomType.descriptionEn ?? roomType.description),
         price: roomType.price,
         guests: roomType.guests,
         mainImageUrl: roomType.mainImageUrl || '',
+        bed:
+          locale === defaultLocale
+            ? roomType.bed
+            : (roomType.bedEn ?? roomType.bed),
       }));
     } catch (error) {
       this.logger.error(

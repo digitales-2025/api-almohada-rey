@@ -1,12 +1,20 @@
-import { Controller, Get, Param } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
+import { Controller, Get, Param, Query } from '@nestjs/common';
+import {
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+  ApiParam,
+  ApiExtraModels,
+} from '@nestjs/swagger';
 import { LandRoomTypeService } from '../service/land-room-type.service';
 import {
-  LandRoomTypeMainImg,
   LandRoomTypeAllImg,
+  BaseRoomTypeMainImg,
 } from '../entities/land-room-type.entity';
+import { BaseQueryDto } from '../../dto/base.query.dto';
 
 @ApiTags('Landing Room Types')
+@ApiExtraModels(BaseQueryDto)
 @Controller({ path: 'landing/room-types', version: '1' })
 export class LandRoomTypeController {
   constructor(private readonly landRoomTypeService: LandRoomTypeService) {}
@@ -23,10 +31,12 @@ export class LandRoomTypeController {
   @ApiResponse({
     status: 200,
     description: 'Lista de tipos de habitaciones resumidas',
-    type: [LandRoomTypeMainImg],
+    type: [BaseRoomTypeMainImg],
   })
-  async findAllLandingRoomTypes(): Promise<LandRoomTypeMainImg[]> {
-    return this.landRoomTypeService.findAllRoomTypesForLanding();
+  async findAllLandingRoomTypes(
+    @Query() queryParams: BaseQueryDto,
+  ): Promise<BaseRoomTypeMainImg[]> {
+    return this.landRoomTypeService.findAllRoomTypesForLanding(queryParams);
   }
 
   /**

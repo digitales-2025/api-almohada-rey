@@ -7,6 +7,7 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
+import { CreateLandingReservationDto } from 'src/modules/landing/reservation/dto/create-reservation.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
 import {
@@ -35,6 +36,11 @@ import { ReservationStatus } from '@prisma/client';
 import { ReservationStateFactory } from './states';
 import { ReservationStatusAvailableActions } from './entities/reservation.status-actions';
 import { UpdateManyDto, UpdateManyResponseDto } from './dto/update-many.dto';
+import {
+  defaultLocale,
+  SupportedLocales,
+} from 'src/modules/landing/i18n/translations';
+import { CreateReservationUseCaseForLanding } from './use-cases/createReservationForLanding.use-case';
 import { ReservationGateway } from 'src/modules/websockets/reservation.gateway';
 
 @Injectable()
@@ -45,6 +51,7 @@ export class ReservationService {
   constructor(
     private readonly reservationRepository: ReservationRepository,
     private readonly createReservationUseCase: CreateReservationUseCase,
+    private readonly createReservationUseCaseForLanding: CreateReservationUseCaseForLanding,
     private readonly updateReservationUseCase: UpdateReservationUseCase,
     private readonly roomRepository: RoomRepository,
     private readonly changeReservationStatusUseCase: ChangeReservationStatusUseCase,
@@ -71,6 +78,54 @@ export class ReservationService {
       const reservation = await this.createReservationUseCase.execute(
         createReservationDto,
         userData,
+      );
+
+      // Emitir evento de nueva reservación por WebSocket
+      if (reservation.success && reservation.data) {
+        // Obtén los detalles completos de la reserva para emitirlos
+        const detailedReservation = await this.findOneDetailed(
+          reservation.data.id,
+        );
+        if (detailedReservation) {
+          this.reservationGateway.emitNewReservation(detailedReservation);
+
+          // Notificar cambio en la disponibilidad de habitaciones
+          this.reservationGateway.emitAvailabilityChange(
+            createReservationDto.checkInDate,
+            createReservationDto.checkOutDate,
+          );
+        }
+      }
+      return reservation;
+    } catch (error) {
+      return this.errorHandler.handleError(error, 'creating');
+    }
+  }
+
+  async createForLanding(
+    createReservationDto: CreateLandingReservationDto,
+    userData: UserData,
+    locale: SupportedLocales = defaultLocale,
+  ): Promise<BaseApiResponse<Reservation>> {
+    try {
+      const roomAvailability = await this.checkAvailability({
+        roomId: createReservationDto.roomId,
+        checkInDate: createReservationDto.checkInDate,
+        checkOutDate: createReservationDto.checkOutDate,
+      });
+
+      if (!roomAvailability.isAvailable) {
+        throw new BadRequestException(
+          locale == defaultLocale
+            ? 'Habitación no disponible'
+            : 'Room not available',
+        );
+      }
+
+      const reservation = await this.createReservationUseCaseForLanding.execute(
+        createReservationDto,
+        userData,
+        locale,
       );
 
       // Emitir evento de nueva reservación por WebSocket
@@ -685,38 +740,76 @@ export class ReservationService {
           parsedCheckOutDate,
         );
 
+      let originalReservation: Reservation | null = null;
+      let sameRoomTypeFilter = {}; // Inicializar filtro vacío por defecto
+
       if (forUpdate && reservationId) {
-        Logger.log('Entrando a las ras reservaciones para update REservation');
-        // If we're updating a reservation, we need to exclude the current reservation
-        // from the list of reserved room IDs
-        const originalReservation =
+        Logger.log('Procesando actualización de reservación');
+        // Buscar la reserva original
+        originalReservation =
           await this.reservationRepository.findOne<Reservation>({
             where: {
               id: reservationId,
               isActive: true,
             },
+            include: { room: true }, // Incluir la habitación para obtener su tipo
           });
 
         if (originalReservation) {
+          // Excluir la habitación actual de las reservadas para permitir mantenerla
           reservedRoomIds = reservedRoomIds.filter(
             (id) => id !== originalReservation.roomId,
           );
+
+          // Si la reserva está CONFIRMED, solo permitir habitaciones del mismo tipo
+          if (originalReservation.status === ReservationStatus.CONFIRMED) {
+            Logger.log(
+              'Reservación CONFIRMED: filtrando por mismo tipo de habitación',
+            );
+
+            // Buscar la habitación original para obtener su tipo
+            const originalRoom = await this.roomRepository.findById(
+              originalReservation.roomId,
+              {
+                RoomTypes: true,
+              },
+            );
+
+            if (originalRoom) {
+              // Crear filtro para buscar solo habitaciones del mismo tipo
+              sameRoomTypeFilter = {
+                roomTypeId: originalRoom.roomTypeId,
+              };
+
+              Logger.log(
+                `Filtrando por tipo de habitación: ${originalRoom.roomTypeId}`,
+              );
+            }
+          }
         }
       }
 
       // Find all available rooms (those not in the reserved list)
+      // Si la reserva está CONFIRMED, aplicamos el filtro adicional de roomTypeId
       const availableRooms = await this.roomRepository.findMany<DetailedRoom>({
         where: {
           isActive: true,
           id: {
             notIn: reservedRoomIds,
           },
+          ...sameRoomTypeFilter, // Aplicar filtro de tipo de habitación si es necesario
         },
         include: { RoomTypes: true },
       });
 
       // Emitir evento de cambio de disponibilidad para mantener a los clientes actualizados
       this.reservationGateway.emitAvailabilityChange(checkInDate, checkOutDate);
+
+      if (originalReservation?.status === ReservationStatus.CONFIRMED) {
+        Logger.log(
+          `Habitaciones disponibles del mismo tipo: ${availableRooms.length}`,
+        );
+      }
 
       return availableRooms;
     } catch (error) {
