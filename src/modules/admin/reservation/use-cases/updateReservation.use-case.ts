@@ -7,12 +7,13 @@ import {
 } from '@nestjs/common';
 import { ReservationRepository } from '../repository/reservation.repository';
 import { UserData } from 'src/interfaces';
-import { AuditActionType, Prisma } from '@prisma/client';
+import { AuditActionType, Prisma, ReservationStatus } from '@prisma/client';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { Reservation } from '../entities/reservation.entity';
 import { AuditRepository } from 'src/modules/admin/audit/audit.repository';
 import { Guest, GuestBuilder } from '../entities/guest.entity';
 import { RoomRepository } from '../../room/repositories/room.repository';
+import { PaymentsService } from '../../payments/payments.service';
 
 @Injectable()
 export class UpdateReservationUseCase {
@@ -21,6 +22,7 @@ export class UpdateReservationUseCase {
     private readonly reservationRepository: ReservationRepository,
     private readonly auditRepository: AuditRepository,
     private readonly roomRepository: RoomRepository,
+    private readonly paymentsService: PaymentsService,
   ) {}
 
   async execute(
@@ -29,6 +31,10 @@ export class UpdateReservationUseCase {
     user: UserData,
   ): Promise<BaseApiResponse<Reservation>> {
     try {
+      // Guardar las fechas originales para comparar después si hay cambios
+      let originalCheckInDate: string | null = null;
+      let originalCheckOutDate: string | null = null;
+      let reservationStatus: ReservationStatus;
       const updatedReservation = await this.reservationRepository.transaction(
         async (tx) => {
           // 0. Check if reservation exists - usar findWithTx que deberías tener en BaseRepository
@@ -38,6 +44,17 @@ export class UpdateReservationUseCase {
           if (!existingReservation) {
             throw new NotFoundException(`Reservation with ID ${id} not found`);
           }
+
+          // Guardar fechas originales en formato ISO string para comparación
+          originalCheckInDate = new Date(
+            existingReservation.checkInDate,
+          ).toISOString();
+          originalCheckOutDate = new Date(
+            existingReservation.checkOutDate,
+          ).toISOString();
+
+          // Guardar el estado actual de la reservación para verificar después
+          reservationStatus = existingReservation.status;
 
           // Verificar disponibilidad si hay cambio de habitación o fechas
           if (
@@ -212,7 +229,56 @@ export class UpdateReservationUseCase {
 
           return reservation;
         },
+        { isolationLevel: 'Serializable' },
       );
+
+      // 4. NUEVO: Actualizar pagos SOLO si la reserva tiene estado CONFIRMED y cambiaron las fechas
+      const hasChangedDates =
+        (possibleUpdatedReservation.checkInDate &&
+          possibleUpdatedReservation.checkInDate !== originalCheckInDate) ||
+        (possibleUpdatedReservation.checkOutDate &&
+          possibleUpdatedReservation.checkOutDate !== originalCheckOutDate);
+
+      if (
+        hasChangedDates &&
+        originalCheckInDate &&
+        originalCheckOutDate &&
+        reservationStatus === 'CONFIRMED'
+      ) {
+        // Solo para reservas CONFIRMED
+
+        try {
+          // Obtener las nuevas fechas de la reserva actualizada
+          const newCheckInDate =
+            possibleUpdatedReservation.checkInDate || originalCheckInDate;
+          const newCheckOutDate =
+            possibleUpdatedReservation.checkOutDate || originalCheckOutDate;
+
+          // Actualizar los pagos relacionados con la reserva
+          this.logger.log(
+            `Actualizando pagos por cambio de fechas para la reserva CONFIRMADA ${id}`,
+          );
+          await this.paymentsService.updatePaymentDetailsForDateChange(
+            id,
+            originalCheckInDate,
+            originalCheckOutDate,
+            newCheckInDate,
+            newCheckOutDate,
+            user,
+          );
+        } catch (paymentUpdateError) {
+          // Loguear el error pero no fallar la actualización completa
+          this.logger.error(
+            `Error al actualizar pagos por cambio de fechas: ${paymentUpdateError.message}`,
+            paymentUpdateError.stack,
+          );
+        }
+      } else if (hasChangedDates && reservationStatus !== 'CONFIRMED') {
+        // Loguear información cuando hay cambios de fechas pero la reserva no está confirmada
+        this.logger.log(
+          `No se actualizaron pagos porque la reserva ${id} no está en estado CONFIRMED (estado actual: ${reservationStatus})`,
+        );
+      }
 
       return {
         success: true,
