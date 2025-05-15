@@ -2,11 +2,13 @@ export interface RoomTypeOccupancyStats {
   roomTypeId: string;
   roomTypeName: string;
   capacity: number;
-  uniqueRoomsCount: number;
+  uniqueRoomsCount: number; // Habitaciones usadas en este período
+  totalRoomsOfThisType: number; // Total de habitaciones disponibles de este tipo
   arrivals: number; // Número de check-ins
   averageStayDuration: number; // Promedio de duración de estadía en días
   occupiedRoomDays: number; // Total de días-habitación ocupados
-  occupancyRatePercent: number; // Porcentaje de ocupación
+  occupancyRatePercent: number; // Porcentaje tradicional de ocupación (días)
+  occupancyRateByArrivalsPercent: number; // Nueva tasa basada en arribos vs habitaciones
   totalGuests: number; // Total de huéspedes principales + acompañantes
   totalOvernights: number; // Total de pernoctaciones (personas x noches)
   arrivalsByDay: Record<string, number>; // Arribos por día
@@ -61,4 +63,6 @@ export interface OccupancySummary {
   totalArrivals: number;
   totalOvernights: number;
   totalGuests: number;
+  totalRooms?: number; // Añadida como opcional
+  totalUniqueRooms?: number; // Añadida como opcional
 }

@@ -447,6 +447,20 @@ export class ReportsRepository {
         ? `${year + 1}-01-01`
         : `${year}-${(month + 1).toString().padStart(2, '0')}-01`;
 
+    // Primero vamos a obtener todas las habitaciones por tipo para tener el conteo total
+    const roomsByType = await this.prisma.room.groupBy({
+      by: ['roomTypeId'],
+      _count: {
+        id: true, // Contar habitaciones por tipo
+      },
+    });
+
+    // Crear un mapa para acceso rápido
+    const roomCountByType: Record<string, number> = {};
+    roomsByType.forEach((item) => {
+      roomCountByType[item.roomTypeId] = item._count.id;
+    });
+
     // 1. Obtener reservas con CHECKED_IN o CHECKED_OUT en el rango especificado
     // junto con información del cliente para análisis de nacionalidad
     const reservations = await this.prisma.reservation.findMany({
@@ -677,36 +691,46 @@ export class ReportsRepository {
 
     // 4. Calcular promedios y formatear resultados por tipo de habitación
     const roomTypeStats = Object.values(statsByRoomType).map((stats) => {
-      // Calcular porcentaje de ocupación por tipo de habitación
+      // Obtener el conteo total de habitaciones de este tipo desde la BD
+      const totalRoomsOfThisType =
+        roomCountByType[stats.roomTypeId] || stats.rooms.size;
+
+      // Calcular porcentaje de ocupación basado en arribos vs habitaciones disponibles
+      const occupancyRateByArrivals =
+        totalRoomsOfThisType > 0
+          ? (stats.arrivals / totalRoomsOfThisType) * 100
+          : 0;
+
+      // También mantenemos el cálculo original para referencia
       const roomCount = stats.rooms.size;
       const totalPossibleRoomDays = roomCount * diasEnMes;
-
-      const occupancyRate =
+      const occupancyRateByDays =
         totalPossibleRoomDays > 0
           ? (stats.occupiedRoomDays / totalPossibleRoomDays) * 100
           : 0;
-
-      // Calcular pernoctaciones totales (personas x noches)
-      const totalOvernights = stats.occupancyDetails.reduce(
-        (sum, detail) => sum + detail.guestCount * detail.stayDuration,
-        0,
-      );
-
-      // Calcular promedio de duración de estadía
-      const averageStayDuration =
-        stats.arrivals > 0 ? stats.totalNights / stats.arrivals : 0;
 
       return {
         roomTypeId: stats.roomTypeId,
         roomTypeName: stats.roomTypeName,
         capacity: stats.capacity,
-        uniqueRoomsCount: roomCount,
+        uniqueRoomsCount: roomCount, // Habitaciones usadas en el período
+        totalRoomsOfThisType, // Total de habitaciones de este tipo (todas las disponibles)
         arrivals: stats.arrivals,
-        averageStayDuration: parseFloat(averageStayDuration.toFixed(2)),
+        averageStayDuration: parseFloat(
+          (stats.arrivals > 0 ? stats.totalNights / stats.arrivals : 0).toFixed(
+            2,
+          ),
+        ),
         occupiedRoomDays: stats.occupiedRoomDays,
-        occupancyRatePercent: parseFloat(occupancyRate.toFixed(2)),
+        occupancyRatePercent: parseFloat(occupancyRateByDays.toFixed(2)),
+        occupancyRateByArrivalsPercent: parseFloat(
+          occupancyRateByArrivals.toFixed(2),
+        ), // Nueva métrica
         totalGuests: stats.totalGuests,
-        totalOvernights: totalOvernights,
+        totalOvernights: stats.occupancyDetails.reduce(
+          (sum, detail) => sum + detail.guestCount * detail.stayDuration,
+          0,
+        ),
         arrivalsByDay: this.calculateDailyArrivals(
           stats.occupancyDetails,
           year,
@@ -722,7 +746,7 @@ export class ReportsRepository {
           year: year,
           daysInMonth: diasEnMes,
           roomType: stats.roomTypeName,
-          totalRooms: roomCount,
+          totalRooms: totalRoomsOfThisType, // Ahora usamos el total real
         },
       };
     });
