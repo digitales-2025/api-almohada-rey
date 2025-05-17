@@ -36,6 +36,8 @@ import { ReservationStateFactory } from './states';
 import { ReservationStatusAvailableActions } from './entities/reservation.status-actions';
 import { UpdateManyDto, UpdateManyResponseDto } from './dto/update-many.dto';
 import { ReservationGateway } from 'src/modules/websockets/reservation.gateway';
+import { ApplyLateCheckoutUseCase } from './use-cases/applyLateCheckout.use.case';
+import { ExtendStayUseCase } from './use-cases/extendStay.use.case';
 
 @Injectable()
 export class ReservationService {
@@ -51,6 +53,8 @@ export class ReservationService {
     private readonly reservationStateFactory: ReservationStateFactory,
     private readonly deactivateReservationsUseCase: DeactivateReservationsUseCase,
     private readonly reactivateReservationsUseCase: ReactivateReservationsUseCase,
+    private readonly applyLateCheckoutUseCase: ApplyLateCheckoutUseCase,
+    private readonly extendStayUseCase: ExtendStayUseCase,
     @Inject(forwardRef(() => ReservationGateway))
     private readonly reservationGateway: ReservationGateway,
   ) {
@@ -759,6 +763,94 @@ export class ReservationService {
       return availableRooms;
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
+    }
+  }
+
+  /**
+   * Aplica Late Checkout a una reserva, extendiendo la hora de salida en el mismo día.
+   * Valida que la habitación esté disponible y no haya otra reserva ese día.
+   * @param reservationId ID de la reserva a modificar
+   * @param newCheckoutTime Nueva hora de checkout (formato HH:mm)
+   * @param userData Información del usuario que realiza la acción
+   * @returns Reserva actualizada
+   */
+  async applyLateCheckout(
+    reservationId: string,
+    newCheckoutTime: string,
+    userData: UserData,
+  ): Promise<BaseApiResponse<Reservation>> {
+    try {
+      this.logger.log(
+        `Solicitando aplicar late checkout a la reserva ${reservationId} con hora ${newCheckoutTime}`,
+      );
+
+      const result = await this.applyLateCheckoutUseCase.execute(
+        reservationId,
+        newCheckoutTime,
+        userData,
+      );
+
+      // Si tuvo éxito, notificar a través de WebSockets
+      if (result.success && result.data) {
+        const detailedReservation = await this.findOneDetailed(result.data.id);
+
+        if (detailedReservation) {
+          this.reservationGateway.emitReservationUpdate(detailedReservation);
+        }
+      }
+
+      return result;
+    } catch (error) {
+      this.logger.error(`Error al aplicar late checkout: ${error.message}`, {
+        error,
+        reservationId,
+        newCheckoutTime,
+      });
+      return this.errorHandler.handleError(error, 'updating');
+    }
+  }
+
+  /**
+   * Extiende la estadía de una reserva, cambiando la fecha de checkout a una fecha posterior.
+   * Valida que la habitación esté disponible para las nuevas fechas.
+   * @param reservationId ID de la reserva a modificar
+   * @param newCheckoutDate Nueva fecha de checkout en formato ISO
+   * @param userData Información del usuario que realiza la acción
+   * @returns Reserva actualizada
+   */
+  async extendStay(
+    reservationId: string,
+    newCheckoutDate: string,
+    userData: UserData,
+  ): Promise<BaseApiResponse<Reservation>> {
+    try {
+      this.logger.log(
+        `Solicitando extender estadía de la reserva ${reservationId} hasta ${newCheckoutDate}`,
+      );
+
+      const result = await this.extendStayUseCase.execute(
+        reservationId,
+        newCheckoutDate,
+        userData,
+      );
+
+      // Si tuvo éxito, notificar a través de WebSockets
+      if (result.success && result.data) {
+        const detailedReservation = await this.findOneDetailed(result.data.id);
+
+        if (detailedReservation) {
+          this.reservationGateway.emitReservationUpdate(detailedReservation);
+        }
+      }
+
+      return result;
+    } catch (error) {
+      this.logger.error(`Error al extender estadía: ${error.message}`, {
+        error,
+        reservationId,
+        newCheckoutDate,
+      });
+      return this.errorHandler.handleError(error, 'updating');
     }
   }
 }

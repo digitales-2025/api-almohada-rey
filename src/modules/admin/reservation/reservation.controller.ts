@@ -7,6 +7,7 @@ import {
   Delete,
   Query,
   Patch,
+  HttpStatus,
 } from '@nestjs/common';
 import { ReservationService } from './reservation.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
@@ -27,6 +28,7 @@ import {
   ApiOperation,
   ApiParam,
   ApiQuery,
+  ApiResponse,
   ApiTags,
   ApiUnauthorizedResponse,
   getSchemaPath,
@@ -42,6 +44,8 @@ import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { ReservationStatusDto } from './dto/reservation-status.dto';
 import { ReservationStatusAvailableActions } from './entities/reservation.status-actions';
 import { UpdateManyDto, UpdateManyResponseDto } from './dto/update-many.dto';
+import { LateCheckoutDto } from './dto/late-checkout.dto';
+import { ExtendStayDto } from './dto/extend-stay.dto';
 
 @ApiTags('Admin Reservations')
 @ApiBadRequestResponse({
@@ -424,17 +428,6 @@ export class ReservationController {
     return this.reservationService.findOne(id);
   }
 
-  // @Patch(':id')
-  // @ApiOperation({ summary: 'Update a reservation' })
-  // @ApiParam({ name: 'id', description: 'Reservation ID' })
-  // @ApiOkResponse({ type: Reservation, description: 'The updated reservation' })
-  // update(
-  //   @Param('id') id: string,
-  //   @Body() updateReservationDto: UpdateReservationDto,
-  // ) {
-  //   return this.reservationService.update(id, updateReservationDto);
-  // }
-
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a reservation' })
   @ApiParam({ name: 'id', description: 'Reservation ID' })
@@ -443,5 +436,77 @@ export class ReservationController {
   })
   remove(@Param('id') id: string) {
     return this.reservationService.remove(+id);
+  }
+
+  @Patch(':id/late-checkout')
+  @ApiOperation({
+    summary: 'Aplicar Late Checkout a una reserva',
+    description:
+      'Extiende la hora de salida de una reserva en el mismo día. Valida que no haya conflictos con otras reservas.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Late checkout aplicado correctamente',
+    type: BaseApiResponse,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'Error: formato incorrecto o reserva incompatible con late checkout',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Error: conflicto con otra reservación existente',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Error: reservación no encontrada',
+  })
+  applyLateCheckout(
+    @Param('id') id: string,
+    @Body() lateCheckoutDto: LateCheckoutDto,
+    @GetUser() user: UserPayload,
+  ): Promise<BaseApiResponse<Reservation>> {
+    return this.reservationService.applyLateCheckout(
+      id,
+      lateCheckoutDto.newCheckoutTime,
+      user,
+    );
+  }
+
+  @Patch(':id/extend-stay')
+  @ApiOperation({
+    summary: 'Extender estadía de una reserva',
+    description:
+      'Cambia la fecha de checkout a una fecha posterior. Valida disponibilidad y conflictos.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Estadía extendida correctamente',
+    type: BaseApiResponse,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'Error: formato incorrecto de fecha o reserva incompatible con extensión',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Error: conflicto con otra reservación existente',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Error: reservación no encontrada',
+  })
+  extendStay(
+    @Param('id') id: string,
+    @Body() extendStayDto: ExtendStayDto,
+    @GetUser() user: UserPayload,
+  ): Promise<BaseApiResponse<Reservation>> {
+    return this.reservationService.extendStay(
+      id,
+      extendStayDto.newCheckoutDate,
+      user,
+    );
   }
 }
