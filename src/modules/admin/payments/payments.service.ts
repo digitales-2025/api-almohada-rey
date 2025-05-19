@@ -22,6 +22,7 @@ import { RoomService } from '../room/services/room.service';
 import {
   AuditActionType,
   PaymentDetailStatus,
+  PaymentDetailType,
   ProductType,
   ReservationStatus,
   TypeMovements,
@@ -39,6 +40,8 @@ import { PaginationService } from 'src/pagination/pagination.service';
 import { MovementsService } from '../movements/movements.service';
 import { CreateMovementDto } from '../movements/dto/create-movement.dto';
 import { WarehouseService } from '../warehouse/warehouse.service';
+import { LateCheckoutDto } from '../reservation/dto/late-checkout.dto';
+import { ExtendStayDto } from '../reservation/dto/extend-stay.dto';
 
 @Injectable()
 export class PaymentsService {
@@ -636,6 +639,383 @@ export class PaymentsService {
   }
 
   /**
+   * Crea un pago por Late Checkout para una reserva
+   * @param reservationId ID de la reserva a la que aplicó el late checkout
+   * @param lateCheckoutDto DTO con información del late checkout
+   * @param user Usuario que realiza la acción
+   * @returns Detalle del pago creado por late checkout
+   */
+  async createLateCheckoutPayment(
+    reservationId: string,
+    lateCheckoutDto: LateCheckoutDto,
+    user: UserData,
+  ): Promise<HttpResponse<PaymentDetailData>> {
+    try {
+      // 1. Obtener la reserva con su habitación
+      const reservation = await this.prisma.reservation.findUnique({
+        where: { id: reservationId },
+        include: {
+          room: {
+            include: {
+              RoomTypes: true,
+            },
+          },
+        },
+      });
+
+      if (!reservation) {
+        throw new BadRequestException(
+          `No se encontró la reserva con ID ${reservationId}`,
+        );
+      }
+
+      if (!reservation.room || !reservation.room.RoomTypes) {
+        throw new BadRequestException(
+          'La reserva no tiene una habitación o tipo de habitación asociada',
+        );
+      }
+
+      // 2. Obtener el pago principal asociado a esta reserva
+      const payment = await this.prisma.payment.findFirst({
+        where: {
+          reservationId,
+        },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          amount: true,
+          amountPaid: true,
+        },
+      });
+
+      if (!payment) {
+        throw new BadRequestException('La reserva no tiene un pago asociado');
+      }
+
+      // 3. Calcular el costo del late checkout (50% del precio de la habitación)
+      const roomPrice = reservation.room.RoomTypes.price;
+      const lateCheckoutPrice = roomPrice * 0.5;
+
+      const formattedDescription = `Late checkout a las ${lateCheckoutDto.lateCheckoutTime}`;
+
+      // 5. Determinar si es un pago pendiente y ajustar valores según corresponda
+      const isPendingPayment =
+        lateCheckoutDto.paymentMethod === 'PENDING_PAYMENT';
+
+      // El subtotal depende del método de pago
+      const subtotal = isPendingPayment ? 0 : lateCheckoutPrice;
+
+      // El estado del detalle también depende del método de pago
+      const detailStatus = isPendingPayment
+        ? PaymentDetailStatus.PENDING
+        : PaymentDetailStatus.PAID;
+
+      // 6. Crear el detalle de pago directamente con nuestra lógica específica para LATE_CHECKOUT
+      const createdDetail = await this.prisma.$transaction(async (prisma) => {
+        // Crear el detalle de pago
+        const newDetail = await prisma.paymentDetail.create({
+          data: {
+            paymentId: payment.id,
+            paymentDate: lateCheckoutDto.paymentDate,
+            description: formattedDescription,
+            type: PaymentDetailType.LATE_CHECKOUT,
+            method: lateCheckoutDto.paymentMethod,
+            status: detailStatus,
+            roomId: reservation.roomId,
+            unitPrice: lateCheckoutPrice,
+            subtotal: subtotal, // 0 si es PENDING_PAYMENT, lateCheckoutPrice de lo contrario
+          },
+          include: {
+            room: {
+              select: {
+                id: true,
+                number: true,
+                RoomTypes: { select: { id: true, name: true } },
+              },
+            },
+          },
+        });
+
+        // Registrar auditoría para el detalle
+        await this.audit.create({
+          entityId: newDetail.id,
+          entityType: 'paymentDetail',
+          action: AuditActionType.CREATE,
+          performedById: user.id,
+          createdAt: new Date(),
+        });
+
+        // Actualizar el pago principal, incrementando el amount para LATE_CHECKOUT
+        // (ya que no es de tipo ROOM_RESERVATION)
+        const newAmount = payment.amount + lateCheckoutPrice;
+
+        // El amountPaid sólo se incrementa si el método no es PENDING_PAYMENT
+        const newAmountPaid = isPendingPayment
+          ? payment.amountPaid
+          : payment.amountPaid + lateCheckoutPrice;
+
+        // Determinar el estado del pago basado en la comparación de amount y amountPaid
+        const newPaymentStatus =
+          newAmountPaid >= newAmount
+            ? PaymentDetailStatus.PAID
+            : PaymentDetailStatus.PENDING;
+
+        // Actualizar el pago principal
+        await prisma.payment.update({
+          where: { id: payment.id },
+          data: {
+            amount: newAmount,
+            amountPaid: newAmountPaid,
+            date: lateCheckoutDto.paymentDate, // Actualizamos la fecha del pago
+            status: newPaymentStatus,
+          },
+        });
+
+        // Registrar auditoría para el pago principal
+        await this.audit.create({
+          entityId: payment.id,
+          entityType: 'payment',
+          action: AuditActionType.UPDATE,
+          performedById: user.id,
+          createdAt: new Date(),
+        });
+
+        return newDetail;
+      });
+
+      return {
+        statusCode: HttpStatus.CREATED,
+        message: 'Pago por Late Checkout creado exitosamente',
+        data: createdDetail as unknown as PaymentDetailData,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error al crear pago por late checkout: ${error.message}`,
+        {
+          error,
+          reservationId,
+          lateCheckoutDto,
+        },
+      );
+
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      handleException(error, 'Error al crear pago por Late Checkout');
+    }
+  }
+
+  /**
+   * Crea un pago por extensión de estadía para una reserva
+   * @param reservationId ID de la reserva a la que se aplicará la extensión de estadía
+   * @param extendStayDto DTO con información de la extensión de estadía
+   * @param user Usuario que realiza la acción
+   * @returns Detalle del pago creado por extensión de estadía o información de actualización
+   */
+  async createExtendStayPayment(
+    reservationId: string,
+    extendStayDto: ExtendStayDto,
+    user: UserData,
+  ): Promise<HttpResponse<any>> {
+    try {
+      // 1. Obtener la reserva con su habitación
+      const reservation = await this.prisma.reservation.findUnique({
+        where: { id: reservationId },
+        include: {
+          room: {
+            include: {
+              RoomTypes: true,
+            },
+          },
+        },
+      });
+
+      if (!reservation) {
+        throw new BadRequestException(
+          `No se encontró la reserva con ID ${reservationId}`,
+        );
+      }
+
+      if (!reservation.room || !reservation.room.RoomTypes) {
+        throw new BadRequestException(
+          'La reserva no tiene una habitación o tipo de habitación asociada',
+        );
+      }
+
+      // 2. Calcular las noches adicionales
+      const originalCheckoutDate = new Date(reservation.checkOutDate);
+      const newCheckoutDate = new Date(extendStayDto.newCheckoutDate);
+
+      // Calcular noches originales y nuevas para determinar las noches adicionales
+      const oldNights = calculateStayNights(
+        reservation.checkInDate.toISOString(),
+        reservation.checkOutDate.toISOString(),
+      );
+      const newNights = calculateStayNights(
+        reservation.checkInDate.toISOString(),
+        extendStayDto.newCheckoutDate,
+      );
+
+      const additionalNights = newNights - oldNights;
+
+      if (additionalNights <= 0) {
+        throw new BadRequestException(
+          'La nueva fecha de checkout debe ser posterior a la fecha original',
+        );
+      }
+
+      // 3. Obtener el pago principal asociado a esta reserva
+      const payment = await this.prisma.payment.findFirst({
+        where: {
+          reservationId,
+        },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          amount: true,
+          amountPaid: true,
+        },
+      });
+
+      if (!payment) {
+        throw new BadRequestException('La reserva no tiene un pago asociado');
+      }
+
+      // 4. Calcular el costo de las noches adicionales
+      const roomPrice = reservation.room.RoomTypes.price;
+      const extendStayAmount = roomPrice * additionalNights;
+
+      // 5. Formatear la descripción con detalles de la extensión
+      const formattedOriginalDate = originalCheckoutDate.toLocaleDateString(
+        'es-ES',
+        {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        },
+      );
+      const formattedNewDate = newCheckoutDate.toLocaleDateString('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      });
+
+      const formattedDescription = `Extensión de estadía del ${formattedOriginalDate} al ${formattedNewDate} (${additionalNights} noche${additionalNights > 1 ? 's' : ''} adicionales)`;
+
+      // 6. Determinar si es un pago pendiente
+      const isPendingPayment =
+        extendStayDto.paymentMethod === 'PENDING_PAYMENT';
+
+      // 7. Crear el detalle de pago o solo actualizar el amount según el método de pago
+      const result = await this.prisma.$transaction(async (prisma) => {
+        // Siempre actualizamos el amount total del pago (sin importar el método)
+        const newAmount = payment.amount + extendStayAmount;
+
+        // Solo si NO es PENDING_PAYMENT, creamos el detalle de pago y aumentamos amountPaid
+        let detailCreated = null;
+        let newAmountPaid = payment.amountPaid;
+
+        if (!isPendingPayment) {
+          // Crear el detalle de pago
+          detailCreated = await prisma.paymentDetail.create({
+            data: {
+              paymentId: payment.id,
+              paymentDate: extendStayDto.paymentDate,
+              description: formattedDescription,
+              type: PaymentDetailType.ROOM_RESERVATION,
+              method: extendStayDto.paymentMethod,
+              status: PaymentDetailStatus.PAID,
+              roomId: reservation.roomId,
+              unitPrice: roomPrice,
+              subtotal: extendStayAmount,
+              days: additionalNights,
+            },
+            include: {
+              room: {
+                select: {
+                  id: true,
+                  number: true,
+                  RoomTypes: { select: { id: true, name: true } },
+                },
+              },
+            },
+          });
+
+          // Registrar auditoría para el detalle
+          await this.audit.create({
+            entityId: detailCreated.id,
+            entityType: 'paymentDetail',
+            action: AuditActionType.CREATE,
+            performedById: user.id,
+            createdAt: new Date(),
+          });
+
+          // Incrementar el amountPaid solo si NO es PENDING_PAYMENT
+          newAmountPaid = payment.amountPaid + extendStayAmount;
+        }
+
+        // Determinar el estado del pago basado en la comparación de amount y amountPaid
+        const newPaymentStatus =
+          newAmountPaid >= newAmount
+            ? PaymentDetailStatus.PAID
+            : PaymentDetailStatus.PENDING;
+
+        // Actualizar el pago principal
+        const updatedPayment = await prisma.payment.update({
+          where: { id: payment.id },
+          data: {
+            amount: newAmount,
+            amountPaid: newAmountPaid,
+            date: extendStayDto.paymentDate, // Actualizamos la fecha del pago
+            status: newPaymentStatus,
+          },
+        });
+
+        // Registrar auditoría para el pago principal
+        await this.audit.create({
+          entityId: payment.id,
+          entityType: 'payment',
+          action: AuditActionType.UPDATE,
+          performedById: user.id,
+          createdAt: new Date(),
+        });
+
+        return {
+          paymentUpdated: updatedPayment,
+          detailCreated,
+          additionalNights,
+          extendStayAmount,
+          isPendingPayment,
+        };
+      });
+
+      return {
+        statusCode: HttpStatus.CREATED,
+        message: isPendingPayment
+          ? `Se ha actualizado el monto del pago para incluir ${additionalNights} noche(s) adicionales como pago pendiente`
+          : `Pago por extensión de estadía creado exitosamente (${additionalNights} noche(s) adicionales)`,
+        data: result,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error al crear pago por extensión de estadía: ${error.message}`,
+        {
+          error,
+          reservationId,
+          extendStayDto,
+        },
+      );
+
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      handleException(error, 'Error al crear pago por extensión de estadía');
+    }
+  }
+
+  /**
    * Obtiene todos los pagos de la base de datos.
    * @returns Lista de pagos
    */
@@ -780,6 +1160,7 @@ export class PaymentsService {
             id: true,
             checkInDate: true,
             checkOutDate: true,
+            appliedLateCheckOut: true,
             customer: {
               select: {
                 id: true,
@@ -837,6 +1218,7 @@ export class PaymentsService {
     const totalNights = calculateStayNights(
       paymentDb.reservation.checkInDate.toISOString(),
       paymentDb.reservation.checkOutDate.toISOString(),
+      paymentDb.reservation.appliedLateCheckOut,
     );
 
     // Sumamos los días ya pagados (de detalles tipo ROOM_RESERVATION con status PAID)
@@ -883,6 +1265,7 @@ export class PaymentsService {
               id: true,
               checkInDate: true,
               checkOutDate: true,
+              appliedLateCheckOut: true,
               customer: {
                 select: {
                   id: true,
@@ -955,6 +1338,7 @@ export class PaymentsService {
       const totalNights = calculateStayNights(
         paymentDb.reservation.checkInDate.toISOString(),
         paymentDb.reservation.checkOutDate.toISOString(),
+        paymentDb.reservation.appliedLateCheckOut,
       );
 
       // Sumamos los días ya pagados (de detalles tipo ROOM_RESERVATION con status PAID)
@@ -1433,6 +1817,15 @@ export class PaymentsService {
         throw new BadRequestException('Payment detail does not exist');
       }
 
+      // Si es un detalle de tipo LATE_CHECKOUT, redirigir a la función específica
+      if (paymentDetail.type === 'LATE_CHECKOUT') {
+        return await this.updateLateCheckoutPaymentDetail(
+          paymentDetailId,
+          updatePaymentDetailDto,
+          user,
+        );
+      }
+
       // 2. NUEVO: Si hay un movement detail asociado, llamar a handlePaymentDetailUpdate
       let movementDetailId = paymentDetail.movementsDetail?.id;
 
@@ -1875,6 +2268,336 @@ export class PaymentsService {
   }
 
   /**
+   * Actualiza un detalle de pago específico de tipo LATE_CHECKOUT
+   * @param paymentDetailId ID del detalle de pago a actualizar
+   * @param updatePaymentDetailDto Datos para actualizar el detalle de pago
+   * @param user Usuario que realiza la acción
+   * @returns Detalle de pago actualizado
+   */
+  async updateLateCheckoutPaymentDetail(
+    paymentDetailId: string,
+    updatePaymentDetailDto: UpdatePaymentDetailDto,
+    user: UserData,
+  ): Promise<HttpResponse<PaymentDetailData>> {
+    try {
+      // 1. Buscar el detalle de pago específico de LATE_CHECKOUT
+      const paymentDetail = await this.prisma.paymentDetail.findUnique({
+        where: { id: paymentDetailId },
+        include: {
+          payment: {
+            select: { id: true, amount: true, amountPaid: true },
+          },
+          room: {
+            select: {
+              id: true,
+              number: true,
+              RoomTypes: { select: { id: true, name: true } },
+            },
+          },
+        },
+      });
+
+      if (!paymentDetail) {
+        throw new BadRequestException('El detalle de pago no existe');
+      }
+
+      // Verificar que sea un detalle de LATE_CHECKOUT
+      if (paymentDetail.type !== 'LATE_CHECKOUT') {
+        throw new BadRequestException(
+          'Esta función solo puede actualizar detalles de pago de tipo LATE_CHECKOUT',
+        );
+      }
+
+      const oldMethod = paymentDetail.method;
+      const newMethod = updatePaymentDetailDto.method || oldMethod;
+
+      // Analizar si hay cambio en el método de pago
+      const isChangingToPaymentPending =
+        newMethod === 'PENDING_PAYMENT' && oldMethod !== 'PENDING_PAYMENT';
+      const isChangingFromPaymentPending =
+        oldMethod === 'PENDING_PAYMENT' && newMethod !== 'PENDING_PAYMENT';
+
+      // 2. Gestionar cambio a PENDING_PAYMENT
+      if (isChangingToPaymentPending) {
+        const originalSubtotal = paymentDetail.subtotal;
+        const currentAmount = paymentDetail.payment.amount; // Este no cambiará
+        const currentAmountPaid = paymentDetail.payment.amountPaid;
+        const paymentId = paymentDetail.payment.id;
+
+        // Cuando cambia a PENDING_PAYMENT, el subtotal es 0 y el estado es PENDING
+        const updateData = {
+          ...updatePaymentDetailDto,
+          subtotal: 0,
+          status: PaymentDetailStatus.PENDING,
+        };
+
+        // Calcular el nuevo amountPaid: restar el subtotal original solo si estaba PAID
+        const newAmountPaid =
+          paymentDetail.status === 'PAID'
+            ? currentAmountPaid - originalSubtotal
+            : currentAmountPaid;
+
+        // Actualizar el detalle y el pago principal en una transacción
+        const updatedDetail = await this.prisma.$transaction(async (prisma) => {
+          const updated = await prisma.paymentDetail.update({
+            where: { id: paymentDetailId },
+            data: updateData,
+            include: {
+              room: {
+                select: {
+                  id: true,
+                  number: true,
+                  RoomTypes: { select: { id: true, name: true } },
+                },
+              },
+            },
+          });
+
+          await this.audit.create({
+            entityId: updated.id,
+            entityType: 'paymentDetail',
+            action: AuditActionType.UPDATE,
+            performedById: user.id,
+            createdAt: new Date(),
+          });
+
+          // Calcular el nuevo estado del pago
+          const paymentStatus =
+            newAmountPaid >= currentAmount
+              ? PaymentDetailStatus.PAID
+              : PaymentDetailStatus.PENDING;
+
+          // Actualizar SOLO amountPaid y status en el pago principal
+          // NO modificamos el amount total
+          await prisma.payment.update({
+            where: { id: paymentId },
+            data: {
+              amountPaid: newAmountPaid,
+              status: paymentStatus,
+            },
+          });
+
+          await this.audit.create({
+            entityId: paymentId,
+            entityType: 'payment',
+            action: AuditActionType.UPDATE,
+            performedById: user.id,
+            createdAt: new Date(),
+          });
+
+          return updated;
+        });
+
+        return {
+          statusCode: HttpStatus.OK,
+          message: 'Detalle de Late Checkout actualizado a pago pendiente',
+          data: updatedDetail as unknown as PaymentDetailData,
+        };
+      }
+
+      // 3. Gestionar cambio desde PENDING_PAYMENT a otro método
+      if (isChangingFromPaymentPending) {
+        const currentAmount = paymentDetail.payment.amount; // Este no cambiará
+        const currentAmountPaid = paymentDetail.payment.amountPaid;
+        const paymentId = paymentDetail.payment.id;
+
+        // Para Late Checkout, el subtotal es igual al unitPrice (no usamos days)
+        // Si se proporciona subtotal en el DTO, usamos ese valor, de lo contrario usamos unitPrice
+        const realSubtotal =
+          updatePaymentDetailDto.subtotal || paymentDetail.unitPrice;
+
+        // Al cambiar desde PENDING_PAYMENT, el subtotal se calcula y el estado cambia a PAID
+        const updateData = {
+          ...updatePaymentDetailDto,
+          subtotal: realSubtotal,
+          status: PaymentDetailStatus.PAID,
+        };
+
+        // Incrementar el amountPaid con el nuevo subtotal
+        const newAmountPaid = currentAmountPaid + realSubtotal;
+
+        // Actualizar el detalle y el pago principal en una transacción
+        const updatedDetail = await this.prisma.$transaction(async (prisma) => {
+          const updated = await prisma.paymentDetail.update({
+            where: { id: paymentDetailId },
+            data: updateData,
+            include: {
+              room: {
+                select: {
+                  id: true,
+                  number: true,
+                  RoomTypes: { select: { id: true, name: true } },
+                },
+              },
+            },
+          });
+
+          await this.audit.create({
+            entityId: updated.id,
+            entityType: 'paymentDetail',
+            action: AuditActionType.UPDATE,
+            performedById: user.id,
+            createdAt: new Date(),
+          });
+
+          // Calcular el nuevo estado del pago
+          const paymentStatus =
+            newAmountPaid >= currentAmount
+              ? PaymentDetailStatus.PAID
+              : PaymentDetailStatus.PENDING;
+
+          // Actualizar SOLO amountPaid y status en el pago principal
+          // NO modificamos el amount total
+          await prisma.payment.update({
+            where: { id: paymentId },
+            data: {
+              amountPaid: newAmountPaid,
+              status: paymentStatus,
+            },
+          });
+
+          await this.audit.create({
+            entityId: paymentId,
+            entityType: 'payment',
+            action: AuditActionType.UPDATE,
+            performedById: user.id,
+            createdAt: new Date(),
+          });
+
+          return updated;
+        });
+
+        return {
+          statusCode: HttpStatus.OK,
+          message: 'Detalle de Late Checkout actualizado de pendiente a pagado',
+          data: updatedDetail as unknown as PaymentDetailData,
+        };
+      }
+
+      // 4. Gestionar actualizaciones generales (sin cambio de método de pago)
+      // Verificar si realmente hay cambios que aplicar
+      const hasChanges = validateChanges(updatePaymentDetailDto, paymentDetail);
+
+      if (!hasChanges) {
+        return {
+          statusCode: HttpStatus.OK,
+          message: 'No se detectaron cambios para aplicar',
+          data: paymentDetail as unknown as PaymentDetailData,
+        };
+      }
+
+      // Preparar solo los campos que han cambiado
+      const updateFields: Record<string, any> = {};
+      for (const [key, value] of Object.entries(updatePaymentDetailDto)) {
+        if (value !== undefined && value !== paymentDetail[key]) {
+          updateFields[key] = value;
+        }
+      }
+
+      // Para LATE_CHECKOUT, si cambia el unitPrice, actualizamos también el subtotal
+      // pero solo si el estado es PAID
+      if (
+        updateFields.unitPrice !== undefined &&
+        paymentDetail.status === 'PAID'
+      ) {
+        updateFields.subtotal = updateFields.unitPrice;
+      }
+
+      // Realizar la actualización en una transacción
+      const updatedDetail = await this.prisma.$transaction(async (prisma) => {
+        const updated = await prisma.paymentDetail.update({
+          where: { id: paymentDetailId },
+          data: updateFields,
+          include: {
+            room: {
+              select: {
+                id: true,
+                number: true,
+                RoomTypes: { select: { id: true, name: true } },
+              },
+            },
+          },
+        });
+
+        await this.audit.create({
+          entityId: updated.id,
+          entityType: 'paymentDetail',
+          action: AuditActionType.UPDATE,
+          performedById: user.id,
+          createdAt: new Date(),
+        });
+
+        // Si cambió el subtotal o el estado, actualizar también el pago principal
+        if (
+          updateFields.subtotal !== undefined ||
+          updateFields.status !== undefined
+        ) {
+          const paymentId = paymentDetail.payment.id;
+
+          // Obtener todos los detalles de pago actualizados
+          const allDetails = await prisma.paymentDetail.findMany({
+            where: { paymentId },
+          });
+
+          // Recalculamos el monto total pagado (amountPaid)
+          const totalAmountPaid = allDetails
+            .filter((detail) => detail.status === 'PAID')
+            .reduce((sum, detail) => sum + detail.subtotal, 0);
+
+          // Determinar el estado del pago
+          const paymentStatus =
+            totalAmountPaid >= paymentDetail.payment.amount
+              ? PaymentDetailStatus.PAID
+              : PaymentDetailStatus.PENDING;
+
+          // Actualizar la fecha del pago si cambió la fecha del detalle
+          const updatePaymentData: any = {
+            amountPaid: totalAmountPaid,
+            status: paymentStatus,
+          };
+
+          if (updateFields.paymentDate) {
+            updatePaymentData.date = updateFields.paymentDate;
+          }
+
+          // Actualizar el pago principal
+          await prisma.payment.update({
+            where: { id: paymentId },
+            data: updatePaymentData,
+          });
+
+          await this.audit.create({
+            entityId: paymentId,
+            entityType: 'payment',
+            action: AuditActionType.UPDATE,
+            performedById: user.id,
+            createdAt: new Date(),
+          });
+        }
+
+        return updated;
+      });
+
+      return {
+        statusCode: HttpStatus.OK,
+        message: 'Detalle de Late Checkout actualizado correctamente',
+        data: updatedDetail as unknown as PaymentDetailData,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error al actualizar detalle de Late Checkout: ${error.message}`,
+        error.stack,
+      );
+
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      handleException(error, 'Error al actualizar detalle de Late Checkout');
+    }
+  }
+
+  /**
    * Actualiza los montos y días de los detalles de pago cuando cambian las fechas de una reserva.
    * @param reservationId ID de la reservación cuyas fechas han cambiado
    * @param oldCheckInDate Fecha de check-in anterior
@@ -1896,10 +2619,6 @@ export class PaymentsService {
       // 1. Calcular las noches de estancia anterior y nueva
       const oldNights = calculateStayNights(oldCheckInDate, oldCheckOutDate);
       const newNights = calculateStayNights(newCheckInDate, newCheckOutDate);
-
-      this.logger.log(
-        `Actualizando pagos para reserva ${reservationId}: noches anteriores ${oldNights}, nuevas noches ${newNights}`,
-      );
 
       // 2. Si no hay cambios en la cantidad de días, no es necesario hacer nada
       if (oldNights === newNights) {
