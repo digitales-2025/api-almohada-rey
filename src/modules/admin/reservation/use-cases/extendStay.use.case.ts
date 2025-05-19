@@ -3,6 +3,8 @@ import {
   BadRequestException,
   Logger,
   ConflictException,
+  forwardRef,
+  Inject,
 } from '@nestjs/common';
 import { UserData } from 'src/interfaces';
 import { AuditActionType, ReservationStatus } from '@prisma/client';
@@ -10,6 +12,8 @@ import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { Reservation } from '../entities/reservation.entity';
 import { ReservationRepository } from '../repository/reservation.repository';
 import { AuditRepository } from '../../audit/audit.repository';
+import { PaymentsService } from '../../payments/payments.service';
+import { ExtendStayDto } from '../dto/extend-stay.dto';
 
 @Injectable()
 export class ExtendStayUseCase {
@@ -18,18 +22,17 @@ export class ExtendStayUseCase {
   constructor(
     private readonly reservationRepository: ReservationRepository,
     private readonly auditRepository: AuditRepository,
+    @Inject(forwardRef(() => PaymentsService))
+    private readonly paymentsService: PaymentsService,
   ) {}
 
   async execute(
     reservationId: string,
-    newCheckoutDate: string,
+    extendStayDto: ExtendStayDto,
     user: UserData,
   ): Promise<BaseApiResponse<Reservation>> {
+    const { newCheckoutDate, additionalNotes } = extendStayDto;
     try {
-      this.logger.log(
-        `Ejecutando caso de uso para extender estadía de la reserva ${reservationId} hasta ${newCheckoutDate}`,
-      );
-
       // Ejecutar toda la lógica dentro de una transacción
       return await this.reservationRepository.transaction(
         async (tx) => {
@@ -59,8 +62,15 @@ export class ExtendStayUseCase {
           const originalCheckoutDate = new Date(reservation.checkOutDate);
           const parsedNewCheckoutDate = new Date(newCheckoutDate);
 
+          // Usar solo la fecha sin la hora para comparaciones más precisas
+          const originalCheckoutDateOnly = new Date(originalCheckoutDate);
+          originalCheckoutDateOnly.setHours(0, 0, 0, 0);
+
+          const parsedNewCheckoutDateOnly = new Date(parsedNewCheckoutDate);
+          parsedNewCheckoutDateOnly.setHours(0, 0, 0, 0);
+
           // Validar que la nueva fecha es posterior a la original
-          if (parsedNewCheckoutDate <= originalCheckoutDate) {
+          if (parsedNewCheckoutDateOnly <= originalCheckoutDateOnly) {
             throw new BadRequestException(
               'La nueva fecha de checkout debe ser posterior a la fecha original',
             );
@@ -68,7 +78,10 @@ export class ExtendStayUseCase {
 
           // Validar que la nueva fecha es posterior a la fecha de check-in
           const originalCheckinDate = new Date(reservation.checkInDate);
-          if (parsedNewCheckoutDate <= originalCheckinDate) {
+          const originalCheckinDateOnly = new Date(originalCheckinDate);
+          originalCheckinDateOnly.setHours(0, 0, 0, 0);
+
+          if (parsedNewCheckoutDateOnly <= originalCheckinDateOnly) {
             throw new BadRequestException(
               'La nueva fecha de checkout debe ser posterior a la fecha de check-in',
             );
@@ -115,7 +128,6 @@ export class ExtendStayUseCase {
                   id: true,
                   checkInDate: true,
                   status: true,
-                  guestName: true,
                 },
                 orderBy: { checkInDate: 'asc' },
               },
@@ -138,13 +150,21 @@ export class ExtendStayUseCase {
             );
           }
 
+          // Preparar objeto de actualización
+          const updateData: any = {
+            checkOutDate: parsedNewCheckoutDate.toISOString(),
+            updatedAt: new Date(),
+          };
+
+          // Agregar observations solo si se proporcionó (es opcional)
+          if (additionalNotes !== undefined) {
+            updateData.observations = additionalNotes;
+          }
+
           // Todo está validado, actualizar la reserva con la nueva fecha
           const updated = await this.reservationRepository.updateWithTx(
             reservationId,
-            {
-              checkOutDate: parsedNewCheckoutDate.toISOString(),
-              updatedAt: new Date(),
-            },
+            updateData,
             tx,
           );
 
@@ -157,6 +177,14 @@ export class ExtendStayUseCase {
               performedById: user.id,
             },
             tx,
+          );
+
+          // IMPORTANTE: Ahora creamos el pago DENTRO de la transacción
+          // para asegurar que solo se cree si todas las validaciones pasan
+          await this.paymentsService.createExtendStayPayment(
+            reservationId,
+            extendStayDto,
+            user,
           );
 
           return {
@@ -172,6 +200,7 @@ export class ExtendStayUseCase {
         error,
         reservationId,
         newCheckoutDate,
+        additionalNotes,
       });
       throw error; // Dejar que el servicio maneje el error
     }
