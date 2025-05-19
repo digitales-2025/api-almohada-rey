@@ -417,6 +417,47 @@ export class ReservationController {
     );
   }
 
+  @Get(':id/check-extended-checkout')
+  @ApiOperation({
+    summary: 'Verificar disponibilidad para extender checkout',
+    description:
+      'Comprueba si es posible aplicar un late checkout o extender estadía sin generar conflictos',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID de la reserva',
+    type: String,
+    required: true,
+  })
+  @ApiQuery({
+    name: 'newCheckoutDate',
+    description: 'Nueva fecha/hora de checkout en formato ISO',
+    type: String,
+    required: true,
+    example: '2025-05-10T14:00:00.000Z',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Verificación completada',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Error: formato incorrecto o reserva no encontrada',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Error: reservación no encontrada',
+  })
+  async checkExtendedCheckoutAvailability(
+    @Param('id') id: string,
+    @Query('newCheckoutDate') newCheckoutDate: string,
+  ) {
+    return this.reservationService.checkExtendedCheckoutAvailability(
+      id,
+      newCheckoutDate,
+    );
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a reservation by ID' })
   @ApiParam({ name: 'id', description: 'Reservation ID' })
@@ -467,11 +508,7 @@ export class ReservationController {
     @Body() lateCheckoutDto: LateCheckoutDto,
     @GetUser() user: UserPayload,
   ): Promise<BaseApiResponse<Reservation>> {
-    return this.reservationService.applyLateCheckout(
-      id,
-      lateCheckoutDto.newCheckoutTime,
-      user,
-    );
+    return this.reservationService.applyLateCheckout(id, lateCheckoutDto, user);
   }
 
   @Patch(':id/extend-stay')
@@ -503,10 +540,6 @@ export class ReservationController {
     @Body() extendStayDto: ExtendStayDto,
     @GetUser() user: UserPayload,
   ): Promise<BaseApiResponse<Reservation>> {
-    return this.reservationService.extendStay(
-      id,
-      extendStayDto.newCheckoutDate,
-      user,
-    );
+    return this.reservationService.extendStay(id, extendStayDto, user);
   }
 }
