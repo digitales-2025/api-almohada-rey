@@ -102,6 +102,13 @@ export class Reservation extends BaseEntity {
   isPendingDeletePayment?: boolean;
 
   @ApiProperty({
+    description: 'Wheter the reservation was applied late check out',
+    required: false,
+    default: false,
+  })
+  appliedLateCheckOut?: boolean;
+
+  @ApiProperty({
     description: 'Timestamp when the reservation was created',
     required: false,
     type: Date,
