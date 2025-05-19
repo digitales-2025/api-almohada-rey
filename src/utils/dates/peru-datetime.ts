@@ -30,14 +30,36 @@ export function getCurrentLimaDate(): Date {
   );
 }
 
+/**
+ * Calcula el número de noches entre dos fechas, teniendo en cuenta si se aplicó late checkout
+ * @param checkInDate Fecha de entrada en formato ISO
+ * @param checkOutDate Fecha de salida en formato ISO
+ * @param appliedLateCheckOut Indica si se aplicó late checkout a la reserva
+ * @returns Número de noches de la estancia
+ */
 export function calculateStayNights(
   checkInDate: string,
   checkOutDate: string,
+  appliedLateCheckOut?: boolean,
 ): number {
   const checkIn = new Date(checkInDate);
   const checkOut = new Date(checkOutDate);
 
-  // Calculamos la diferencia en milisegundos y convertimos a días
+  // Si hay late checkout aplicado, ajustamos el cálculo para no contar las horas extras como un día adicional
+  if (appliedLateCheckOut) {
+    // Creamos una fecha de checkout ajustada a las 12:00 PM de ese día
+    const adjustedCheckOut = new Date(checkOut);
+    adjustedCheckOut.setHours(12, 0, 0, 0);
+
+    // Si el checkout original es después del mediodía, usamos el checkout ajustado
+    if (checkOut.getHours() > 12) {
+      const diffTime = adjustedCheckOut.getTime() - checkIn.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays;
+    }
+  }
+
+  // Si no hay late checkout o el checkout es antes del mediodía, usamos el cálculo normal
   const diffTime = checkOut.getTime() - checkIn.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
