@@ -253,11 +253,6 @@ export class UpdateReservationUseCase {
             possibleUpdatedReservation.checkInDate || originalCheckInDate;
           const newCheckOutDate =
             possibleUpdatedReservation.checkOutDate || originalCheckOutDate;
-
-          // Actualizar los pagos relacionados con la reserva
-          this.logger.log(
-            `Actualizando pagos por cambio de fechas para la reserva CONFIRMADA ${id}`,
-          );
           await this.paymentsService.updatePaymentDetailsForDateChange(
             id,
             originalCheckInDate,
@@ -274,10 +269,6 @@ export class UpdateReservationUseCase {
           );
         }
       } else if (hasChangedDates && reservationStatus !== 'CONFIRMED') {
-        // Loguear información cuando hay cambios de fechas pero la reserva no está confirmada
-        this.logger.log(
-          `No se actualizaron pagos porque la reserva ${id} no está en estado CONFIRMED (estado actual: ${reservationStatus})`,
-        );
       }
 
       return {
