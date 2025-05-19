@@ -7,6 +7,7 @@ import { BalanceReportUseCase } from './use-cases/balance-report.use-case';
 import { ExpenseReportUseCase } from './use-cases/expense-report.use-case';
 import { ProfitReportUseCase } from './use-cases/profit-report.use-case';
 import { ProfitTypeRoomReportUseCase } from './use-cases/profit-typeroom-report.use-case';
+import { OccupancyReportUseCase } from './use-cases/occupancy-report.use-case';
 
 @Module({
   imports: [PrismaModule],
@@ -18,6 +19,7 @@ import { ProfitTypeRoomReportUseCase } from './use-cases/profit-typeroom-report.
     ExpenseReportUseCase,
     ProfitReportUseCase,
     ProfitTypeRoomReportUseCase,
+    OccupancyReportUseCase,
   ],
 })
 export class ReportsModule {}

@@ -4,6 +4,8 @@ import { ProfitReportUseCase } from '../use-cases/profit-report.use-case';
 import { ExpenseReportUseCase } from '../use-cases/expense-report.use-case';
 import { ProfitTypeRoomReportUseCase } from '../use-cases/profit-typeroom-report.use-case';
 import { BalanceReportUseCase } from '../use-cases/balance-report.use-case';
+import { OccupancyStatsResponse } from '../interfaces/occupancy';
+import { OccupancyReportUseCase } from '../use-cases/occupancy-report.use-case';
 // Si tienes un use case para unificar ambos, lo importas también
 
 @Injectable()
@@ -14,6 +16,7 @@ export class ReportsService {
     private readonly expenseReportUseCase: ExpenseReportUseCase,
     private readonly ProfitTypeRoomReportUseCase: ProfitTypeRoomReportUseCase,
     private readonly balanceReportUseCase: BalanceReportUseCase, // si lo necesitas
+    private readonly occupancyReportUseCase: OccupancyReportUseCase,
   ) {}
 
   /**
@@ -71,5 +74,28 @@ export class ReportsService {
       typeRoomId,
     );
     return this.ProfitTypeRoomReportUseCase.execute(data, { month, year });
+  }
+
+  /**
+   * Obtiene los datos de estadísticas de ocupación por tipo de habitación
+   * @param month Mes numérico (1-12)
+   * @param year Año (YYYY)
+   * @returns Estadísticas detalladas de ocupación
+   */
+  async getOccupancyData(
+    month: number,
+    year: number,
+  ): Promise<OccupancyStatsResponse> {
+    return this.reportsRepository.getOccupancyStatsByRoomType(month, year);
+  }
+
+  /**
+   * Genera un Excel con estadísticas de ocupación por tipo de habitación
+   * @param params Objeto con month y year
+   * @returns Workbook de ExcelJS listo para descargar
+   */
+  async getOccupancyExcel({ month, year }: { month: number; year: number }) {
+    const occupancyStats = await this.getOccupancyData(month, year);
+    return this.occupancyReportUseCase.execute(occupancyStats, { month, year });
   }
 }
