@@ -3,6 +3,8 @@ import {
   BadRequestException,
   Logger,
   ConflictException,
+  forwardRef,
+  Inject,
 } from '@nestjs/common';
 import { UserData } from 'src/interfaces';
 import { AuditActionType, ReservationStatus } from '@prisma/client';
@@ -10,6 +12,16 @@ import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { Reservation } from '../entities/reservation.entity';
 import { ReservationRepository } from '../repository/reservation.repository';
 import { AuditRepository } from '../../audit/audit.repository';
+import { LateCheckoutDto } from '../dto/late-checkout.dto';
+import { PaymentsService } from '../../payments/payments.service';
+
+// Definir una interfaz para los datos de actualización
+interface ReservationUpdateData {
+  checkOutDate: string;
+  appliedLateCheckOut: boolean;
+  updatedAt: Date;
+  observations?: string; // La propiedad es opcional
+}
 
 @Injectable()
 export class ApplyLateCheckoutUseCase {
@@ -18,28 +30,27 @@ export class ApplyLateCheckoutUseCase {
   constructor(
     private readonly reservationRepository: ReservationRepository,
     private readonly auditRepository: AuditRepository,
+    @Inject(forwardRef(() => PaymentsService))
+    private readonly paymentsService: PaymentsService,
   ) {}
 
   async execute(
     reservationId: string,
-    newCheckoutTime: string,
+    lateCheckoutDto: LateCheckoutDto,
     user: UserData,
   ): Promise<BaseApiResponse<Reservation>> {
+    const { lateCheckoutTime, additionalNotes } = lateCheckoutDto;
     try {
-      this.logger.log(
-        `Ejecutando caso de uso para aplicar late checkout a la reserva ${reservationId} con hora ${newCheckoutTime}`,
-      );
-
       // Validar formato de hora (HH:mm)
       const timeRegex = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/;
-      if (!timeRegex.test(newCheckoutTime)) {
+      if (!timeRegex.test(lateCheckoutTime)) {
         throw new BadRequestException(
           'El formato de la nueva hora de checkout debe ser HH:mm',
         );
       }
 
       // Ejecutar toda la lógica de late checkout dentro de una transacción
-      return await this.reservationRepository.transaction(
+      const result = await this.reservationRepository.transaction(
         async (tx) => {
           // Obtener la reserva original dentro de la transacción
           const reservation = await this.reservationRepository.findByIdWithTx(
@@ -63,11 +74,18 @@ export class ApplyLateCheckoutUseCase {
             );
           }
 
+          // Verificar que no se haya aplicado ya un late checkout
+          if (reservation.appliedLateCheckOut) {
+            throw new BadRequestException(
+              'Ya se ha aplicado un Late Checkout a esta reserva. No se puede aplicar múltiples veces.',
+            );
+          }
+
           // Extraer fecha de checkout original
           const originalCheckoutDate = new Date(reservation.checkOutDate);
 
           // Parsear la nueva hora
-          const [hours, minutes] = newCheckoutTime.split(':').map(Number);
+          const [hours, minutes] = lateCheckoutTime.split(':').map(Number);
 
           // Crear una nueva fecha con la misma fecha pero diferente hora
           const newCheckoutDate = new Date(originalCheckoutDate);
@@ -156,13 +174,22 @@ export class ApplyLateCheckoutUseCase {
             );
           }
 
+          // Preparar objeto de actualización con tipo adecuado
+          const updateData: ReservationUpdateData = {
+            checkOutDate: newCheckoutDate.toISOString(),
+            appliedLateCheckOut: true,
+            updatedAt: new Date(),
+          };
+
+          // Agregar observations solo si se proporcionó (es opcional)
+          if (additionalNotes !== undefined) {
+            updateData.observations = additionalNotes;
+          }
+
           // Todo está validado, actualizar la reserva con la nueva hora
           const updated = await this.reservationRepository.updateWithTx(
             reservationId,
-            {
-              checkOutDate: newCheckoutDate.toISOString(), // Convertir a string ISO
-              updatedAt: new Date(),
-            },
+            updateData,
             tx,
           );
 
@@ -179,29 +206,41 @@ export class ApplyLateCheckoutUseCase {
 
           // Registrar en el log para auditoría y seguimiento
           this.logger.log(
-            `Late checkout aplicado para la reserva ${reservationId}. Hora original: ${originalCheckoutDate.toLocaleTimeString()}, Nueva hora: ${newCheckoutTime}`,
+            `Late checkout aplicado para la reserva ${reservationId}. Hora original: ${originalCheckoutDate.toLocaleTimeString()}, Nueva hora: ${lateCheckoutTime}`,
             {
               userId: user.id,
               originalTime: originalCheckoutDate.toLocaleTimeString(),
-              newTime: newCheckoutTime,
+              newTime: lateCheckoutTime,
+              additionalNotes,
             },
           );
 
           return {
             data: updated,
-            message: `Late checkout aplicado correctamente. Nueva hora de salida: ${newCheckoutTime}`,
+            message: `Late checkout aplicado correctamente. Nueva hora de salida: ${lateCheckoutTime}`,
             success: true,
           };
         },
         { isolationLevel: 'Serializable' }, // Usar nivel de aislamiento Serializable
       );
+
+      // Una vez completada la transacción y actualizada la reserva exitosamente,
+      // creamos el pago correspondiente al late checkout
+      await this.paymentsService.createLateCheckoutPayment(
+        reservationId,
+        lateCheckoutDto,
+        user,
+      );
+
+      return result;
     } catch (error) {
       this.logger.error(`Error al aplicar late checkout: ${error.message}`, {
         error,
         reservationId,
-        newCheckoutTime,
+        lateCheckoutTime,
+        additionalNotes,
       });
-      throw error; // Dejar que el servicio maneje el error
+      throw error;
     }
   }
 }
