@@ -843,10 +843,6 @@ export class PaymentsService {
         );
       }
 
-      // 2. Calcular las noches adicionales
-      const originalCheckoutDate = new Date(reservation.checkOutDate);
-      const newCheckoutDate = new Date(extendStayDto.newCheckoutDate);
-
       // Calcular noches originales y nuevas para determinar las noches adicionales
       const oldNights = calculateStayNights(
         reservation.checkInDate.toISOString(),
@@ -886,22 +882,7 @@ export class PaymentsService {
       const roomPrice = reservation.room.RoomTypes.price;
       const extendStayAmount = roomPrice * additionalNights;
 
-      // 5. Formatear la descripción con detalles de la extensión
-      const formattedOriginalDate = originalCheckoutDate.toLocaleDateString(
-        'es-ES',
-        {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-        },
-      );
-      const formattedNewDate = newCheckoutDate.toLocaleDateString('es-ES', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      });
-
-      const formattedDescription = `Extensión de estadía del ${formattedOriginalDate} al ${formattedNewDate} (${additionalNights} noche${additionalNights > 1 ? 's' : ''} adicionales)`;
+      const formattedDescription = `Extensión de estadía`;
 
       // 6. Determinar si es un pago pendiente
       const isPendingPayment =
@@ -1641,50 +1622,134 @@ export class PaymentsService {
             updatePayload.paymentDate = paymentDate;
           if (method !== undefined) updatePayload.method = method;
 
-          if (method === 'PENDING_PAYMENT') {
-            if (detail.room) {
-              await prisma.paymentDetail.delete({ where: { id: detail.id } });
-            } else {
-              updatePayload.status = 'PENDING';
+          // NUEVO: Manejo especial para LATE_CHECKOUT
+          if (detail.type === 'LATE_CHECKOUT') {
+            const oldMethod = detail.method;
+            const newMethod = method || oldMethod;
+
+            // Analizar si hay cambio en el método de pago
+            const isChangingToPaymentPending =
+              newMethod === 'PENDING_PAYMENT' &&
+              oldMethod !== 'PENDING_PAYMENT';
+            const isChangingFromPaymentPending =
+              oldMethod === 'PENDING_PAYMENT' &&
+              newMethod !== 'PENDING_PAYMENT';
+
+            // Caso 1: Cambio a PENDING_PAYMENT para LATE_CHECKOUT
+            if (isChangingToPaymentPending) {
+              const originalSubtotal = detail.subtotal;
+              // Cuando cambia a PENDING_PAYMENT, el subtotal es 0 y el estado es PENDING
               updatePayload.subtotal = 0;
+              updatePayload.status = 'PENDING';
+
+              // Actualizar el detalle
               await prisma.paymentDetail.update({
                 where: { id: detail.id },
                 data: updatePayload,
               });
+
+              // Si estaba pagado, debemos restar su subtotal del amountPaid del pago principal
+              if (detail.status === 'PAID') {
+                await prisma.payment.update({
+                  where: { id: detail.paymentId },
+                  data: {
+                    amountPaid: {
+                      decrement: originalSubtotal,
+                    },
+                  },
+                });
+              }
             }
-          } else {
-            let subtotal = 0;
+            // Caso 2: Cambio desde PENDING_PAYMENT para LATE_CHECKOUT
+            else if (isChangingFromPaymentPending) {
+              // Para Late Checkout, el subtotal es igual al unitPrice
+              const realSubtotal = detail.unitPrice;
 
-            if (detail.room) {
-              const days = detail.days ?? 1;
-              const price = detail.room.RoomTypes?.price ?? 0;
-              subtotal = price * days;
-            } else if (detail.product) {
-              const qty = detail.quantity ?? 1;
-              const price = detail.product.unitCost ?? 0;
-              subtotal = price * qty;
-            } else if (detail.service) {
-              const qty = detail.quantity ?? 1;
-              const price = detail.service.price ?? 0;
-              subtotal = price * qty;
-            }
+              // Al cambiar desde PENDING_PAYMENT, actualizamos subtotal y estado
+              updatePayload.subtotal = realSubtotal;
+              updatePayload.status = 'PAID';
 
-            updatePayload.status = 'PAID';
-            updatePayload.subtotal = subtotal;
+              await prisma.paymentDetail.update({
+                where: { id: detail.id },
+                data: updatePayload,
+              });
 
-            await prisma.paymentDetail.update({
-              where: { id: detail.id },
-              data: updatePayload,
-            });
-
-            await prisma.payment.update({
-              where: { id: detail.paymentId },
-              data: {
-                amountPaid: {
-                  increment: subtotal,
+              // Incrementar el amountPaid en el pago principal
+              await prisma.payment.update({
+                where: { id: detail.paymentId },
+                data: {
+                  amountPaid: {
+                    increment: realSubtotal,
+                  },
                 },
-              },
-            });
+              });
+            }
+            // Caso 3: Solo actualización de fecha para LATE_CHECKOUT
+            else if (paymentDate && !method) {
+              await prisma.paymentDetail.update({
+                where: { id: detail.id },
+                data: { paymentDate },
+              });
+            }
+            // Caso 4: Solo actualizamos el método sin cambiar de/a PENDING_PAYMENT
+            else if (
+              method &&
+              !isChangingToPaymentPending &&
+              !isChangingFromPaymentPending
+            ) {
+              await prisma.paymentDetail.update({
+                where: { id: detail.id },
+                data: { method },
+              });
+            }
+          }
+          // Manejo para tipos de pago diferentes a LATE_CHECKOUT (código existente)
+          else {
+            if (method === 'PENDING_PAYMENT') {
+              if (detail.room) {
+                await prisma.paymentDetail.delete({ where: { id: detail.id } });
+              } else {
+                updatePayload.status = 'PENDING';
+                updatePayload.subtotal = 0;
+                await prisma.paymentDetail.update({
+                  where: { id: detail.id },
+                  data: updatePayload,
+                });
+              }
+            } else {
+              let subtotal = 0;
+
+              if (detail.room) {
+                const days = detail.days ?? 1;
+                const price = detail.room.RoomTypes?.price ?? 0;
+                subtotal = price * days;
+              } else if (detail.product) {
+                const qty = detail.quantity ?? 1;
+                const price = detail.product.unitCost ?? 0;
+                subtotal = price * qty;
+              } else if (detail.service) {
+                const qty = detail.quantity ?? 1;
+                const price = detail.service.price ?? 0;
+                subtotal = price * qty;
+              }
+
+              updatePayload.status = 'PAID';
+              updatePayload.subtotal = subtotal;
+
+              await prisma.paymentDetail.update({
+                where: { id: detail.id },
+                data: updatePayload,
+              });
+
+              await prisma.payment.update({
+                where: { id: detail.paymentId },
+                data: {
+                  amountPaid: {
+                    increment: subtotal,
+                  },
+                },
+              });
+            }
           }
 
           await this.audit.create({
