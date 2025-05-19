@@ -180,21 +180,22 @@ enum ReservationStatus {
 }
 
 model Reservation {
-  id              String            @id @default(uuid())
-  customer        Customer          @relation(fields: [customerId], references: [id])
-  customerId      String
-  room            Room              @relation(fields: [roomId], references: [id])
-  roomId          String
-  user            User              @relation(fields: [userId], references: [id])
-  userId          String
-  reservationDate DateTime          @default(now()) @db.Timestamptz(6)
-  checkInDate     DateTime          @db.Timestamptz(6)
-  checkOutDate    DateTime          @db.Timestamptz(6)
-  status          ReservationStatus
-  origin          String // Origin place from the customer
-  reason          String // Reason for reservation
-  guests          Json? // List of companions
-  observations    String? // Additional notes
+  id                  String            @id @default(uuid())
+  customer            Customer          @relation(fields: [customerId], references: [id])
+  customerId          String
+  room                Room              @relation(fields: [roomId], references: [id])
+  roomId              String
+  user                User              @relation(fields: [userId], references: [id])
+  userId              String
+  reservationDate     DateTime          @default(now()) @db.Timestamptz(6)
+  checkInDate         DateTime          @db.Timestamptz(6)
+  checkOutDate        DateTime          @db.Timestamptz(6)
+  status              ReservationStatus
+  origin              String // Origin place from the customer
+  reason              String // Reason for reservation
+  guests              Json? // List of companions
+  observations        String? // Additional notes
+  appliedLateCheckOut Boolean           @default(false) // Flag to indicate if late check-out is applied
 
   payment Payment[] @relation("PaymentReservation")
 
@@ -226,6 +227,7 @@ model Payment {
 
 enum PaymentDetailType {
   ROOM_RESERVATION
+  LATE_CHECKOUT
   EXTRA_SERVICE
 }
 
