@@ -86,7 +86,7 @@ export class RoomTypesWithImages extends RoomType {
   @ApiProperty({
     description: 'URL de la imagen principal del tipo de habitación',
     example: 'https://example.com/image.jpg',
-    type: ImageRoomType,
+    type: [ImageRoomType],
   })
   ImageRoomType?: ImageRoomType[];
 
