@@ -102,9 +102,6 @@ export class CleaningChecklistService {
       roomId,
       RoomStatus.AVAILABLE,
     );
-    this.logger.log(
-      `Habitación ${roomId} marcada como disponible después de la limpieza`,
-    );
   }
 
   /**
