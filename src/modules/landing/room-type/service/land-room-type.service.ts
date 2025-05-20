@@ -47,6 +47,7 @@ export class LandRoomTypeService {
           locale === defaultLocale
             ? roomType.bed
             : (roomType.bedEn ?? roomType.bed),
+        Room: roomType.Room,
       }));
     } catch (error) {
       this.logger.error(
