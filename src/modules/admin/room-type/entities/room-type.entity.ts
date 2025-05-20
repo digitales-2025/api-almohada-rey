@@ -57,4 +57,43 @@ export class RoomType extends BaseEntity {
   }
 }
 
+export class ImageRoomType extends BaseEntity {
+  @ApiProperty({
+    description: 'URL de la imagen',
+    example: 'https://example.com/image.jpg',
+  })
+  imageUrl: string;
+
+  @ApiProperty({
+    description: 'Indica si es la imagen principal',
+    example: true,
+  })
+  isMain: boolean;
+
+  @ApiProperty({
+    description: 'ID del tipo de habitación asociado',
+    example: '12345678-1234-1234-1234-123456789012',
+  })
+  roomTypeId: string;
+
+  constructor(partial: Partial<ImageRoomType> = {}) {
+    super(partial);
+    Object.assign(this, partial);
+  }
+}
+
+export class RoomTypesWithImages extends RoomType {
+  @ApiProperty({
+    description: 'URL de la imagen principal del tipo de habitación',
+    example: 'https://example.com/image.jpg',
+    type: [ImageRoomType],
+  })
+  ImageRoomType?: ImageRoomType[];
+
+  constructor(partial: Partial<RoomTypesWithImages> = {}) {
+    super(partial);
+    Object.assign(this, partial);
+  }
+}
+
 export type SummaryRoomTypeData = Pick<RoomTypes, 'id' | 'name' | 'isActive'>;

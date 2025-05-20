@@ -40,6 +40,11 @@ export class LandRoomTypeRepository {
             },
             take: 1, // Solo necesitamos una imagen (la principal)
           },
+          Room: {
+            select: {
+              id: true,
+            },
+          },
         },
         orderBy: {
           createdAt: 'desc',
@@ -61,6 +66,7 @@ export class LandRoomTypeRepository {
           roomType.ImageRoomType.length > 0
             ? roomType.ImageRoomType[0].imageUrl
             : null,
+        Room: roomType.Room.map((room) => room.id), // Obtener solo el ID de la habitación
       }));
     } catch (error) {
       console.error(

@@ -12,6 +12,8 @@ import {
   BaseRoomTypeMainImg,
 } from '../entities/land-room-type.entity';
 import { BaseQueryDto } from '../../dto/base.query.dto';
+import { DetailedRoomWithImages } from 'src/modules/admin/room/entities/room.entity';
+import { defaultLocale, SupportedLocales } from '../../i18n/translations';
 
 @ApiTags('Landing Room Types')
 @ApiExtraModels(BaseQueryDto)
@@ -60,5 +62,20 @@ export class LandRoomTypeController {
   })
   async findRoomTypeById(@Param('id') id: string): Promise<LandRoomTypeAllImg> {
     return this.landRoomTypeService.findRoomTypeById(id);
+  }
+
+  @Get('room-detail/:roomId')
+  @ApiOperation({ summary: 'Get room details' })
+  @ApiResponse({
+    status: 200,
+    description: 'Room details retrieved successfully',
+    type: [DetailedRoomWithImages],
+  })
+  @ApiResponse({ status: 404, description: 'Room not found' })
+  getRoomDetail(
+    @Param('roomId') roomId: string,
+    @Query('locale') locale: SupportedLocales = defaultLocale,
+  ) {
+    return this.landRoomTypeService.findRoomById(roomId, locale);
   }
 }
