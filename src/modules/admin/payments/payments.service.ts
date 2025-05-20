@@ -3215,4 +3215,20 @@ export class PaymentsService {
       handleException(error, 'Error al eliminar el pago por reservación');
     }
   }
+
+  /**
+   * Verifica si el pago de una reservación está pendiente.
+   * @param reservationId ID de la reservación
+   * @returns true si el pago está pendiente, false en caso contrario
+   */
+  async validateReservationPaymentPending(
+    reservationId: string,
+  ): Promise<boolean> {
+    const payment = await this.prisma.payment.findFirst({
+      where: { reservationId },
+      select: { status: true },
+    });
+
+    return payment?.status === 'PENDING';
+  }
 }
