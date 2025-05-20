@@ -1,6 +1,10 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { RoomRepository } from '../repositories/room.repository';
-import { FindAllRoom, Room } from '../entities/room.entity';
+import {
+  DetailedRoomWithImages,
+  FindAllRoom,
+  Room,
+} from '../entities/room.entity';
 import { CreateRoomDto, UpdateRoomDto, DeleteRoomDto } from '../dto';
 import { UserData, UserPayload } from 'src/interfaces';
 import { validateArray, validateChanges } from 'src/prisma/src/utils';
@@ -311,6 +315,23 @@ export class RoomService {
    */
   async findById(id: string): Promise<Room> {
     const room = await this.roomRepository.findById(id);
+    if (!room) {
+      throw new BadRequestException(roomErrorMessages.notFound);
+    }
+    return room;
+  }
+
+  async findByIdDetailed(id: string): Promise<DetailedRoomWithImages> {
+    const room = await this.roomRepository.findOne<DetailedRoomWithImages>({
+      where: { id },
+      include: {
+        RoomTypes: {
+          include: {
+            ImageRoomType: true,
+          },
+        },
+      },
+    });
     if (!room) {
       throw new BadRequestException(roomErrorMessages.notFound);
     }

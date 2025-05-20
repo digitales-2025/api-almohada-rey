@@ -1,7 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { RoomStatus as RoomStatusPrisma } from '@prisma/client';
 import { BaseEntity } from 'src/prisma/src/abstract/base.entity';
-import { RoomType } from '../../room-type/entities/room-type.entity';
+import {
+  RoomType,
+  RoomTypesWithImages,
+} from '../../room-type/entities/room-type.entity';
 import { FloorTypes } from '../dto';
 import { FloorTypes as FloorTypesPrisma } from '@prisma/client';
 
@@ -106,6 +109,14 @@ export class DetailedRoom extends Room {
     type: RoomType,
   })
   RoomTypes: RoomType;
+}
+
+export class DetailedRoomWithImages extends Room {
+  @ApiProperty({
+    description: 'Nombre del tipo de habitación asociado',
+    type: RoomTypesWithImages,
+  })
+  RoomTypes: RoomTypesWithImages;
 }
 
 /**

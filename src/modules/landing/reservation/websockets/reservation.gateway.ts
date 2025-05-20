@@ -161,7 +161,7 @@ export class ReservationGateway
       const reservation = await this.executeBasicValidation(client, payload);
       const timeLimit = 120;
 
-      Logger.log(reservation, 'ReservationGateway');
+      // Logger.log(reservation, 'ReservationGateway');
 
       if (
         !this.reservationStateFactory.getAvailableActions(reservation.status)

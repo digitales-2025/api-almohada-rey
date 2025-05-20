@@ -21,6 +21,11 @@ export class BaseRoomTypeMainImg {
 
   @ApiProperty()
   mainImageUrl: string;
+
+  @ApiProperty({
+    type: [String],
+  })
+  Room: string[];
 }
 
 export class LandRoomTypeMainImg extends BaseRoomTypeMainImg {
@@ -32,6 +37,11 @@ export class LandRoomTypeMainImg extends BaseRoomTypeMainImg {
 
   @ApiProperty()
   bedEn?: string;
+
+  @ApiProperty({
+    type: [String],
+  })
+  Room: string[];
 }
 export class LandImageRoomType {
   @ApiProperty()
