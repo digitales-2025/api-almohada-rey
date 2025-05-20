@@ -82,10 +82,31 @@ export class Reservation extends BaseEntity {
   guests?: string;
 
   @ApiProperty({
+    description: 'Number of guests requested by the landing page',
+    required: false,
+    default: 1,
+  })
+  requestedGuestNumber?: number;
+
+  @ApiProperty({
     description: 'Additional notes or observations',
     required: false,
   })
   observations?: string;
+
+  @ApiProperty({
+    description: 'Whether the customer accepted extra services',
+    required: false,
+    default: false,
+  })
+  didAcceptExtraServices?: boolean;
+
+  @ApiProperty({
+    description: 'Whether the customer accepted terms and conditions',
+    required: false,
+    default: false,
+  })
+  didAcceptTerms?: boolean;
 
   @ApiProperty({
     description: 'Whether the reservation is active',
@@ -121,6 +142,13 @@ export class Reservation extends BaseEntity {
     type: Date,
   })
   updatedAt?: Date;
+
+  @ApiProperty({
+    description: 'Customer created by landing page',
+    required: false,
+    default: false,
+  })
+  createdByLandingPage?: boolean;
 
   constructor(partial: Partial<Reservation>) {
     super(partial);

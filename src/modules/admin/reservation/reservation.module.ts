@@ -17,6 +17,8 @@ import {
 import { ChangeReservationStatusUseCase } from './use-cases/changeReservationStatus.use.case';
 import { DeactivateReservationsUseCase } from './use-cases/deactivateReservations.use-case';
 import { ReactivateReservationsUseCase } from './use-cases/reactivateReservations.use-case';
+import { CreateReservationUseCaseForLanding } from './use-cases/createReservationForLanding.use-case';
+import { ConfirmPaymentLandingUseCase } from './use-cases/confirm-payment-landing.use-case';
 import { WebsocketsModule } from 'src/modules/websockets/websockets.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { ApplyLateCheckoutUseCase } from './use-cases/applyLateCheckout.use.case';
@@ -48,7 +50,14 @@ import { RemoveLateCheckoutUseCase } from './use-cases/removeLateCheckout.use.ca
     ChangeReservationStatusUseCase,
     DeactivateReservationsUseCase,
     ReactivateReservationsUseCase,
+    CreateReservationUseCaseForLanding,
+    ConfirmPaymentLandingUseCase,
   ],
-  exports: [ReservationService],
+  exports: [
+    ReservationService,
+    ReservationRepository,
+    ReservationStateFactory,
+    ConfirmPaymentLandingUseCase,
+  ],
 })
 export class ReservationModule {}

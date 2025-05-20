@@ -18,6 +18,7 @@ model User {
   lastLogin          DateTime    @default(now()) @db.Timestamptz(6)
   isActive           Boolean     @default(true)
   mustChangePassword Boolean     @default(true)
+  isLandingUser      Boolean     @default(false) // Indicates if the user was created through the landing page and if that's the case, notify the admin to complete the missing data
 
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt
@@ -59,18 +60,18 @@ enum AuditActionType {
 model Customer {
   id             String                @id @default(uuid())
   name           String
-  address        String
-  birthPlace     String
+  address        String? //Admin is required, landing is not
+  birthPlace     String? //Admin is required, landing is not
   birthDate      String?
-  country        String
+  country        String? //Admin is required, landing is not
   department     String?
   province       String?
   phone          String
-  occupation     String
+  occupation     String? //Admin is required, landing is not
   documentType   CustomerDocumentType
   documentNumber String                @unique
-  email          String?               @unique
-  maritalStatus  CustomerMaritalStatus
+  email          String?               //@unique
+  maritalStatus  CustomerMaritalStatus? //Admin is required, landing is not
   companyName    String?
   ruc            String?               @unique
   companyAddress String?
@@ -78,6 +79,8 @@ model Customer {
   createdAt      DateTime              @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime              @updatedAt
 
+  createdByLandingPage Boolean?        @default(false) // Indicates if the customer was created through the landing page and if that's the case, notify the admin to complete the missing data
+  mustCompleteData    Boolean?        @default(false) // Indicates if the admin was created by the landing page and if that's the case, notify the admin to complete the missing data
   reservations Reservation[]
 }
 
@@ -102,12 +105,15 @@ enum FloorTypes {
 model RoomTypes {
   id     String @id @default(uuid())
   name   String
+  nameEn String? //Translation in English for the landing page
   guests Int
   price  Float
 
   description String
+  descriptionEn String //Translation in English, mandatory for the landing page always
 
   bed           String
+  bedEn         String? //Translation in English for the landing page
   isActive      Boolean         @default(true)
   createdAt     DateTime        @default(now()) @db.Timestamptz(6)
   updatedAt     DateTime        @updatedAt
@@ -181,21 +187,24 @@ enum ReservationStatus {
 
 model Reservation {
   id                  String            @id @default(uuid())
-  customer            Customer          @relation(fields: [customerId], references: [id])
-  customerId          String
+  customer            Customer?        @relation(fields: [customerId], references: [id]) //Required for the admin, but optional for the landing page
+  customerId          String?           //Required for the admin, but optional for the landing page
   room                Room              @relation(fields: [roomId], references: [id])
   roomId              String
-  user                User              @relation(fields: [userId], references: [id])
-  userId              String
+  user                User?             @relation(fields: [userId], references: [id]) //Required for the admin, but optional for the landing page
+  userId              String?           //Required for the admin, but optional for the landing page
   reservationDate     DateTime          @default(now()) @db.Timestamptz(6)
   checkInDate         DateTime          @db.Timestamptz(6)
   checkOutDate        DateTime          @db.Timestamptz(6)
   status              ReservationStatus
-  origin              String // Origin place from the customer
-  reason              String // Reason for reservation
+  origin              String? // Origin place from the customer //Required for the admin, but optional for the landing page 
+  reason              String? // Reason for reservation //Mandatory for the admin, but optional for the landing page
   guests              Json? // List of companions
+  requestedGuestNumber Int? // Number of guests requested in the landing
   observations        String? // Additional notes
   appliedLateCheckOut Boolean           @default(false) // Flag to indicate if late check-out is applied
+  didAcceptExtraServices Boolean   @default(false) // Accept extra services
+  didAcceptTerms     Boolean   @default(false)  // Accept terms and conditions
 
   payment Payment[] @relation("PaymentReservation")
 
@@ -205,6 +214,8 @@ model Reservation {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt
+
+  createdByLandingPage Boolean?        @default(false) // Indicates if the reservation was created through the landing page and if that's the case, notify the admin to complete the missing data
 }
 
 model Payment {
