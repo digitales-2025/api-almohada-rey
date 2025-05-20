@@ -23,4 +23,6 @@ export {
   SummaryMovementsData,
 } from './movement.interface';
 
+export { AnnualAdministratorStatisticsData } from './dashboard.interface';
+
 export { HttpResponse } from './https-response.interface';
