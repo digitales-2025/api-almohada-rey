@@ -181,7 +181,7 @@ export class ReservationService {
     }
   }
 
-  deactivateReservations(
+  async deactivateReservations(
     dto: UpdateManyDto,
     userData: UserData,
   ): Promise<BaseApiResponse<UpdateManyResponseDto>> {
@@ -206,7 +206,7 @@ export class ReservationService {
     }
   }
 
-  reactivateReservations(
+  async reactivateReservations(
     dto: UpdateManyDto,
     userData: UserData,
   ): Promise<BaseApiResponse<UpdateManyResponseDto>> {
@@ -236,37 +236,36 @@ export class ReservationService {
     }
   }
 
-  changeReservationStatus(
+  async changeReservationStatus(
     id: string,
     newStatus: ReservationStatus,
     userData: UserData,
   ) {
     try {
       Logger.log(
-        'Rquest received to change reservation status' +
+        'Request received to change reservation status' +
           ' ' +
           id +
           ' ' +
           newStatus,
       );
-      const reservation = this.changeReservationStatusUseCase.execute(
+      const reservation = await this.changeReservationStatusUseCase.execute(
         id,
         newStatus,
         userData,
       );
 
       // Emitir evento de actualización por WebSocket
-      reservation.then(async (result) => {
-        if (result.success && result.data) {
-          const detailedReservation = await this.findOneDetailed(id);
-          if (detailedReservation) {
-            this.reservationGateway.emitReservationUpdate(detailedReservation);
-          }
+      if (reservation.success && reservation.data) {
+        const detailedReservation = await this.findOneDetailed(id);
+        if (detailedReservation) {
+          this.reservationGateway.emitReservationUpdate(detailedReservation);
         }
-      });
+      }
+
       return reservation;
     } catch (error) {
-      this.errorHandler.handleError(error, 'updating');
+      return this.errorHandler.handleError(error, 'updating');
     }
   }
 
@@ -286,7 +285,7 @@ export class ReservationService {
     }
   }
 
-  findAll() {
+  async findAll() {
     try {
       return this.reservationRepository.findMany();
     } catch (error) {
@@ -295,7 +294,7 @@ export class ReservationService {
   }
 
   //In the future some filters may be applied
-  findManyPaginated(
+  async findManyPaginated(
     user: UserPayload,
     pagination?: PaginationParams,
     additionalParams?: FilterQueryParamsByField<Reservation>,
@@ -398,7 +397,7 @@ export class ReservationService {
     }
   }
 
-  findOne(id: string) {
+  async findOne(id: string) {
     try {
       return this.reservationRepository.findOne<Reservation>({
         where: {
@@ -411,7 +410,7 @@ export class ReservationService {
     }
   }
 
-  findOneDetailed(id: string) {
+  async findOneDetailed(id: string) {
     try {
       return this.reservationRepository.findOne<DetailedReservation>({
         where: {
@@ -431,10 +430,6 @@ export class ReservationService {
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
     }
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} reservation`;
   }
 
   /**

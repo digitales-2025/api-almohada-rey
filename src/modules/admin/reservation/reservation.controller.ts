@@ -357,12 +357,6 @@ export class ReservationController {
     @Query('forUpdate') forUpdate: boolean = false,
     @Query('reservationId') reservationId?: string,
   ): Promise<DetailedReservation[]> {
-    // const checkAvailabilityDto: CheckAvailabilityDto = {
-    //   roomId: '',
-    //   checkInDate,
-    //   checkOutDate,
-    // };
-
     return this.reservationService.getAllReservationsInTimeInterval(
       checkInDate,
       checkOutDate,
@@ -467,16 +461,6 @@ export class ReservationController {
   })
   findOne(@Param('id') id: string) {
     return this.reservationService.findOne(id);
-  }
-
-  @Delete(':id')
-  @ApiOperation({ summary: 'Delete a reservation' })
-  @ApiParam({ name: 'id', description: 'Reservation ID' })
-  @ApiOkResponse({
-    description: 'The reservation has been successfully deleted',
-  })
-  remove(@Param('id') id: string) {
-    return this.reservationService.remove(+id);
   }
 
   @Patch(':id/late-checkout')
