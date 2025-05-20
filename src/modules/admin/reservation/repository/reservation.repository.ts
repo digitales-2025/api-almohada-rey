@@ -23,52 +23,67 @@ export class ReservationRepository extends BaseRepository<Reservation> {
     checkOutDate: Date,
     forUpdate: boolean = false,
     reservationId?: string,
-    tx?: any, // Añadir parámetro para transacción
+    tx?: any, // Parámetro para transacción
   ): Promise<boolean> {
     // Usar el cliente de transacción o el cliente normal
     const prismaClient = tx || this.prisma;
 
-    // Buscamos reservaciones existentes que se superpongan con las fechas solicitadas
-    // y que estén en estados que impliquen que la habitación está ocupada
-    const overlappingReservations = await prismaClient.reservation.count({
-      where: {
-        roomId,
-        isActive: true,
-        // Solo considerar reservaciones activas o confirmadas
-        status: {
-          in: [
-            ReservationStatus.CHECKED_IN, // Reservaciones Activas, el cliente ya está en la habitación
-            ReservationStatus.PENDING, //This is when was reserved, but not payed yet
-            ReservationStatus.CONFIRMED, // Reservaciones Confirmadas
-          ],
-        },
-        // Excluye la reserva actual si forUpdate es true
-        ...(forUpdate && reservationId ? { id: { not: reservationId } } : {}),
-        // Verificar superposición de fechas
-        OR: [
-          // Caso 1: La fecha de check-in solicitada está dentro de una reserva existente
-          {
-            checkInDate: { lte: checkInDate },
-            checkOutDate: { gt: checkInDate },
-          },
-          // Caso 2: La fecha de check-out solicitada está dentro de una reserva existente
-          {
-            checkInDate: { lt: checkOutDate },
-            checkOutDate: { gte: checkOutDate },
-          },
-          // Caso 3: Las fechas solicitadas envuelven completamente a una reserva existente
-          {
-            checkInDate: { gte: checkInDate },
-            checkOutDate: { lte: checkOutDate },
-          },
+    // Condición de superposición de fechas
+    const whereCondition = {
+      roomId,
+      isActive: true,
+      // Solo considerar reservaciones activas o confirmadas
+      status: {
+        in: [
+          ReservationStatus.CHECKED_IN,
+          ReservationStatus.PENDING,
+          ReservationStatus.CONFIRMED,
         ],
       },
-      // Usar FOR UPDATE para bloqueo pesimista si estamos en una transacción y forUpdate es true
-      ...(tx && forUpdate ? { lockMode: 'pessimistic_write' } : {}),
-    });
+      // Excluye la reserva actual si forUpdate es true
+      ...(forUpdate && reservationId ? { id: { not: reservationId } } : {}),
+      // Verificar superposición de fechas
+      OR: [
+        // Caso 1: La fecha de check-in solicitada está dentro de una reserva existente
+        {
+          checkInDate: { lte: checkInDate },
+          checkOutDate: { gt: checkInDate },
+        },
+        // Caso 2: La fecha de check-out solicitada está dentro de una reserva existente
+        {
+          checkInDate: { lt: checkOutDate },
+          checkOutDate: { gte: checkOutDate },
+        },
+        // Caso 3: Las fechas solicitadas envuelven completamente a una reserva existente
+        {
+          checkInDate: { gte: checkInDate },
+          checkOutDate: { lte: checkOutDate },
+        },
+      ],
+    };
 
-    // Si no hay reservaciones superpuestas, la habitación está disponible
-    return overlappingReservations === 0;
+    // Si queremos bloqueo pesimista y estamos dentro de una transacción
+    if (forUpdate && tx) {
+      // Primero hacemos findMany para obtener y bloquear los registros
+      // Dentro de una transacción con nivel Serializable, esto crea un bloqueo efectivo
+      const reservationsToBlock = await prismaClient.reservation.findMany({
+        where: whereCondition,
+        select: { id: true },
+        orderBy: { id: 'asc' }, // Ordenar para prevenir deadlocks
+      });
+
+      // Devolvemos true si no hay superposiciones
+      return reservationsToBlock.length === 0;
+    }
+    // Sin bloqueo pesimista, usamos count directamente
+    else {
+      const overlappingReservations = await prismaClient.reservation.count({
+        where: whereCondition,
+      });
+
+      // Si no hay reservaciones superpuestas, la habitación está disponible
+      return overlappingReservations === 0;
+    }
   }
 
   async checkCurrentRoomAvailability(roomId: string): Promise<boolean> {
