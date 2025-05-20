@@ -6,19 +6,25 @@ import {
   ReservationStateTransitionResult,
 } from './reservation-state.interface';
 import { PrismaTransaction } from 'src/prisma/src/types/prisma.types';
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { ReservationRepository } from '../repository/reservation.repository';
+import { PaymentsService } from '../../payments/payments.service';
 
 @Injectable()
 export class CheckedInReservationState implements ReservationStateHandler {
+  private readonly logger = new Logger(CheckedInReservationState.name);
+
   constructor(
     private readonly roomRepository: RoomRepository,
     private readonly reservationRepository: ReservationRepository,
+    @Inject(forwardRef(() => PaymentsService))
+    private readonly paymentsService: PaymentsService,
   ) {}
 
-  canTransitionTo(
+  async canTransitionTo(
     targetStatus: ReservationStatus,
-  ): ReservationStateTransitionResult {
+    reservation?: Reservation,
+  ): Promise<ReservationStateTransitionResult> {
     switch (targetStatus) {
       case 'CHECKED_IN':
         return { isValid: true, isActive: true };
@@ -39,6 +45,25 @@ export class CheckedInReservationState implements ReservationStateHandler {
       case 'CANCELED':
         return { isValid: true, isActive: false };
       case 'CHECKED_OUT':
+        // Verificar que la reserva tenga un pago en estado PAID
+        if (reservation) {
+          // Buscar el pago relacionado con la reserva
+          const hasPaymentPending =
+            await this.paymentsService.validateReservationPaymentPending(
+              reservation.id,
+            );
+
+          // Verificamos si el pago está en estado PAID
+          if (hasPaymentPending) {
+            return {
+              isValid: false,
+              errorMessage:
+                'No se puede realizar el checkout, se cuentan con pagos pendientes',
+              isActive: true,
+            };
+          }
+        }
+
         return {
           isValid: true,
           isActive: false,

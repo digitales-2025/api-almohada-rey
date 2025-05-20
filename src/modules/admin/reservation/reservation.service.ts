@@ -42,6 +42,11 @@ import {
 } from 'src/modules/landing/i18n/translations';
 import { CreateReservationUseCaseForLanding } from './use-cases/createReservationForLanding.use-case';
 import { ReservationGateway } from 'src/modules/websockets/reservation.gateway';
+import { ApplyLateCheckoutUseCase } from './use-cases/applyLateCheckout.use.case';
+import { ExtendStayUseCase } from './use-cases/extendStay.use.case';
+import { LateCheckoutDto } from './dto/late-checkout.dto';
+import { ExtendStayDto } from './dto/extend-stay.dto';
+import { RemoveLateCheckoutUseCase } from './use-cases/removeLateCheckout.use.case';
 
 @Injectable()
 export class ReservationService {
@@ -58,6 +63,9 @@ export class ReservationService {
     private readonly reservationStateFactory: ReservationStateFactory,
     private readonly deactivateReservationsUseCase: DeactivateReservationsUseCase,
     private readonly reactivateReservationsUseCase: ReactivateReservationsUseCase,
+    private readonly applyLateCheckoutUseCase: ApplyLateCheckoutUseCase,
+    private readonly removeLateCheckoutUseCase: RemoveLateCheckoutUseCase,
+    private readonly extendStayUseCase: ExtendStayUseCase,
     @Inject(forwardRef(() => ReservationGateway))
     private readonly reservationGateway: ReservationGateway,
   ) {
@@ -230,7 +238,7 @@ export class ReservationService {
     }
   }
 
-  deactivateReservations(
+  async deactivateReservations(
     dto: UpdateManyDto,
     userData: UserData,
   ): Promise<BaseApiResponse<UpdateManyResponseDto>> {
@@ -255,7 +263,7 @@ export class ReservationService {
     }
   }
 
-  reactivateReservations(
+  async reactivateReservations(
     dto: UpdateManyDto,
     userData: UserData,
   ): Promise<BaseApiResponse<UpdateManyResponseDto>> {
@@ -285,37 +293,36 @@ export class ReservationService {
     }
   }
 
-  changeReservationStatus(
+  async changeReservationStatus(
     id: string,
     newStatus: ReservationStatus,
     userData: UserData,
   ) {
     try {
       Logger.log(
-        'Rquest received to change reservation status' +
+        'Request received to change reservation status' +
           ' ' +
           id +
           ' ' +
           newStatus,
       );
-      const reservation = this.changeReservationStatusUseCase.execute(
+      const reservation = await this.changeReservationStatusUseCase.execute(
         id,
         newStatus,
         userData,
       );
 
       // Emitir evento de actualización por WebSocket
-      reservation.then(async (result) => {
-        if (result.success && result.data) {
-          const detailedReservation = await this.findOneDetailed(id);
-          if (detailedReservation) {
-            this.reservationGateway.emitReservationUpdate(detailedReservation);
-          }
+      if (reservation.success && reservation.data) {
+        const detailedReservation = await this.findOneDetailed(id);
+        if (detailedReservation) {
+          this.reservationGateway.emitReservationUpdate(detailedReservation);
         }
-      });
+      }
+
       return reservation;
     } catch (error) {
-      this.errorHandler.handleError(error, 'updating');
+      return this.errorHandler.handleError(error, 'updating');
     }
   }
 
@@ -335,7 +342,7 @@ export class ReservationService {
     }
   }
 
-  findAll() {
+  async findAll() {
     try {
       return this.reservationRepository.findMany();
     } catch (error) {
@@ -344,7 +351,7 @@ export class ReservationService {
   }
 
   //In the future some filters may be applied
-  findManyPaginated(
+  async findManyPaginated(
     user: UserPayload,
     pagination?: PaginationParams,
     additionalParams?: FilterQueryParamsByField<Reservation>,
@@ -447,7 +454,7 @@ export class ReservationService {
     }
   }
 
-  findOne(id: string) {
+  async findOne(id: string) {
     try {
       return this.reservationRepository.findOne<Reservation>({
         where: {
@@ -460,7 +467,7 @@ export class ReservationService {
     }
   }
 
-  findOneDetailed(id: string) {
+  async findOneDetailed(id: string) {
     try {
       return this.reservationRepository.findOne<DetailedReservation>({
         where: {
@@ -480,10 +487,6 @@ export class ReservationService {
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
     }
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} reservation`;
   }
 
   /**
@@ -596,6 +599,190 @@ export class ReservationService {
       this.errorHandler.handleError(error, 'getting');
     }
   }
+
+  /**
+   * Verifica si es posible modificar la fecha/hora de checkout de una reserva sin generar conflictos.
+   * Sirve tanto para Late Checkout como para extensión de estadía.
+   *
+   * @param reservationId ID de la reserva que se desea modificar
+   * @param newCheckoutDate Nueva fecha y hora de checkout en formato ISO 8601
+   * @returns Resultado de la verificación con información sobre conflictos
+   */
+  async checkExtendedCheckoutAvailability(
+    reservationId: string,
+    newCheckoutDate: string,
+  ): Promise<{
+    isAvailable: boolean;
+  }> {
+    try {
+      this.logger.log(
+        `Verificando disponibilidad para modificar checkout de la reserva ${reservationId} hasta ${newCheckoutDate}`,
+      );
+
+      // Obtener la reserva original
+      const reservation =
+        await this.reservationRepository.findOne<DetailedReservation>({
+          where: {
+            id: reservationId,
+            isActive: true,
+          },
+          include: {
+            room: {
+              include: {
+                RoomTypes: true,
+              },
+            },
+            customer: true,
+            user: true,
+          },
+        });
+
+      if (!reservation) {
+        throw new BadRequestException(
+          `No se encontró la reserva con ID ${reservationId}`,
+        );
+      }
+
+      // Convertir strings a objetos Date para comparación
+      const originalCheckoutDate = new Date(reservation.checkOutDate);
+      const parsedNewCheckoutDate = new Date(newCheckoutDate);
+
+      // Validar que la nueva fecha es posterior a la original
+      if (parsedNewCheckoutDate <= originalCheckoutDate) {
+        throw new BadRequestException(
+          'La nueva fecha/hora de checkout debe ser posterior a la original',
+        );
+      }
+
+      // Validar que la nueva fecha es posterior a la fecha de check-in
+      const originalCheckinDate = new Date(reservation.checkInDate);
+      if (parsedNewCheckoutDate <= originalCheckinDate) {
+        throw new BadRequestException(
+          'La nueva fecha/hora de checkout debe ser posterior a la fecha de check-in',
+        );
+      }
+
+      // Determinar si se trata de un late checkout (mismo día) o una extensión de estadía
+      const isLateCheckout =
+        parsedNewCheckoutDate.getFullYear() ===
+          originalCheckoutDate.getFullYear() &&
+        parsedNewCheckoutDate.getMonth() === originalCheckoutDate.getMonth() &&
+        parsedNewCheckoutDate.getDate() === originalCheckoutDate.getDate();
+
+      this.logger.log(
+        `Tipo de modificación: ${isLateCheckout ? 'Late Checkout' : 'Extensión de estadía'}`,
+      );
+
+      // Definir la estructura de consulta para encontrar conflictos
+      interface ConflictQueryParams {
+        where: {
+          id: { not: string };
+          roomId: string;
+          isActive: boolean;
+          status: {
+            in: ReservationStatus[];
+          };
+          OR: Array<
+            | { checkInDate: { gte: Date; lt: Date } }
+            | { checkOutDate: { gt: Date; lte: Date } }
+            | {
+                AND: Array<
+                  | { checkInDate: { lte: Date } }
+                  | { checkOutDate: { gte: Date } }
+                >;
+              }
+          >;
+        };
+        include: {
+          room: {
+            include: {
+              RoomTypes: boolean;
+            };
+          };
+          customer: boolean;
+          user: boolean;
+        };
+        orderBy: {
+          checkInDate: 'asc' | 'desc';
+        };
+      }
+
+      // Construir la consulta para buscar reservas conflictivas
+      const conflictQuery: ConflictQueryParams = {
+        where: {
+          id: { not: reservationId },
+          roomId: reservation.roomId,
+          isActive: true,
+          status: {
+            in: [
+              ReservationStatus.PENDING,
+              ReservationStatus.CONFIRMED,
+              ReservationStatus.CHECKED_IN,
+            ],
+          },
+          OR: [
+            // Caso 1: La fecha de check-in de otra reserva está dentro de nuestro nuevo período
+            {
+              checkInDate: {
+                gte: originalCheckoutDate,
+                lt: parsedNewCheckoutDate,
+              },
+            },
+            // Caso 2: La fecha de check-out de otra reserva está dentro de nuestro nuevo período
+            {
+              checkOutDate: {
+                gt: originalCheckoutDate,
+                lte: parsedNewCheckoutDate,
+              },
+            },
+            // Caso 3: Otra reserva abarca completamente nuestro nuevo período
+            {
+              AND: [
+                { checkInDate: { lte: originalCheckoutDate } },
+                { checkOutDate: { gte: parsedNewCheckoutDate } },
+              ],
+            },
+          ],
+        },
+        include: {
+          room: {
+            include: {
+              RoomTypes: true,
+            },
+          },
+          customer: true,
+          user: true,
+        },
+        orderBy: { checkInDate: 'asc' },
+      };
+
+      // Buscar reservas que puedan entrar en conflicto
+      const conflictingReservations =
+        await this.reservationRepository.findMany<DetailedReservation>(
+          conflictQuery,
+        );
+
+      const isAvailable = conflictingReservations.length === 0;
+
+      // Emitir la verificación para mantener sincronizados a los clientes
+      this.reservationGateway.emitCheckoutAvailabilityChecked(
+        reservation.roomId,
+        reservation.checkOutDate,
+        newCheckoutDate,
+        isAvailable,
+      );
+
+      return {
+        isAvailable,
+      };
+    } catch (error) {
+      this.logger.error(`Error al verificar disponibilidad: ${error.message}`, {
+        error,
+      });
+      throw error;
+    }
+  }
+
   /**
    * Obtiene todas las reservas que se solapan con un rango de fechas específico
    * @param checkInDate - Fecha de inicio en formato ISO
@@ -814,6 +1001,125 @@ export class ReservationService {
       return availableRooms;
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
+    }
+  }
+
+  /**
+   * Aplica Late Checkout a una reserva, extendiendo la hora de salida en el mismo día.
+   * Valida que la habitación esté disponible y no haya otra reserva ese día.
+   * @param reservationId ID de la reserva a modificar
+   * @param newCheckoutTime Nueva hora de checkout (formato HH:mm)
+   * @param userData Información del usuario que realiza la acción
+   * @returns Reserva actualizada
+   */
+  async applyLateCheckout(
+    reservationId: string,
+    lateCheckoutDto: LateCheckoutDto,
+    userData: UserData,
+  ): Promise<BaseApiResponse<Reservation>> {
+    const { lateCheckoutTime } = lateCheckoutDto;
+    try {
+      const result = await this.applyLateCheckoutUseCase.execute(
+        reservationId,
+        lateCheckoutDto,
+        userData,
+      );
+
+      // Si tuvo éxito, notificar a través de WebSockets
+      if (result.success && result.data) {
+        const detailedReservation = await this.findOneDetailed(result.data.id);
+
+        if (detailedReservation) {
+          this.reservationGateway.emitReservationUpdate(detailedReservation);
+        }
+      }
+
+      return result;
+    } catch (error) {
+      this.logger.error(`Error al aplicar late checkout: ${error.message}`, {
+        error,
+        reservationId,
+        lateCheckoutTime,
+      });
+      return this.errorHandler.handleError(error, 'updating');
+    }
+  }
+
+  /**
+   * Elimina un Late Checkout aplicado a una reserva, restaurando la hora original de salida
+   * @param reservationId ID de la reserva a la que se eliminará el Late Checkout
+   * @param userData Usuario que realiza la acción
+   * @returns Reserva actualizada con la hora de checkout original
+   */
+  async removeLateCheckout(
+    reservationId: string,
+    userData: UserData,
+  ): Promise<BaseApiResponse<Reservation>> {
+    try {
+      // Llamar al caso de uso de eliminación de Late Checkout
+      const result = await this.removeLateCheckoutUseCase.execute(
+        reservationId,
+        userData,
+      );
+
+      // Si tuvo éxito, notificar a través de WebSockets
+      if (result.success && result.data) {
+        const detailedReservation = await this.findOneDetailed(result.data.id);
+
+        if (detailedReservation) {
+          this.reservationGateway.emitReservationUpdate(detailedReservation);
+        }
+      }
+
+      return result;
+    } catch (error) {
+      this.logger.error(`Error al eliminar late checkout: ${error.message}`, {
+        error,
+        reservationId,
+        userId: userData.id,
+      });
+      return this.errorHandler.handleError(error, 'updating');
+    }
+  }
+
+  /**
+   * Extiende la estadía de una reserva, cambiando la fecha de checkout a una fecha posterior.
+   * Valida que la habitación esté disponible para las nuevas fechas.
+   * @param reservationId ID de la reserva a modificar
+   * @param newCheckoutDate Nueva fecha de checkout en formato ISO
+   * @param userData Información del usuario que realiza la acción
+   * @returns Reserva actualizada
+   */
+  async extendStay(
+    reservationId: string,
+    extendStayDto: ExtendStayDto,
+    userData: UserData,
+  ): Promise<BaseApiResponse<Reservation>> {
+    const { newCheckoutDate } = extendStayDto;
+    try {
+      const result = await this.extendStayUseCase.execute(
+        reservationId,
+        extendStayDto,
+        userData,
+      );
+
+      // Si tuvo éxito, notificar a través de WebSockets
+      if (result.success && result.data) {
+        const detailedReservation = await this.findOneDetailed(result.data.id);
+
+        if (detailedReservation) {
+          this.reservationGateway.emitReservationUpdate(detailedReservation);
+        }
+      }
+
+      return result;
+    } catch (error) {
+      this.logger.error(`Error al extender estadía: ${error.message}`, {
+        error,
+        reservationId,
+        newCheckoutDate,
+      });
+      return this.errorHandler.handleError(error, 'updating');
     }
   }
 }

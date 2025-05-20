@@ -46,7 +46,8 @@ export class ConfirmPaymentLandingUseCase {
           );
 
           // 3. Check if transition is valid
-          const transitionResult = currentStatus.canTransitionTo('CONFIRMED');
+          const transitionResult =
+            await currentStatus.canTransitionTo('CONFIRMED');
 
           if (!transitionResult.isValid) {
             throw new BadRequestException(transitionResult.errorMessage);

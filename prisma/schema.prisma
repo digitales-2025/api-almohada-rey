@@ -186,22 +186,23 @@ enum ReservationStatus {
 }
 
 model Reservation {
-  id              String            @id @default(uuid())
-  customer        Customer?        @relation(fields: [customerId], references: [id]) //Required for the admin, but optional for the landing page
-  customerId      String?           //Required for the admin, but optional for the landing page
-  room            Room              @relation(fields: [roomId], references: [id])
-  roomId          String
-  user            User?             @relation(fields: [userId], references: [id]) //Required for the admin, but optional for the landing page
-  userId          String?           //Required for the admin, but optional for the landing page
-  reservationDate DateTime          @default(now()) @db.Timestamptz(6)
-  checkInDate     DateTime          @db.Timestamptz(6)
-  checkOutDate    DateTime          @db.Timestamptz(6)
-  status          ReservationStatus
-  origin          String? // Origin place from the customer //Required for the admin, but optional for the landing page 
-  reason          String? // Reason for reservation //Mandatory for the admin, but optional for the landing page
-  guests          Json? // List of companions
+  id                  String            @id @default(uuid())
+  customer            Customer?        @relation(fields: [customerId], references: [id]) //Required for the admin, but optional for the landing page
+  customerId          String?           //Required for the admin, but optional for the landing page
+  room                Room              @relation(fields: [roomId], references: [id])
+  roomId              String
+  user                User?             @relation(fields: [userId], references: [id]) //Required for the admin, but optional for the landing page
+  userId              String?           //Required for the admin, but optional for the landing page
+  reservationDate     DateTime          @default(now()) @db.Timestamptz(6)
+  checkInDate         DateTime          @db.Timestamptz(6)
+  checkOutDate        DateTime          @db.Timestamptz(6)
+  status              ReservationStatus
+  origin              String? // Origin place from the customer //Required for the admin, but optional for the landing page 
+  reason              String? // Reason for reservation //Mandatory for the admin, but optional for the landing page
+  guests              Json? // List of companions
   requestedGuestNumber Int? // Number of guests requested in the landing
-  observations    String? // Additional notes
+  observations        String? // Additional notes
+  appliedLateCheckOut Boolean           @default(false) // Flag to indicate if late check-out is applied
   didAcceptExtraServices Boolean   @default(false) // Accept extra services
   didAcceptTerms     Boolean   @default(false)  // Accept terms and conditions
 
@@ -237,6 +238,7 @@ model Payment {
 
 enum PaymentDetailType {
   ROOM_RESERVATION
+  LATE_CHECKOUT
   EXTRA_SERVICE
 }
 

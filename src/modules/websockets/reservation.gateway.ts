@@ -111,6 +111,33 @@ export class ReservationGateway
     });
   }
 
+  /**
+   * Emite un evento cuando se verifica la disponibilidad para modificar el checkout de una reserva
+   * @param roomId ID de la habitación
+   * @param originalCheckoutDate Fecha/hora original de checkout
+   * @param newCheckoutDate Nueva fecha/hora de checkout propuesta
+   * @param isAvailable Indica si es posible realizar el cambio
+   */
+  emitCheckoutAvailabilityChecked(
+    roomId: string,
+    originalCheckoutDate: string,
+    newCheckoutDate: string,
+    isAvailable: boolean,
+  ): void {
+    this.logger.log(
+      `Emitiendo verificación de disponibilidad de checkout extendido para habitación ${roomId}: ${
+        isAvailable ? 'disponible' : 'no disponible'
+      }`,
+    );
+    this.server.emit('checkout-availability-checked', {
+      roomId,
+      originalCheckoutDate,
+      newCheckoutDate,
+      isAvailable,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   // Suscripción para que un cliente solicite datos de reservaciones en un intervalo
   @SubscribeMessage('getReservationsInInterval')
   async handleGetReservationsInInterval(
