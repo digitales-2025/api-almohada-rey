@@ -40,6 +40,7 @@ import { ApplyLateCheckoutUseCase } from './use-cases/applyLateCheckout.use.case
 import { ExtendStayUseCase } from './use-cases/extendStay.use.case';
 import { LateCheckoutDto } from './dto/late-checkout.dto';
 import { ExtendStayDto } from './dto/extend-stay.dto';
+import { RemoveLateCheckoutUseCase } from './use-cases/removeLateCheckout.use.case';
 
 @Injectable()
 export class ReservationService {
@@ -56,6 +57,7 @@ export class ReservationService {
     private readonly deactivateReservationsUseCase: DeactivateReservationsUseCase,
     private readonly reactivateReservationsUseCase: ReactivateReservationsUseCase,
     private readonly applyLateCheckoutUseCase: ApplyLateCheckoutUseCase,
+    private readonly removeLateCheckoutUseCase: RemoveLateCheckoutUseCase,
     private readonly extendStayUseCase: ExtendStayUseCase,
     @Inject(forwardRef(() => ReservationGateway))
     private readonly reservationGateway: ReservationGateway,
@@ -983,6 +985,43 @@ export class ReservationService {
         error,
         reservationId,
         lateCheckoutTime,
+      });
+      return this.errorHandler.handleError(error, 'updating');
+    }
+  }
+
+  /**
+   * Elimina un Late Checkout aplicado a una reserva, restaurando la hora original de salida
+   * @param reservationId ID de la reserva a la que se eliminará el Late Checkout
+   * @param userData Usuario que realiza la acción
+   * @returns Reserva actualizada con la hora de checkout original
+   */
+  async removeLateCheckout(
+    reservationId: string,
+    userData: UserData,
+  ): Promise<BaseApiResponse<Reservation>> {
+    try {
+      // Llamar al caso de uso de eliminación de Late Checkout
+      const result = await this.removeLateCheckoutUseCase.execute(
+        reservationId,
+        userData,
+      );
+
+      // Si tuvo éxito, notificar a través de WebSockets
+      if (result.success && result.data) {
+        const detailedReservation = await this.findOneDetailed(result.data.id);
+
+        if (detailedReservation) {
+          this.reservationGateway.emitReservationUpdate(detailedReservation);
+        }
+      }
+
+      return result;
+    } catch (error) {
+      this.logger.error(`Error al eliminar late checkout: ${error.message}`, {
+        error,
+        reservationId,
+        userId: userData.id,
       });
       return this.errorHandler.handleError(error, 'updating');
     }

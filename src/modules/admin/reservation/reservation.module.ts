@@ -21,6 +21,7 @@ import { WebsocketsModule } from 'src/modules/websockets/websockets.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { ApplyLateCheckoutUseCase } from './use-cases/applyLateCheckout.use.case';
 import { ExtendStayUseCase } from './use-cases/extendStay.use.case';
+import { RemoveLateCheckoutUseCase } from './use-cases/removeLateCheckout.use.case';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { ExtendStayUseCase } from './use-cases/extendStay.use.case';
     CreateReservationUseCase,
     UpdateReservationUseCase,
     ApplyLateCheckoutUseCase,
+    RemoveLateCheckoutUseCase,
     ExtendStayUseCase,
     CanceledReservationState,
     CheckedOutReservationState,

@@ -3067,7 +3067,7 @@ export class PaymentsService {
         // Nunca modificamos el amount cuando eliminamos un ROOM_RESERVATION
         let newAmount = currentAmount;
 
-        if (detailType === 'EXTRA_SERVICE') {
+        if (detailType === 'EXTRA_SERVICE' || detailType === 'LATE_CHECKOUT') {
           // Si es un servicio extra, restamos su valor real del amount
           newAmount = currentAmount - realDetailValue;
         }

@@ -495,6 +495,33 @@ export class ReservationController {
     return this.reservationService.applyLateCheckout(id, lateCheckoutDto, user);
   }
 
+  @Delete(':id/late-checkout')
+  @ApiOperation({
+    summary: 'Eliminar Late Checkout de una reserva',
+    description:
+      'Elimina el Late Checkout aplicado a una reserva y restaura la hora original de salida.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Late checkout eliminado correctamente',
+    type: BaseApiResponse,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'Error: La reserva no tiene Late Checkout aplicado o no está en estado válido',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Error: Reserva no encontrada',
+  })
+  removeLateCheckout(
+    @Param('id') id: string,
+    @GetUser() user: UserPayload,
+  ): Promise<BaseApiResponse<Reservation>> {
+    return this.reservationService.removeLateCheckout(id, user);
+  }
+
   @Patch(':id/extend-stay')
   @ApiOperation({
     summary: 'Extender estadía de una reserva',
