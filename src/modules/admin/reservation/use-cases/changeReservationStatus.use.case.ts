@@ -19,7 +19,6 @@ export class ChangeReservationStatusUseCase {
   constructor(
     private readonly reservationRepository: ReservationRepository,
     private readonly auditRepository: AuditRepository,
-    // private readonly roomRepository: RoomRepository,
     private readonly stateFactory: ReservationStateFactory,
   ) {}
 
@@ -29,29 +28,32 @@ export class ChangeReservationStatusUseCase {
     user: UserData,
   ): Promise<BaseApiResponse<Reservation>> {
     try {
+      // 1. Verificar si la reserva existe antes de iniciar la transacción
+      const existingReservation = await this.reservationRepository.findById(id);
+
+      if (!existingReservation) {
+        throw new NotFoundException(`Reservation with ID ${id} not found`);
+      }
+
+      // 2. Obtener el manejador de estado para el estado actual
+      const currentStatus = this.stateFactory.getStateHandler(
+        existingReservation.status,
+      );
+
+      // 3. Verificar si la transición es válida antes de iniciar la transacción
+      const transitionResult = await currentStatus.canTransitionTo(
+        newStatus,
+        existingReservation,
+      );
+
+      if (!transitionResult.isValid) {
+        throw new BadRequestException(transitionResult.errorMessage);
+      }
+
+      // 4. Ahora que sabemos que la transición es válida, iniciamos la transacción
       const updatedReservation = await this.reservationRepository.transaction(
         async (tx) => {
-          // 1. Check if reservation exists
-          const existingReservation =
-            await this.reservationRepository.findById(id);
-
-          if (!existingReservation) {
-            throw new NotFoundException(`Reservation with ID ${id} not found`);
-          }
-
-          // 2. Get state handler for current status
-          const currentStatus = this.stateFactory.getStateHandler(
-            existingReservation.status,
-          );
-
-          // 3. Check if transition is valid
-          const transitionResult = currentStatus.canTransitionTo(newStatus);
-
-          if (!transitionResult.isValid) {
-            throw new BadRequestException(transitionResult.errorMessage);
-          }
-
-          // 4. Update reservation status
+          // Actualizar estado de reserva
           const reservation = await this.reservationRepository.updateWithTx(
             id,
             {
@@ -62,14 +64,14 @@ export class ChangeReservationStatusUseCase {
             tx,
           );
 
-          // 5. Handle state-specific actions, like changing room status
+          // Manejar acciones específicas del estado
           await currentStatus.handleTransition(
             existingReservation,
             newStatus,
             tx,
           );
 
-          // 6. Register audit
+          // Registrar auditoría
           await this.auditRepository.createWithTx(
             {
               entityId: reservation.id,

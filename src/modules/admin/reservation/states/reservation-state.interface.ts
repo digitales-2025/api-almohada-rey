@@ -1,4 +1,4 @@
-import { ReservationStatus, RoomStatus } from '@prisma/client';
+import { ReservationStatus } from '@prisma/client';
 import { Reservation } from '../entities/reservation.entity';
 import { PrismaTransaction } from 'src/prisma/src/types/prisma.types';
 
@@ -7,14 +7,18 @@ export interface ReservationStateTransitionResult {
   errorMessage?: string;
   isActive: boolean;
   roomStatusUpdate?: {
-    status: RoomStatus;
+    status: string;
   };
 }
 
 export interface ReservationStateHandler {
   canTransitionTo(
     targetStatus: ReservationStatus,
-  ): ReservationStateTransitionResult;
+    reservation?: Reservation,
+  ):
+    | Promise<ReservationStateTransitionResult>
+    | ReservationStateTransitionResult;
+
   handleTransition(
     reservation: Reservation,
     targetStatus: ReservationStatus,
