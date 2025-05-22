@@ -23,6 +23,15 @@ export {
   SummaryMovementsData,
 } from './movement.interface';
 
-export { AnnualAdministratorStatisticsData } from './dashboard.interface';
+export {
+  AnnualAdministratorStatisticsData,
+  MonthlyEarningsAndExpensesData,
+  RoomOccupancyMapData,
+  ListRoom,
+  RecentReservationsData,
+  NextPendingPaymentsData,
+  OccupationStatisticsPercentageData,
+  MonthlyBookingTrendData,
+} from './dashboard.interface';
 
 export { HttpResponse } from './https-response.interface';
