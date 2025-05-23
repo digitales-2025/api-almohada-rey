@@ -83,3 +83,21 @@ export interface SummaryFinanceData {
   totalExpensesOther: number;
   totalExpensesProducts: number;
 }
+
+export interface CustomerOriginSummaryData {
+  totalCustomers: number;
+  totalNationalCustomers: number;
+  totalInternationalCustomers: number;
+  totalCountry: number;
+}
+
+export interface MonthlyCustomerOriginData {
+  month: string;
+  nationalCustomers: number;
+  internationalCustomers: number;
+}
+
+export interface Top10CountriesProvincesData {
+  countryProvince: string;
+  totalCustomers: number;
+}

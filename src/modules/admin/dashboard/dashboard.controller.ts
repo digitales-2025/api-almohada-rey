@@ -17,13 +17,16 @@ import {
 } from '@nestjs/swagger';
 import {
   AnnualAdministratorStatisticsData,
+  CustomerOriginSummaryData,
   MonthlyBookingTrendData,
+  MonthlyCustomerOriginData,
   MonthlyEarningsAndExpensesData,
   NextPendingPaymentsData,
   OccupationStatisticsPercentageData,
   RecentReservationsData,
   RoomOccupancyMapData,
   SummaryFinanceData,
+  Top10CountriesProvincesData,
 } from 'src/interfaces';
 import { Auth } from '../auth/decorators';
 
@@ -189,5 +192,102 @@ export class DashboardController {
     year: number,
   ): Promise<SummaryFinanceData> {
     return this.dashboardService.findSummaryFinance(year);
+  }
+
+  @Get('customer-origin')
+  @ApiOperation({
+    summary: 'Obtener resumen del origen de los clientes',
+  })
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    type: Number,
+    description:
+      'Año para el que se desea obtener el resumen de origen de clientes (por defecto: año actual)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Resumen de origen de clientes obtenido correctamente',
+  })
+  @ApiResponse({ status: 400, description: 'Solicitud incorrecta' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  findCustomerOriginSummary(
+    @Query('year', new DefaultValuePipe(new Date().getFullYear()), ParseIntPipe)
+    year: number,
+  ): Promise<CustomerOriginSummaryData> {
+    return this.dashboardService.findCustomerOriginSummary(year);
+  }
+
+  @Get('monthly-customer-origin')
+  @ApiOperation({
+    summary:
+      'Obtener distribución mensual de clientes nacionales e internacionales',
+  })
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    type: Number,
+    description:
+      'Año para el que se desea obtener la distribución mensual de clientes (por defecto: año actual)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Distribución mensual de clientes obtenida correctamente',
+  })
+  @ApiResponse({ status: 400, description: 'Solicitud incorrecta' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  findMonthlyCustomerOrigin(
+    @Query('year', new DefaultValuePipe(new Date().getFullYear()), ParseIntPipe)
+    year: number,
+  ): Promise<MonthlyCustomerOriginData[]> {
+    return this.dashboardService.findMonthlyCustomerOrigin(year);
+  }
+
+  @Get('top-countries')
+  @ApiOperation({
+    summary: 'Obtener top 10 países con más clientes (excluyendo Perú)',
+  })
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    type: Number,
+    description:
+      'Año para el que se desea obtener el top de países (por defecto: año actual)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Top 10 países obtenidos correctamente',
+  })
+  @ApiResponse({ status: 400, description: 'Solicitud incorrecta' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  findTop10Countries(
+    @Query('year', new DefaultValuePipe(new Date().getFullYear()), ParseIntPipe)
+    year: number,
+  ): Promise<Top10CountriesProvincesData[]> {
+    return this.dashboardService.findTop10CountriesCustomers(year);
+  }
+
+  @Get('top-provinces')
+  @ApiOperation({
+    summary: 'Obtener top 10 provincias de Perú con más clientes',
+  })
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    type: Number,
+    description:
+      'Año para el que se desea obtener el top de provincias (por defecto: año actual)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Top 10 provincias obtenidas correctamente',
+  })
+  @ApiResponse({ status: 400, description: 'Solicitud incorrecta' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  findTop10Provinces(
+    @Query('year', new DefaultValuePipe(new Date().getFullYear()), ParseIntPipe)
+    year: number,
+  ): Promise<Top10CountriesProvincesData[]> {
+    return this.dashboardService.findTop10ProvincesCustomers(year);
   }
 }

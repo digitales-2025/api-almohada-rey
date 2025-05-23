@@ -33,6 +33,9 @@ export {
   OccupationStatisticsPercentageData,
   MonthlyBookingTrendData,
   SummaryFinanceData,
+  CustomerOriginSummaryData,
+  MonthlyCustomerOriginData,
+  Top10CountriesProvincesData,
 } from './dashboard.interface';
 
 export { HttpResponse } from './https-response.interface';

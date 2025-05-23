@@ -1,14 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   AnnualAdministratorStatisticsData,
+  CustomerOriginSummaryData,
   ListRoom,
   MonthlyBookingTrendData,
+  MonthlyCustomerOriginData,
   MonthlyEarningsAndExpensesData,
   NextPendingPaymentsData,
   OccupationStatisticsPercentageData,
   RecentReservationsData,
   RoomOccupancyMapData,
   SummaryFinanceData,
+  Top10CountriesProvincesData,
 } from 'src/interfaces';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { handleException } from 'src/utils';
@@ -918,6 +921,286 @@ export class DashboardService {
     } catch (error) {
       this.logger.error('Error obteniendo resumen financiero');
       handleException(error, 'Error obteniendo resumen financiero');
+    }
+  }
+
+  /**
+   * Obtiene un resumen del origen de los clientes para un año específico.
+   * @param year Año para el que se desea obtener el resumen
+   * @returns Resumen del origen de los clientes
+   */
+  async findCustomerOriginSummary(
+    year: number,
+  ): Promise<CustomerOriginSummaryData> {
+    try {
+      // Definir el rango de fechas para el año seleccionado
+      const startDate = new Date(`${year}-01-01T00:00:00.000Z`);
+      const endDate = new Date(`${year}-12-31T23:59:59.999Z`);
+
+      // Obtener todos los clientes creados en el año seleccionado
+      const customers = await this.prisma.customer.findMany({
+        where: {
+          createdAt: {
+            gte: startDate,
+            lte: endDate,
+          },
+          isActive: true,
+        },
+        select: {
+          country: true,
+        },
+      });
+
+      // Inicializar contadores
+      const totalCustomers = customers.length;
+      let totalNationalCustomers = 0;
+      let totalInternationalCustomers = 0;
+
+      // Set para almacenar países únicos
+      const uniqueCountries = new Set<string>();
+
+      // Analizar cada cliente
+      for (const customer of customers) {
+        // Si el país está definido, agregarlo al conjunto de países únicos
+        if (customer.country) {
+          uniqueCountries.add(customer.country);
+
+          // Contar cliente como nacional o internacional según su país
+          if (customer.country === 'Perú') {
+            totalNationalCustomers++;
+          } else {
+            totalInternationalCustomers++;
+          }
+        } else {
+          // Si no tiene país definido, considerarlo como nacional por defecto
+          totalNationalCustomers++;
+        }
+      }
+
+      // Retornar el resumen
+      return {
+        totalCustomers,
+        totalNationalCustomers,
+        totalInternationalCustomers,
+        totalCountry: uniqueCountries.size, // Número total de países diferentes
+      };
+    } catch (error) {
+      this.logger.error('Error obteniendo resumen del origen de los clientes');
+      handleException(
+        error,
+        'Error obteniendo resumen del origen de los clientes',
+      );
+    }
+  }
+
+  /**
+   * Obtiene la distribución mensual de clientes nacionales e internacionales para un año específico.
+   * @param year Año para el que se desea obtener la distribución
+   * @returns Distribución mensual de clientes nacionales e internacionales
+   */
+  async findMonthlyCustomerOrigin(
+    year: number,
+  ): Promise<MonthlyCustomerOriginData[]> {
+    try {
+      // 1. Definir el rango de fechas para el año seleccionado
+      const startDate = new Date(`${year}-01-01T00:00:00.000Z`);
+      const endDate = new Date(`${year}-12-31T23:59:59.999Z`);
+
+      // 2. Inicializar array con los nombres de los meses
+      const monthNames = [
+        'Enero',
+        'Febrero',
+        'Marzo',
+        'Abril',
+        'Mayo',
+        'Junio',
+        'Julio',
+        'Agosto',
+        'Septiembre',
+        'Octubre',
+        'Noviembre',
+        'Diciembre',
+      ];
+
+      // 3. Crear un objeto para cada mes con contadores inicializados en 0
+      const monthlyData: MonthlyCustomerOriginData[] = monthNames.map(
+        (month) => ({
+          month,
+          nationalCustomers: 0,
+          internationalCustomers: 0,
+        }),
+      );
+
+      // 4. Obtener todos los clientes creados en el año seleccionado
+      const customers = await this.prisma.customer.findMany({
+        where: {
+          createdAt: {
+            gte: startDate,
+            lte: endDate,
+          },
+          isActive: true,
+        },
+        select: {
+          country: true,
+          createdAt: true,
+        },
+      });
+
+      // 5. Contar clientes por mes y origen (nacional vs internacional)
+      for (const customer of customers) {
+        // Obtener el mes (0-11) de la fecha de creación
+        const month = customer.createdAt.getMonth();
+
+        // Clasificar al cliente como nacional o internacional
+        if (!customer.country || customer.country === 'Perú') {
+          // Cliente nacional (Perú o sin país definido)
+          monthlyData[month].nationalCustomers++;
+        } else {
+          // Cliente internacional (cualquier país excepto Perú)
+          monthlyData[month].internationalCustomers++;
+        }
+      }
+
+      return monthlyData;
+    } catch (error) {
+      this.logger.error(
+        'Error obteniendo distribución mensual de origen de clientes',
+      );
+      handleException(
+        error,
+        'Error obteniendo distribución mensual de origen de clientes',
+      );
+    }
+  }
+
+  /**
+   * Obtiene los top 10 países con más clientes para un año específico.
+   * @param year Año para el que se desean obtener las estadísticas
+   * @returns Top 10 países con más clientes (excluyendo Perú)
+   */
+  async findTop10CountriesCustomers(
+    year: number,
+  ): Promise<Top10CountriesProvincesData[]> {
+    try {
+      // Definir el rango de fechas para el año seleccionado
+      const startDate = new Date(`${year}-01-01T00:00:00.000Z`);
+      const endDate = new Date(`${year}-12-31T23:59:59.999Z`);
+
+      // Obtener todos los clientes activos creados en el año seleccionado
+      const customers = await this.prisma.customer.findMany({
+        where: {
+          createdAt: {
+            gte: startDate,
+            lte: endDate,
+          },
+          isActive: true,
+          // Excluir clientes de Perú
+          NOT: {
+            country: 'Perú',
+          },
+          // Solo incluir clientes con país definido
+          country: {
+            not: null,
+          },
+        },
+        select: {
+          country: true,
+        },
+      });
+
+      // Contar clientes por país
+      const countryCounts: { [key: string]: number } = {};
+
+      for (const customer of customers) {
+        if (customer.country) {
+          if (countryCounts[customer.country]) {
+            countryCounts[customer.country]++;
+          } else {
+            countryCounts[customer.country] = 1;
+          }
+        }
+      }
+
+      // Convertir a array y ordenar por cantidad de clientes (descendente)
+      const sortedCountries = Object.entries(countryCounts)
+        .map(([countryProvince, totalCustomers]) => ({
+          countryProvince,
+          totalCustomers,
+        }))
+        .sort((a, b) => b.totalCustomers - a.totalCustomers)
+        .slice(0, 10); // Tomar solo los 10 primeros
+
+      return sortedCountries;
+    } catch (error) {
+      this.logger.error('Error obteniendo top 10 países con más clientes');
+      handleException(error, 'Error obteniendo top 10 países con más clientes');
+    }
+  }
+
+  /**
+   * Obtiene las top 10 provincias de Perú con más clientes para un año específico.
+   * @param year Año para el que se desean obtener las estadísticas
+   * @returns Top 10 provincias de Perú con más clientes
+   */
+  async findTop10ProvincesCustomers(
+    year: number,
+  ): Promise<Top10CountriesProvincesData[]> {
+    try {
+      // Definir el rango de fechas para el año seleccionado
+      const startDate = new Date(`${year}-01-01T00:00:00.000Z`);
+      const endDate = new Date(`${year}-12-31T23:59:59.999Z`);
+
+      // Obtener todos los clientes activos de Perú creados en el año seleccionado
+      const customers = await this.prisma.customer.findMany({
+        where: {
+          createdAt: {
+            gte: startDate,
+            lte: endDate,
+          },
+          isActive: true,
+          // Solo incluir clientes de Perú
+          country: 'Perú',
+          // Solo incluir clientes con provincia definida
+          province: {
+            not: null,
+          },
+        },
+        select: {
+          province: true,
+        },
+      });
+
+      // Contar clientes por provincia
+      const provinceCounts: { [key: string]: number } = {};
+
+      for (const customer of customers) {
+        if (customer.province) {
+          if (provinceCounts[customer.province]) {
+            provinceCounts[customer.province]++;
+          } else {
+            provinceCounts[customer.province] = 1;
+          }
+        }
+      }
+
+      // Convertir a array y ordenar por cantidad de clientes (descendente)
+      const sortedProvinces = Object.entries(provinceCounts)
+        .map(([countryProvince, totalCustomers]) => ({
+          countryProvince,
+          totalCustomers,
+        }))
+        .sort((a, b) => b.totalCustomers - a.totalCustomers)
+        .slice(0, 10); // Tomar solo los 10 primeros
+
+      return sortedProvinces;
+    } catch (error) {
+      this.logger.error(
+        'Error obteniendo top 10 provincias de Perú con más clientes',
+      );
+      handleException(
+        error,
+        'Error obteniendo top 10 provincias de Perú con más clientes',
+      );
     }
   }
 }
