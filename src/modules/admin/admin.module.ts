@@ -10,6 +10,7 @@ import { ReservationModule } from './reservation/reservation.module';
 import { PaymentsModule } from './payments/payments.module';
 import { WarehouseModule } from './warehouse/warehouse.module';
 import { MovementsModule } from './movements/movements.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { MovementsModule } from './movements/movements.module';
     PaymentsModule,
     WarehouseModule,
     MovementsModule,
+    DashboardModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],

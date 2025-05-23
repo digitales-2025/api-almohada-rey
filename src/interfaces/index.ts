@@ -23,4 +23,19 @@ export {
   SummaryMovementsData,
 } from './movement.interface';
 
+export {
+  AnnualAdministratorStatisticsData,
+  MonthlyEarningsAndExpensesData,
+  RoomOccupancyMapData,
+  ListRoom,
+  RecentReservationsData,
+  NextPendingPaymentsData,
+  OccupationStatisticsPercentageData,
+  MonthlyBookingTrendData,
+  SummaryFinanceData,
+  CustomerOriginSummaryData,
+  MonthlyCustomerOriginData,
+  Top10CountriesProvincesData,
+} from './dashboard.interface';
+
 export { HttpResponse } from './https-response.interface';
