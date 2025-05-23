@@ -8,6 +8,7 @@ import {
   OccupationStatisticsPercentageData,
   RecentReservationsData,
   RoomOccupancyMapData,
+  SummaryFinanceData,
 } from 'src/interfaces';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { handleException } from 'src/utils';
@@ -769,6 +770,154 @@ export class DashboardService {
         error,
         'Error obteniendo tendencia mensual de reservaciones',
       );
+    }
+  }
+
+  /**
+   * Obtiene un resumen financiero para un año específico.
+   * @param year Año para el que se desea obtener el resumen financiero
+   * @returns Resumen financiero del año especificado
+   */
+  async findSummaryFinance(year: number): Promise<SummaryFinanceData> {
+    try {
+      // Construir el prefijo del año para comparar con los campos de fecha en string
+      const yearPrefix = `${year}-`;
+
+      // 1. CÁLCULO DE INGRESOS TOTALES
+      // Obtener todos los pagos del año
+      const payments = await this.prisma.payment.findMany({
+        where: {
+          date: {
+            startsWith: yearPrefix, // Filtrar pagos por año usando el prefijo
+          },
+        },
+        select: {
+          amountPaid: true,
+          paymentDetail: {
+            where: {
+              paymentDate: {
+                startsWith: yearPrefix, // Filtrar detalles de pago por año
+              },
+            },
+            select: {
+              paymentDate: true,
+              subtotal: true,
+              description: true,
+              type: true,
+              productId: true,
+              serviceId: true,
+            },
+          },
+        },
+      });
+
+      // Resto de la lógica para calcular ingresos...
+      let totalIncome = 0;
+      let totalRoomReservations = 0;
+      let totalServices = 0;
+      let totalProducts = 0;
+      let totalLateCheckout = 0;
+
+      for (const payment of payments) {
+        totalIncome += payment.amountPaid;
+
+        for (const detail of payment.paymentDetail) {
+          const subtotal = detail.subtotal;
+
+          switch (detail.type) {
+            case 'ROOM_RESERVATION':
+              totalRoomReservations += subtotal;
+              break;
+            case 'LATE_CHECKOUT':
+              totalLateCheckout += subtotal;
+              break;
+            case 'EXTRA_SERVICE':
+              if (detail.serviceId) {
+                totalServices += subtotal;
+              } else if (detail.productId) {
+                totalProducts += subtotal;
+              }
+              break;
+          }
+        }
+      }
+
+      // 2. CÁLCULO DE GASTOS TOTALES
+      let totalExpenses = 0;
+      let totalExpensesFixed = 0;
+      let totalExpensesVariable = 0;
+      let totalExpensesOther = 0;
+      let totalExpensesProducts = 0;
+
+      // 2.1 Gastos del hotel (fijos, variables, otros)
+      const hotelExpenses = await this.prisma.hotelExpense.findMany({
+        where: {
+          date: {
+            startsWith: yearPrefix, // Filtrar gastos del hotel por año
+          },
+        },
+      });
+
+      for (const expense of hotelExpenses) {
+        const amount = expense.amount;
+        totalExpenses += amount;
+
+        switch (expense.category) {
+          case 'FIXED':
+            totalExpensesFixed += amount;
+            break;
+          case 'VARIABLE':
+            totalExpensesVariable += amount;
+            break;
+          case 'OTHER':
+            totalExpensesOther += amount;
+            break;
+        }
+      }
+
+      // 2.2 Gastos en productos (movimientos de entrada)
+      const inputMovements = await this.prisma.movements.findMany({
+        where: {
+          dateMovement: {
+            startsWith: yearPrefix, // Filtrar movimientos por año
+          },
+          type: 'INPUT',
+        },
+        include: {
+          movementsDetail: {
+            select: {
+              subtotal: true,
+            },
+          },
+        },
+      });
+
+      for (const movement of inputMovements) {
+        for (const detail of movement.movementsDetail) {
+          totalExpensesProducts += detail.subtotal;
+          totalExpenses += detail.subtotal;
+        }
+      }
+
+      // 3. CÁLCULO DE BENEFICIO
+      const totalProfit = totalIncome - totalExpenses;
+
+      return {
+        totalIncome: parseFloat(totalIncome.toFixed(2)),
+        totalExpenses: parseFloat(totalExpenses.toFixed(2)),
+        totalProfit: parseFloat(totalProfit.toFixed(2)),
+        totalRoomReservations: parseFloat(totalRoomReservations.toFixed(2)),
+        totalServices: parseFloat(totalServices.toFixed(2)),
+        totalProducts: parseFloat(totalProducts.toFixed(2)),
+        totalLateCheckout: parseFloat(totalLateCheckout.toFixed(2)),
+        totalExpensesFixed: parseFloat(totalExpensesFixed.toFixed(2)),
+        totalExpensesVariable: parseFloat(totalExpensesVariable.toFixed(2)),
+        totalExpensesOther: parseFloat(totalExpensesOther.toFixed(2)),
+        totalExpensesProducts: parseFloat(totalExpensesProducts.toFixed(2)),
+      };
+    } catch (error) {
+      this.logger.error('Error obteniendo resumen financiero');
+      handleException(error, 'Error obteniendo resumen financiero');
     }
   }
 }

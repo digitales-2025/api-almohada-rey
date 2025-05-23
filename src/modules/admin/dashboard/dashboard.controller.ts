@@ -23,6 +23,7 @@ import {
   OccupationStatisticsPercentageData,
   RecentReservationsData,
   RoomOccupancyMapData,
+  SummaryFinanceData,
 } from 'src/interfaces';
 import { Auth } from '../auth/decorators';
 
@@ -164,5 +165,29 @@ export class DashboardController {
     year: number,
   ): Promise<MonthlyBookingTrendData[]> {
     return this.dashboardService.findMontlyBookingTrend(year);
+  }
+
+  @Get('summary-finance')
+  @ApiOperation({
+    summary: 'Obtener resumen financiero',
+  })
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    type: Number,
+    description:
+      'Año para el que se desea obtener el resumen financiero (por defecto: año actual)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Resumen financiero obtenido correctamente',
+  })
+  @ApiResponse({ status: 400, description: 'Solicitud incorrecta' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  findSummaryFinance(
+    @Query('year', new DefaultValuePipe(new Date().getFullYear()), ParseIntPipe)
+    year: number,
+  ): Promise<SummaryFinanceData> {
+    return this.dashboardService.findSummaryFinance(year);
   }
 }
