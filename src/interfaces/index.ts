@@ -32,6 +32,7 @@ export {
   NextPendingPaymentsData,
   OccupationStatisticsPercentageData,
   MonthlyBookingTrendData,
+  SummaryFinanceData,
 } from './dashboard.interface';
 
 export { HttpResponse } from './https-response.interface';
