@@ -101,3 +101,10 @@ export interface Top10CountriesProvincesData {
   countryProvince: string;
   totalCustomers: number;
 }
+
+export interface TodayRecepcionistStatisticsData {
+  todayCheckIn: number;
+  todayCheckOut: number;
+  todayAvailableRooms: number;
+  todayPendingTask: number;
+}
