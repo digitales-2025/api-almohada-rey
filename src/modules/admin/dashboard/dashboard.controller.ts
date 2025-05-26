@@ -16,6 +16,7 @@ import {
   ApiBadRequestResponse,
 } from '@nestjs/swagger';
 import {
+  AmenitiesByPriorityData,
   AnnualAdministratorStatisticsData,
   CustomerOriginSummaryData,
   MonthlyBookingTrendData,
@@ -351,5 +352,21 @@ export class DashboardController {
   @ApiResponse({ status: 500, description: 'Error interno del servidor' })
   findTop5PriorityAmenities(): Promise<Top5PriorityPendingAmenitiesData[]> {
     return this.dashboardService.findTop5PriorityPendingAmenities();
+  }
+
+  @Get('priority-amenities-grouped')
+  @ApiOperation({
+    summary:
+      'Obtener habitaciones con amenidades pendientes agrupadas por nivel de prioridad',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Habitaciones con amenidades agrupadas por prioridad obtenidas correctamente',
+  })
+  @ApiResponse({ status: 400, description: 'Solicitud incorrecta' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  findAmenitiesByPriority(): Promise<AmenitiesByPriorityData> {
+    return this.dashboardService.findAmenitiesByPriority();
   }
 }

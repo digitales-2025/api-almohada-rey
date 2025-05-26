@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
+  AmenitiesByPriorityData,
   AnnualAdministratorStatisticsData,
   CustomerOriginSummaryData,
   ListRoom,
@@ -10,6 +11,7 @@ import {
   OccupationStatisticsPercentageData,
   PriorityLevel,
   RecentReservationsData,
+  RoomAmenityDetail,
   RoomOccupancyMapData,
   SummaryFinanceData,
   TodayRecepcionistStatisticsData,
@@ -1612,6 +1614,141 @@ export class DashboardService {
       handleException(
         error,
         'Error obteniendo top 5 habitaciones con amenidades pendientes',
+      );
+    }
+  }
+
+  /**
+   * Obtiene todas las habitaciones con amenidades pendientes agrupadas por nivel de prioridad.
+   * @returns Habitaciones con amenidades pendientes agrupadas por prioridad (alta, media, baja)
+   */
+  async findAmenitiesByPriority(): Promise<AmenitiesByPriorityData> {
+    try {
+      // 1. Obtener todas las habitaciones activas que tengan al menos una amenidad en false
+      const roomsWithPendingAmenities = await this.prisma.room.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            { trashBin: false },
+            { towel: false },
+            { toiletPaper: false },
+            { showerSoap: false },
+            { handSoap: false },
+            { lamp: false },
+          ],
+        },
+        include: {
+          RoomTypes: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      });
+
+      // 2. Inicializar estructuras para cada nivel de prioridad
+      const highPriorityRooms: RoomAmenityDetail[] = [];
+      const mediumPriorityRooms: RoomAmenityDetail[] = [];
+      const lowPriorityRooms: RoomAmenityDetail[] = [];
+
+      // 3. Procesar cada habitación y clasificarla según prioridad
+      for (const room of roomsWithPendingAmenities) {
+        // Contar cuántas amenidades faltan
+        let missingAmenitiesCount = 0;
+        const missingAmenities: string[] = [];
+
+        if (!room.trashBin) {
+          missingAmenitiesCount++;
+          missingAmenities.push('Tacho de basura');
+        }
+        if (!room.towel) {
+          missingAmenitiesCount++;
+          missingAmenities.push('Toalla');
+        }
+        if (!room.toiletPaper) {
+          missingAmenitiesCount++;
+          missingAmenities.push('Papel higiénico');
+        }
+        if (!room.showerSoap) {
+          missingAmenitiesCount++;
+          missingAmenities.push('Jabón de ducha');
+        }
+        if (!room.handSoap) {
+          missingAmenitiesCount++;
+          missingAmenities.push('Jabón de manos');
+        }
+        if (!room.lamp) {
+          missingAmenitiesCount++;
+          missingAmenities.push('Lámpara');
+        }
+
+        // Determinar nivel de prioridad
+        let priority: PriorityLevel;
+        let description: string;
+
+        // Determinar prioridad basada en criterios
+        if (missingAmenitiesCount >= 5 || !room.toiletPaper) {
+          priority = PriorityLevel.HIGH;
+        } else if (missingAmenitiesCount >= 3 || !room.showerSoap) {
+          priority = PriorityLevel.MEDIUM;
+        } else {
+          priority = PriorityLevel.LOW;
+        }
+
+        // Determinar la descripción
+        if (room.status === 'CLEANING' && missingAmenitiesCount === 6) {
+          description = 'Falta realizar limpieza en la habitación';
+        } else {
+          description = `Falta: ${missingAmenities.join(', ')}`;
+        }
+
+        // Crear objeto con detalles de la habitación
+        const roomDetail: RoomAmenityDetail = {
+          id: room.id,
+          roomNumber: room.number,
+          typeRoom: room.RoomTypes.name,
+          priority, // Incluimos el nivel de prioridad en cada habitación
+          description,
+        };
+
+        // Agregar a la lista correspondiente según prioridad
+        if (priority === PriorityLevel.HIGH) {
+          highPriorityRooms.push(roomDetail);
+        } else if (priority === PriorityLevel.MEDIUM) {
+          mediumPriorityRooms.push(roomDetail);
+        } else {
+          lowPriorityRooms.push(roomDetail);
+        }
+      }
+
+      // 4. Ordenar cada grupo por número de habitación
+      const sortByRoomNumber = (a: RoomAmenityDetail, b: RoomAmenityDetail) =>
+        a.roomNumber - b.roomNumber;
+
+      highPriorityRooms.sort(sortByRoomNumber);
+      mediumPriorityRooms.sort(sortByRoomNumber);
+      lowPriorityRooms.sort(sortByRoomNumber);
+
+      // 5. Construir y retornar resultado final
+      return {
+        highPriority: {
+          count: highPriorityRooms.length,
+          rooms: highPriorityRooms,
+        },
+        mediumPriority: {
+          count: mediumPriorityRooms.length,
+          rooms: mediumPriorityRooms,
+        },
+        lowPriority: {
+          count: lowPriorityRooms.length,
+          rooms: lowPriorityRooms,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error obteniendo amenidades agrupadas por prioridad');
+      handleException(
+        error,
+        'Error obteniendo amenidades agrupadas por prioridad',
       );
     }
   }
