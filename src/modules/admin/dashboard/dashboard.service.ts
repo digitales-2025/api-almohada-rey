@@ -8,10 +8,15 @@ import {
   MonthlyEarningsAndExpensesData,
   NextPendingPaymentsData,
   OccupationStatisticsPercentageData,
+  PriorityLevel,
   RecentReservationsData,
   RoomOccupancyMapData,
   SummaryFinanceData,
+  TodayRecepcionistStatisticsData,
   Top10CountriesProvincesData,
+  Top5PriorityPendingAmenitiesData,
+  Top5TodayCheckInData,
+  Top5TodayCheckOutData,
 } from 'src/interfaces';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { handleException } from 'src/utils';
@@ -1200,6 +1205,413 @@ export class DashboardService {
       handleException(
         error,
         'Error obteniendo top 10 provincias de Perú con más clientes',
+      );
+    }
+  }
+
+  /**
+   * Obtiene estadísticas diarias para recepcionistas.
+   * @returns Estadísticas del día actual para recepcionistas
+   */
+  async findTodayRecepcionistStatistics(): Promise<TodayRecepcionistStatisticsData> {
+    try {
+      // Obtener la fecha actual (inicio y fin del día)
+      const today = new Date();
+      const startOfDay = new Date(today.setHours(0, 0, 0, 0));
+      const endOfDay = new Date(today.setHours(23, 59, 59, 999));
+
+      // 1. Contar TODOS los check-ins programados para hoy (independiente del estado)
+      const todayCheckIn = await this.prisma.reservation.count({
+        where: {
+          checkInDate: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+          isActive: true,
+        },
+      });
+
+      // 2. Contar check-ins ya realizados hoy (estado CHECKED_IN o CHECKED_OUT)
+      const todayCheckInPerformed = await this.prisma.reservation.count({
+        where: {
+          checkInDate: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+          isActive: true,
+          status: {
+            in: ['CHECKED_IN', 'CHECKED_OUT'],
+          },
+        },
+      });
+
+      // 3. Contar TODOS los check-outs programados para hoy (independiente del estado)
+      const todayCheckOut = await this.prisma.reservation.count({
+        where: {
+          checkOutDate: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+          isActive: true,
+        },
+      });
+
+      // 4. Contar check-outs ya realizados hoy (estado CHECKED_OUT)
+      const todayCheckOutPerformed = await this.prisma.reservation.count({
+        where: {
+          checkOutDate: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+          isActive: true,
+          status: 'CHECKED_OUT',
+        },
+      });
+
+      // 5. Contar habitaciones disponibles
+      const todayAvailableRooms = await this.prisma.room.count({
+        where: {
+          isActive: true,
+          status: 'AVAILABLE',
+        },
+      });
+
+      // 6. Contar total de habitaciones
+      const totalRooms = await this.prisma.room.count({
+        where: {
+          isActive: true,
+        },
+      });
+
+      // 7. Contar amenidades pendientes (al menos una amenidad en false)
+      const roomsWithPendingAmenities = await this.prisma.room.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            { trashBin: false },
+            { towel: false },
+            { toiletPaper: false },
+            { showerSoap: false },
+            { handSoap: false },
+            { lamp: false },
+          ],
+        },
+        select: {
+          trashBin: true,
+          towel: true,
+          toiletPaper: true,
+          showerSoap: true,
+          handSoap: true,
+          lamp: true,
+        },
+      });
+
+      // Contar amenidades pendientes y urgentes
+      let todayPendingAmenities = 0;
+      let urgentPendingAmenities = 0;
+
+      for (const room of roomsWithPendingAmenities) {
+        // Contar cuántas amenidades faltan en esta habitación
+        let missingAmenities = 0;
+
+        if (!room.trashBin) {
+          todayPendingAmenities++;
+          missingAmenities++;
+        }
+        if (!room.towel) {
+          todayPendingAmenities++;
+          missingAmenities++;
+        }
+        if (!room.toiletPaper) {
+          todayPendingAmenities++;
+          missingAmenities++;
+        }
+        if (!room.showerSoap) {
+          todayPendingAmenities++;
+          missingAmenities++;
+        }
+        if (!room.handSoap) {
+          todayPendingAmenities++;
+          missingAmenities++;
+        }
+        if (!room.lamp) {
+          todayPendingAmenities++;
+          missingAmenities++;
+        }
+
+        // Si faltan 5 o 6 amenidades en una misma habitación, todas ellas son urgentes
+        if (missingAmenities >= 5) {
+          // Todas las amenidades que faltan en esta habitación son urgentes
+          urgentPendingAmenities += missingAmenities;
+        }
+      }
+
+      return {
+        todayCheckIn,
+        todayCheckInPerformed,
+        todayCheckOut,
+        todayCheckOutPerformed,
+        todayAvailableRooms,
+        totalRooms,
+        todayPendingAmenities,
+        urgentPendingAmenities,
+      };
+    } catch (error) {
+      this.logger.error(
+        'Error obteniendo estadísticas diarias de recepcionista',
+      );
+      handleException(
+        error,
+        'Error obteniendo estadísticas diarias de recepcionista',
+      );
+    }
+  }
+
+  /**
+   * Obtiene los 5 próximos check-ins programados para el día de hoy.
+   * @returns Top 5 check-ins programados para hoy
+   */
+  async findTop5TodayCheckIn(): Promise<Top5TodayCheckInData[]> {
+    try {
+      // Obtener la fecha actual (inicio y fin del día)
+      const today = new Date();
+      const startOfDay = new Date(today.setHours(0, 0, 0, 0));
+      const endOfDay = new Date(today.setHours(23, 59, 59, 999));
+
+      // Buscar las 5 próximas reservaciones con check-in para hoy
+      const todayCheckIns = await this.prisma.reservation.findMany({
+        where: {
+          checkInDate: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+          isActive: true,
+          // Mostrar primero las pendientes y confirmadas
+          status: {
+            in: ['PENDING', 'CONFIRMED'],
+          },
+        },
+        orderBy: [
+          // Primero ordenar por estado (PENDING/CONFIRMED primero)
+          { status: 'asc' },
+          // Luego ordenar por hora de check-in
+          { checkInDate: 'asc' },
+        ],
+        take: 5,
+        include: {
+          customer: {
+            select: {
+              name: true,
+            },
+          },
+          room: {
+            select: {
+              number: true,
+            },
+          },
+        },
+      });
+
+      // Formatear los resultados según la interfaz requerida
+      return todayCheckIns.map((reservation) => ({
+        id: reservation.id,
+        customerName: reservation.customer?.name || 'Cliente sin nombre',
+        roomNumber: reservation.room.number,
+        status: reservation.status,
+        checkInDate: reservation.checkInDate,
+      }));
+    } catch (error) {
+      this.logger.error('Error obteniendo top 5 check-ins de hoy');
+      handleException(error, 'Error obteniendo top 5 check-ins de hoy');
+    }
+  }
+
+  /**
+   * Obtiene los 5 próximos check-outs programados para el día de hoy.
+   * @returns Top 5 check-outs programados para hoy
+   */
+  async findTop5TodayCheckOut(): Promise<Top5TodayCheckOutData[]> {
+    try {
+      // Obtener la fecha actual (inicio y fin del día)
+      const today = new Date();
+      const startOfDay = new Date(today.setHours(0, 0, 0, 0));
+      const endOfDay = new Date(today.setHours(23, 59, 59, 999));
+
+      // Buscar las 5 próximas reservaciones con check-out para hoy
+      const todayCheckOuts = await this.prisma.reservation.findMany({
+        where: {
+          checkOutDate: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+          isActive: true,
+          // Mostrar primero las que ya están en CHECKED_IN
+          status: 'CHECKED_IN',
+        },
+        orderBy: {
+          // Ordenar por hora de check-out
+          checkOutDate: 'asc',
+        },
+        take: 5,
+        include: {
+          customer: {
+            select: {
+              name: true,
+            },
+          },
+          room: {
+            select: {
+              number: true,
+            },
+          },
+        },
+      });
+
+      // Formatear los resultados según la interfaz requerida
+      return todayCheckOuts.map((reservation) => ({
+        id: reservation.id,
+        customerName: reservation.customer?.name || 'Cliente sin nombre',
+        roomNumber: reservation.room.number,
+        status: reservation.status,
+        checkOutDate: reservation.checkOutDate,
+      }));
+    } catch (error) {
+      this.logger.error('Error obteniendo top 5 check-outs de hoy');
+      handleException(error, 'Error obteniendo top 5 check-outs de hoy');
+    }
+  }
+
+  /**
+   * Obtiene las 5 habitaciones con mayor prioridad de reposición de amenidades.
+   * @returns Top 5 habitaciones con amenidades pendientes según prioridad
+   */
+  async findTop5PriorityPendingAmenities(): Promise<
+    Top5PriorityPendingAmenitiesData[]
+  > {
+    try {
+      // 1. Obtener todas las habitaciones activas que tengan al menos una amenidad en false
+      const roomsWithPendingAmenities = await this.prisma.room.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            { trashBin: false },
+            { towel: false },
+            { toiletPaper: false },
+            { showerSoap: false },
+            { handSoap: false },
+            { lamp: false },
+          ],
+        },
+        include: {
+          RoomTypes: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      });
+
+      // 2. Calcular la prioridad de cada habitación basada en amenidades pendientes
+      const prioritizedRooms = roomsWithPendingAmenities.map((room) => {
+        // Contar cuántas amenidades faltan
+        let missingAmenitiesCount = 0;
+        const missingAmenities: string[] = [];
+
+        if (!room.trashBin) {
+          missingAmenitiesCount++;
+          missingAmenities.push('Tacho de basura');
+        }
+        if (!room.towel) {
+          missingAmenitiesCount++;
+          missingAmenities.push('Toalla');
+        }
+        if (!room.toiletPaper) {
+          missingAmenitiesCount++;
+          missingAmenities.push('Papel higiénico');
+        }
+        if (!room.showerSoap) {
+          missingAmenitiesCount++;
+          missingAmenities.push('Jabón de ducha');
+        }
+        if (!room.handSoap) {
+          missingAmenitiesCount++;
+          missingAmenities.push('Jabón de manos');
+        }
+        if (!room.lamp) {
+          missingAmenitiesCount++;
+          missingAmenities.push('Lámpara');
+        }
+
+        // Determinar nivel de prioridad:
+        // - HIGH: 5-6 amenidades pendientes o falta papel higiénico
+        // - MEDIUM: 3-4 amenidades pendientes o falta jabón de ducha
+        // - LOW: 1-2 amenidades pendientes
+        let priority: PriorityLevel;
+
+        if (missingAmenitiesCount >= 5 || !room.toiletPaper) {
+          priority = PriorityLevel.HIGH;
+        } else if (missingAmenitiesCount >= 3 || !room.showerSoap) {
+          priority = PriorityLevel.MEDIUM;
+        } else {
+          priority = PriorityLevel.LOW;
+        }
+
+        // Determinar la descripción
+        let description: string;
+
+        // Si la habitación está en estado CLEANING y faltan todas las amenidades,
+        // mostrar "Falta limpieza"
+        if (room.status === 'CLEANING' && missingAmenitiesCount === 6) {
+          description = 'Falta realizar limpieza en la habitación';
+        } else {
+          description = `Falta: ${missingAmenities.join(', ')}`;
+        }
+
+        return {
+          id: room.id,
+          roomNumber: room.number,
+          typeRoom: room.RoomTypes.name,
+          priority,
+          description,
+          // Campo oculto para ordenar
+          _priorityScore:
+            missingAmenitiesCount +
+            (priority === PriorityLevel.HIGH
+              ? 10
+              : priority === PriorityLevel.MEDIUM
+                ? 5
+                : 0),
+        };
+      });
+
+      // 3. Ordenar por prioridad y número de amenidades pendientes
+      const sortedRooms = prioritizedRooms
+        .sort((a, b) => {
+          // Primero ordenar por el puntaje calculado (prioridad + cantidad)
+          if (b._priorityScore !== a._priorityScore) {
+            return b._priorityScore - a._priorityScore;
+          }
+          // Si tienen la misma prioridad, ordenar por número de habitación
+          return a.roomNumber - b.roomNumber;
+        })
+        .slice(0, 5) // Tomar solo los 5 primeros
+        .map(({ id, roomNumber, typeRoom, priority, description }) => ({
+          // Eliminar el campo _priorityScore que usamos solo para ordenar
+          id,
+          roomNumber,
+          typeRoom,
+          priority,
+          description,
+        }));
+
+      return sortedRooms;
+    } catch (error) {
+      this.logger.error(
+        'Error obteniendo top 5 habitaciones con amenidades pendientes',
+      );
+      handleException(
+        error,
+        'Error obteniendo top 5 habitaciones con amenidades pendientes',
       );
     }
   }
