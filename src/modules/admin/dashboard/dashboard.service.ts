@@ -3,6 +3,7 @@ import {
   AmenitiesByPriorityData,
   AnnualAdministratorStatisticsData,
   CustomerOriginSummaryData,
+  FullReservationsData,
   ListRoom,
   MonthlyBookingTrendData,
   MonthlyCustomerOriginData,
@@ -14,14 +15,17 @@ import {
   RoomAmenityDetail,
   RoomOccupancyMapData,
   SummaryFinanceData,
+  TodayAvailableRoomsData,
   TodayRecepcionistStatisticsData,
   Top10CountriesProvincesData,
   Top5PriorityPendingAmenitiesData,
   Top5TodayCheckInData,
   Top5TodayCheckOutData,
+  WeekReservationsData,
 } from 'src/interfaces';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { handleException } from 'src/utils';
+import { calculateStayNights } from 'src/utils/dates/peru-datetime';
 
 @Injectable()
 export class DashboardService {
@@ -1750,6 +1754,286 @@ export class DashboardService {
         error,
         'Error obteniendo amenidades agrupadas por prioridad',
       );
+    }
+  }
+
+  /**
+   * Obtiene las habitaciones que están realmente disponibles hoy.
+   * Verifica que la habitación esté en estado AVAILABLE y que no tenga reservas
+   * activas o programadas que se superpongan con la fecha actual.
+   * @returns Lista de habitaciones realmente disponibles
+   */
+  async findTodayAvailableRooms(): Promise<TodayAvailableRoomsData[]> {
+    try {
+      // 1. Obtener la fecha actual
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Inicio del día actual
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1); // Inicio del día siguiente
+
+      // 2. Primero, obtener todas las habitaciones con estado AVAILABLE
+      const availableRooms = await this.prisma.room.findMany({
+        where: {
+          isActive: true,
+          status: 'AVAILABLE',
+        },
+        include: {
+          RoomTypes: {
+            select: {
+              name: true,
+              price: true,
+            },
+          },
+        },
+      });
+
+      // 3. Obtener TODAS las reservas activas que afectan el día de hoy
+      const todayReservations = await this.prisma.reservation.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            // Caso 1: Check-in antes o igual a hoy Y check-out después o igual a hoy
+            {
+              checkInDate: { lte: today },
+              checkOutDate: { gte: today },
+            },
+            // Caso 2: Check-in hoy
+            {
+              checkInDate: {
+                gte: today,
+                lt: tomorrow,
+              },
+            },
+            // Caso 3: Reserva programada que incluye hoy (estado PENDING o CONFIRMED)
+            {
+              status: {
+                in: ['PENDING', 'CONFIRMED'],
+              },
+              checkInDate: { lte: today },
+              checkOutDate: { gte: today },
+            },
+          ],
+        },
+        select: {
+          roomId: true,
+        },
+      });
+
+      // 4. Crear un conjunto de IDs de habitaciones reservadas
+      const reservedRoomIds = new Set(
+        todayReservations.map((res) => res.roomId),
+      );
+
+      // 5. Filtrar para incluir solo habitaciones que NO están en el conjunto de reservadas
+      const trulyAvailableRooms = availableRooms
+        .filter((room) => !reservedRoomIds.has(room.id))
+        .map((room) => ({
+          id: room.id,
+          number: room.number,
+          status: room.status,
+          price: room.RoomTypes.price,
+          typeRoom: room.RoomTypes.name,
+        }));
+
+      return trulyAvailableRooms;
+    } catch (error) {
+      this.logger.error('Error obteniendo habitaciones disponibles para hoy');
+      handleException(
+        error,
+        'Error obteniendo habitaciones disponibles para hoy',
+      );
+    }
+  }
+
+  /**
+   * Obtiene información de reservaciones para la semana actual.
+   * @returns Datos de reservaciones para hoy, mañana, semana y estados
+   */
+  async findWeekReservations(): Promise<WeekReservationsData> {
+    try {
+      // Obtener fechas relevantes
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const endOfWeek = new Date(today);
+      endOfWeek.setDate(endOfWeek.getDate() + 7);
+
+      // 1. Contar reservas con check-in hoy
+      const todayReservationsCount = await this.prisma.reservation.count({
+        where: {
+          checkInDate: {
+            gte: today,
+            lt: tomorrow,
+          },
+          isActive: true,
+        },
+      });
+
+      // 2. Contar reservas con check-in mañana
+      const tomorrowReservationsCount = await this.prisma.reservation.count({
+        where: {
+          checkInDate: {
+            gte: tomorrow,
+            lt: new Date(tomorrow.getTime() + 24 * 60 * 60 * 1000),
+          },
+          isActive: true,
+        },
+      });
+
+      // 3. Contar reservas con check-in esta semana
+      const weekReservationsCount = await this.prisma.reservation.count({
+        where: {
+          checkInDate: {
+            gte: today,
+            lt: endOfWeek,
+          },
+          isActive: true,
+        },
+      });
+
+      // 4. Contar reservas pendientes
+      const pendingReservationsCount = await this.prisma.reservation.count({
+        where: {
+          status: 'PENDING',
+          isActive: true,
+        },
+      });
+
+      // 5. Contar reservas confirmadas
+      const confirmedReservationsCount = await this.prisma.reservation.count({
+        where: {
+          status: 'CONFIRMED',
+          isActive: true,
+        },
+      });
+
+      // 6. Obtener todas las reservas activas con sus detalles
+      const allReservations = await this.prisma.reservation.findMany({
+        where: {
+          isActive: true,
+          status: {
+            in: ['PENDING', 'CONFIRMED', 'CHECKED_IN'],
+          },
+        },
+        orderBy: [{ checkInDate: 'asc' }],
+        include: {
+          customer: {
+            select: {
+              name: true,
+            },
+          },
+          room: {
+            select: {
+              number: true,
+              RoomTypes: {
+                select: {
+                  name: true,
+                  price: true, // Incluir el precio para calcular subtotal en PENDING
+                },
+              },
+            },
+          },
+          payment: {
+            select: {
+              amount: true,
+            },
+          },
+        },
+      });
+
+      // 7. Formatear las reservas según la interfaz requerida
+      const formattedReservations: FullReservationsData[] = allReservations.map(
+        (reservation) => {
+          // Calcular el número de noches
+          const nights = calculateStayNights(
+            reservation.checkInDate.toISOString(),
+            reservation.checkOutDate.toISOString(),
+            reservation.appliedLateCheckOut,
+          );
+
+          // Calcular subtotal basado en pagos o precio de la habitación
+          let subtotal = 0;
+          if (reservation.payment && reservation.payment.length > 0) {
+            // Si hay pagos registrados, usar ese monto
+            subtotal = reservation.payment[0].amount;
+          } else {
+            // Si no hay pagos (como en PENDING), calcular basado en el precio de la habitación
+            const roomPrice = reservation.room.RoomTypes.price;
+            subtotal = roomPrice * nights;
+          }
+
+          // Calcular el número total de huéspedes (cliente principal + acompañantes)
+          let numberGuests = 1; // Siempre contar el cliente principal
+
+          // Contar acompañantes solo si existen
+          if (reservation.guests) {
+            try {
+              // Intentar diferentes formatos posibles de guests
+              if (typeof reservation.guests === 'string') {
+                // Si es un string JSON
+                const guestsString = reservation.guests as string;
+
+                // Intenta parsear el string
+                try {
+                  const parsed = JSON.parse(guestsString);
+                  if (Array.isArray(parsed)) {
+                    numberGuests += parsed.length;
+                  }
+                } catch {
+                  // Si falla el parseo directo, puede tener escape de caracteres
+                  try {
+                    const cleanString = guestsString.replace(/\\"/g, '"');
+                    const parsed = JSON.parse(cleanString);
+                    if (Array.isArray(parsed)) {
+                      numberGuests += parsed.length;
+                    }
+                  } catch {
+                    // Si aún falla, contar las ocurrencias de "name"
+                    const matches = guestsString.match(/name/g);
+                    if (matches) {
+                      numberGuests += matches.length;
+                    }
+                  }
+                }
+              } else if (Array.isArray(reservation.guests)) {
+                // Si ya es un array
+                numberGuests += reservation.guests.length;
+              }
+            } catch (e) {
+              // En caso de error de parseo, mantener solo el cliente principal
+              this.logger.warn('Error al parsear guests en reservación:', e);
+            }
+          }
+
+          return {
+            id: reservation.id,
+            customerName: reservation.customer?.name || 'Cliente sin nombre',
+            roomNumber: reservation.room.number,
+            typeRoom: reservation.room.RoomTypes.name,
+            status: reservation.status,
+            checkInDate: reservation.checkInDate,
+            checkOutDate: reservation.checkOutDate,
+            subtotal,
+            nights,
+            numberGuests,
+          };
+        },
+      );
+
+      return {
+        todayReservations: todayReservationsCount,
+        tomorrowReservations: tomorrowReservationsCount,
+        weekReservations: weekReservationsCount,
+        pendingReservations: pendingReservationsCount,
+        confirmedReservations: confirmedReservationsCount,
+        reservations: formattedReservations,
+      };
+    } catch (error) {
+      this.logger.error('Error obteniendo reservaciones de la semana');
+      handleException(error, 'Error obteniendo reservaciones de la semana');
     }
   }
 }

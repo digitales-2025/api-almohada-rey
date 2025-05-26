@@ -44,6 +44,9 @@ export {
   AmenitiesByPriorityData,
   PriorityAmenitiesGroup,
   RoomAmenityDetail,
+  TodayAvailableRoomsData,
+  WeekReservationsData,
+  FullReservationsData,
 } from './dashboard.interface';
 
 export { HttpResponse } from './https-response.interface';

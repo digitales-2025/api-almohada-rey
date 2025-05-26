@@ -27,11 +27,13 @@ import {
   RecentReservationsData,
   RoomOccupancyMapData,
   SummaryFinanceData,
+  TodayAvailableRoomsData,
   TodayRecepcionistStatisticsData,
   Top10CountriesProvincesData,
   Top5PriorityPendingAmenitiesData,
   Top5TodayCheckInData,
   Top5TodayCheckOutData,
+  WeekReservationsData,
 } from 'src/interfaces';
 import { Auth } from '../auth/decorators';
 
@@ -368,5 +370,33 @@ export class DashboardController {
   @ApiResponse({ status: 500, description: 'Error interno del servidor' })
   findAmenitiesByPriority(): Promise<AmenitiesByPriorityData> {
     return this.dashboardService.findAmenitiesByPriority();
+  }
+
+  @Get('today-available-rooms')
+  @ApiOperation({
+    summary: 'Obtener habitaciones disponibles para hoy sin reservas',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Habitaciones disponibles obtenidas correctamente',
+  })
+  @ApiResponse({ status: 400, description: 'Solicitud incorrecta' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  findTodayAvailableRooms(): Promise<TodayAvailableRoomsData[]> {
+    return this.dashboardService.findTodayAvailableRooms();
+  }
+
+  @Get('week-reservations')
+  @ApiOperation({
+    summary: 'Obtener información sobre reservaciones para la semana actual',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Información de reservaciones obtenida correctamente',
+  })
+  @ApiResponse({ status: 400, description: 'Solicitud incorrecta' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  findWeekReservations(): Promise<WeekReservationsData> {
+    return this.dashboardService.findWeekReservations();
   }
 }
