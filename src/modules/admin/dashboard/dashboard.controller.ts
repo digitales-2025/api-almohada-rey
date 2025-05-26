@@ -16,6 +16,7 @@ import {
   ApiBadRequestResponse,
 } from '@nestjs/swagger';
 import {
+  AmenitiesByPriorityData,
   AnnualAdministratorStatisticsData,
   CustomerOriginSummaryData,
   MonthlyBookingTrendData,
@@ -26,7 +27,13 @@ import {
   RecentReservationsData,
   RoomOccupancyMapData,
   SummaryFinanceData,
+  TodayAvailableRoomsData,
+  TodayRecepcionistStatisticsData,
   Top10CountriesProvincesData,
+  Top5PriorityPendingAmenitiesData,
+  Top5TodayCheckInData,
+  Top5TodayCheckOutData,
+  WeekReservationsData,
 } from 'src/interfaces';
 import { Auth } from '../auth/decorators';
 
@@ -289,5 +296,107 @@ export class DashboardController {
     year: number,
   ): Promise<Top10CountriesProvincesData[]> {
     return this.dashboardService.findTop10ProvincesCustomers(year);
+  }
+
+  @Get('today-receptionist-statistics')
+  @ApiOperation({
+    summary: 'Obtener estadísticas diarias para recepcionistas',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Estadísticas diarias obtenidas correctamente',
+  })
+  @ApiResponse({ status: 400, description: 'Solicitud incorrecta' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  findTodayRecepcionistStatistics(): Promise<TodayRecepcionistStatisticsData> {
+    return this.dashboardService.findTodayRecepcionistStatistics();
+  }
+
+  @Get('top-today-check-ins')
+  @ApiOperation({
+    summary: 'Obtener los 5 próximos check-ins programados para hoy',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Top 5 check-ins obtenidos correctamente',
+  })
+  @ApiResponse({ status: 400, description: 'Solicitud incorrecta' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  findTop5TodayCheckIns(): Promise<Top5TodayCheckInData[]> {
+    return this.dashboardService.findTop5TodayCheckIn();
+  }
+
+  @Get('top-today-check-outs')
+  @ApiOperation({
+    summary: 'Obtener los 5 próximos check-outs programados para hoy',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Top 5 check-outs obtenidos correctamente',
+  })
+  @ApiResponse({ status: 400, description: 'Solicitud incorrecta' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  findTop5TodayCheckOuts(): Promise<Top5TodayCheckOutData[]> {
+    return this.dashboardService.findTop5TodayCheckOut();
+  }
+
+  @Get('top-priority-amenities')
+  @ApiOperation({
+    summary:
+      'Obtener las 5 habitaciones con mayor prioridad de reposición de amenidades',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Top 5 habitaciones con amenidades prioritarias obtenidas correctamente',
+  })
+  @ApiResponse({ status: 400, description: 'Solicitud incorrecta' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  findTop5PriorityAmenities(): Promise<Top5PriorityPendingAmenitiesData[]> {
+    return this.dashboardService.findTop5PriorityPendingAmenities();
+  }
+
+  @Get('priority-amenities-grouped')
+  @ApiOperation({
+    summary:
+      'Obtener habitaciones con amenidades pendientes agrupadas por nivel de prioridad',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Habitaciones con amenidades agrupadas por prioridad obtenidas correctamente',
+  })
+  @ApiResponse({ status: 400, description: 'Solicitud incorrecta' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  findAmenitiesByPriority(): Promise<AmenitiesByPriorityData> {
+    return this.dashboardService.findAmenitiesByPriority();
+  }
+
+  @Get('today-available-rooms')
+  @ApiOperation({
+    summary: 'Obtener habitaciones disponibles para hoy sin reservas',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Habitaciones disponibles obtenidas correctamente',
+  })
+  @ApiResponse({ status: 400, description: 'Solicitud incorrecta' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  findTodayAvailableRooms(): Promise<TodayAvailableRoomsData[]> {
+    return this.dashboardService.findTodayAvailableRooms();
+  }
+
+  @Get('week-reservations')
+  @ApiOperation({
+    summary: 'Obtener información sobre reservaciones para la semana actual',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Información de reservaciones obtenida correctamente',
+  })
+  @ApiResponse({ status: 400, description: 'Solicitud incorrecta' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  findWeekReservations(): Promise<WeekReservationsData> {
+    return this.dashboardService.findWeekReservations();
   }
 }

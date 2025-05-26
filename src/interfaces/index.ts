@@ -36,6 +36,17 @@ export {
   CustomerOriginSummaryData,
   MonthlyCustomerOriginData,
   Top10CountriesProvincesData,
+  TodayRecepcionistStatisticsData,
+  Top5TodayCheckInData,
+  Top5TodayCheckOutData,
+  PriorityLevel,
+  Top5PriorityPendingAmenitiesData,
+  AmenitiesByPriorityData,
+  PriorityAmenitiesGroup,
+  RoomAmenityDetail,
+  TodayAvailableRoomsData,
+  WeekReservationsData,
+  FullReservationsData,
 } from './dashboard.interface';
 
 export { HttpResponse } from './https-response.interface';
