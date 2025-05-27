@@ -73,7 +73,7 @@ model Customer {
   email          String?               //@unique
   maritalStatus  CustomerMaritalStatus? //Admin is required, landing is not
   companyName    String?
-  ruc            String?               @unique
+  ruc            String?
   companyAddress String?
   isActive       Boolean               @default(true)
   createdAt      DateTime              @default(now()) @db.Timestamptz(6)

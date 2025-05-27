@@ -22,6 +22,7 @@ import { StatusRoomDto } from '../dto/status.dto';
 import { AuditActionType } from '@prisma/client';
 import { AuditService } from '../../audit/audit.service';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
+import { UpdateAmenitiesRoomDto } from '../dto/update-amenities-room.dto';
 
 @Injectable()
 export class RoomService {
@@ -459,6 +460,94 @@ export class RoomService {
         data: updatedRoom,
       };
     } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Actualiza las amenities de una habitación
+   * @param id Id de la habitación a actualizar
+   * @param updateAmenitiesRoomDto Amenities a actualizar
+   * @param user Usuario que realiza la actualización
+   * @returns Datos de la habitación actualizada
+   */
+  async updateAmenities(
+    id: string,
+    updateAmenitiesRoomDto: UpdateAmenitiesRoomDto,
+    user: UserData,
+  ): Promise<BaseApiResponse<Room>> {
+    try {
+      const currentRoom = await this.findById(id);
+
+      // Verificar si hay cambios en las amenities
+      if (!validateChanges(updateAmenitiesRoomDto, currentRoom)) {
+        return {
+          success: true,
+          message:
+            'No se detectaron cambios en las amenidades de la habitación',
+          data: currentRoom,
+        };
+      }
+
+      // Actualizar las amenities
+      const updatedAmenities = {
+        trashBin: updateAmenitiesRoomDto.trashBin ?? currentRoom.trashBin,
+        towel: updateAmenitiesRoomDto.towel ?? currentRoom.towel,
+        toiletPaper:
+          updateAmenitiesRoomDto.toiletPaper ?? currentRoom.toiletPaper,
+        showerSoap: updateAmenitiesRoomDto.showerSoap ?? currentRoom.showerSoap,
+        handSoap: updateAmenitiesRoomDto.handSoap ?? currentRoom.handSoap,
+        lamp: updateAmenitiesRoomDto.lamp ?? currentRoom.lamp,
+      };
+
+      // Determinar el nuevo estado basado en las amenities
+      let newStatus = currentRoom.status;
+      const allAmenitiesTrue = Object.values(updatedAmenities).every(
+        (value) => value === true,
+      );
+      const hasAnyAmenityFalse = Object.values(updatedAmenities).some(
+        (value) => value === false,
+      );
+
+      // Solo cambiar el estado si no está en OCCUPIED
+      if (currentRoom.status !== 'OCCUPIED') {
+        if (allAmenitiesTrue) {
+          newStatus = 'AVAILABLE';
+        } else if (hasAnyAmenityFalse && currentRoom.status !== 'INCOMPLETE') {
+          newStatus = 'INCOMPLETE';
+        }
+      }
+
+      // Preparar los datos para actualizar
+      const updateData = {
+        ...updatedAmenities,
+        ...(newStatus !== currentRoom.status && { status: newStatus }),
+      };
+
+      // Actualizar en la base de datos
+      const updatedRoom = await this.roomRepository.update(id, updateData);
+
+      // Registrar auditoría
+      await this.auditService.create({
+        entityId: id,
+        entityType: 'room',
+        action: AuditActionType.UPDATE,
+        performedById: user.id,
+        createdAt: new Date(),
+      });
+
+      const statusMessage =
+        newStatus !== currentRoom.status
+          ? ` y estado actualizado a ${newStatus}`
+          : '';
+
+      return {
+        success: true,
+        message: `Amenidades de la habitación actualizadas exitosamente${statusMessage}`,
+        data: updatedRoom,
+      };
+    } catch (error) {
+      this.errorHandler.handleError(error, 'updating');
       throw error;
     }
   }
