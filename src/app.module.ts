@@ -20,6 +20,7 @@ import { ReservationModule as LandingReservationModule } from './modules/landing
 import { ExpenseModule } from './modules/admin/expense/expense.module';
 import { WarehouseModule } from './modules/admin/warehouse/warehouse.module';
 import { ReportsModule } from './modules/admin/reports/reports.module';
+import { PaymentModule } from './modules/landing/payment/payment.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { ReportsModule } from './modules/admin/reports/reports.module';
     ExpenseModule,
     WarehouseModule,
     ReportsModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [AppService],
