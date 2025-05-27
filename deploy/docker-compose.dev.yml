@@ -1,6 +1,6 @@
 services:
   almohada-backend-develop:
-    image: docker.io/digitalesacide/almohada-backend-develop:{$ALMOHADA_BACKEND_VERSION:-latest}
+    image: docker.io/digitalesacide/almohada-backend-develop:${ALMOHADA_BACKEND_VERSION:-latest}
     container_name: almohada-backend-develop
     restart: unless-stopped
     depends_on:
@@ -41,7 +41,7 @@ services:
       - almohada-network-develop
 
   almohada-frontend-develop:
-    image: docker.io/digitalesacide/almohada-frontend-develop:{$ALMOHADA_FRONTEND_VERSION:-latest}
+    image: docker.io/digitalesacide/almohada-frontend-develop:${ALMOHADA_FRONTEND_VERSION:-latest}
     container_name: almohada-frontend-develop
     restart: unless-stopped
     depends_on:
@@ -63,7 +63,7 @@ services:
       - "traefik.http.services.almohada-frontend-develop.loadbalancer.server.port=3000"
 
   almohada-landing-develop:
-    image: docker.io/digitalesacide/almohada-landing-develop:0
+    image: docker.io/digitalesacide/almohada-landing-develop:${ALMOHADA_LANDING_VERSION:-latest}
     container_name: almohada-landing-develop
     restart: unless-stopped
     environment:
