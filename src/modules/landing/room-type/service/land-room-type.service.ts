@@ -5,7 +5,9 @@ import {
   BaseRoomTypeMainImg,
 } from '../entities/land-room-type.entity';
 import { BaseQueryDto } from '../../dto/base.query.dto';
-import { defaultLocale } from '../../i18n/translations';
+import { defaultLocale, SupportedLocales } from '../../i18n/translations';
+import { DetailedRoomWithImages } from 'src/modules/admin/room/entities/room.entity';
+import { RoomService } from 'src/modules/admin/room/services/room.service';
 
 @Injectable()
 export class LandRoomTypeService {
@@ -13,6 +15,7 @@ export class LandRoomTypeService {
 
   constructor(
     private readonly landRoomTypeRepository: LandRoomTypeRepository,
+    private readonly roomService: RoomService,
   ) {}
 
   /**
@@ -44,6 +47,7 @@ export class LandRoomTypeService {
           locale === defaultLocale
             ? roomType.bed
             : (roomType.bedEn ?? roomType.bed),
+        Room: roomType.Room,
       }));
     } catch (error) {
       this.logger.error(
@@ -73,6 +77,22 @@ export class LandRoomTypeService {
         `Error obteniendo tipo de habitación por ID para landing: ${error.message}`,
       );
       throw error;
+    }
+  }
+
+  async findRoomById(
+    id: string,
+    locale: SupportedLocales,
+  ): Promise<DetailedRoomWithImages> {
+    try {
+      const roomDetail = await this.roomService.findByIdDetailed(id);
+      return roomDetail;
+    } catch {
+      throw new Error(
+        locale === defaultLocale
+          ? 'Habitación no encontrada'
+          : 'Room not found',
+      );
     }
   }
 }

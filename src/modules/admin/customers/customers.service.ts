@@ -130,34 +130,6 @@ export class CustomersService {
   // }
 
   /**
-   * Buscar un cliente por su RUC
-   * @param ruc RUC del cliente
-   * @param id Id del cliente
-   */
-  async findByRuc(ruc: string, id?: string) {
-    await this.validateLengthRuc(ruc);
-    const customerDB = await this.prisma.customer.findUnique({
-      where: { ruc },
-      select: {
-        id: true,
-        ruc: true,
-        isActive: true,
-      },
-    });
-
-    if (!!customerDB && customerDB.id !== id) {
-      if (!customerDB.isActive) {
-        throw new BadRequestException(
-          'This RUC is already in use but the customer is inactive',
-        );
-      }
-      if (customerDB) {
-        throw new BadRequestException('This RUC is already in use');
-      }
-    }
-  }
-
-  /**
    * Crear un nuevo cliente
    * @param createCustomerDto Datos del cliente a crear
    * @param user Usuario que realiza la acción
@@ -190,8 +162,6 @@ export class CustomersService {
     try {
       // Crear el cliente y registrar la auditoría
       await this.findByDocumentNumber(documentNumber);
-      // if (email) await this.findByEmail(email);
-      if (ruc) await this.findByRuc(ruc);
 
       newCustomer = await this.prisma.$transaction(async () => {
         // Crear el nuevo cliente
@@ -742,7 +712,6 @@ export class CustomersService {
     try {
       const customerDB = await this.findById(id);
 
-      if (updateData.ruc) await this.findByRuc(updateData.ruc, id);
       // if (updateData.email) await this.findByEmail(updateData.email, id);
       if (updateData.documentNumber)
         await this.findByDocumentNumber(updateData.documentNumber, id);
@@ -1164,8 +1133,6 @@ export class CustomersService {
           // Verificar duplicados sin lanzar excepciones
           const duplicateInfo = await this.checkForDuplicates(
             customerData.documentNumber,
-            customerData.email,
-            customerData.ruc,
           );
 
           if (duplicateInfo) {
@@ -1751,8 +1718,6 @@ export class CustomersService {
    */
   private async checkForDuplicates(
     documentNumber: string,
-    email?: string,
-    ruc?: string,
   ): Promise<string | null> {
     // Verificar documento
     const existingByDocument = await this.prisma.customer.findUnique({
@@ -1762,40 +1727,6 @@ export class CustomersService {
 
     if (existingByDocument) {
       return `Número de documento ${documentNumber} ya existe${!existingByDocument.isActive ? ' (inactivo)' : ''}`;
-    }
-
-    // Verificar email si existe
-    // This is no longer necessary because of landing automatic creation reasosns
-    // if (email) {
-    //   const existingByEmail = await this.prisma.customer.findUnique({
-    //     where: { email },
-    //     select: { id: true, isActive: true },
-    //   });
-
-    //   if (existingByEmail) {
-    //     return `Email ${email} ya existe${!existingByEmail.isActive ? ' (inactivo)' : ''}`;
-    //   }
-    // }
-
-    // Verificar ruc si existe
-    if (ruc) {
-      try {
-        // Validar longitud de RUC primero
-        if (ruc.length !== 11) {
-          return `La longitud del RUC ${ruc} es incorrecta`;
-        }
-
-        const existingByRuc = await this.prisma.customer.findUnique({
-          where: { ruc },
-          select: { id: true, isActive: true },
-        });
-
-        if (existingByRuc) {
-          return `RUC ${ruc} ya existe${!existingByRuc.isActive ? ' (inactivo)' : ''}`;
-        }
-      } catch (error) {
-        return `Error al validar RUC: ${error.message}`;
-      }
     }
 
     return null;

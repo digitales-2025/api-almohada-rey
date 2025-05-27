@@ -21,6 +21,9 @@ import { CreateReservationUseCaseForLanding } from './use-cases/createReservatio
 import { ConfirmPaymentLandingUseCase } from './use-cases/confirm-payment-landing.use-case';
 import { WebsocketsModule } from 'src/modules/websockets/websockets.module';
 import { PaymentsModule } from '../payments/payments.module';
+import { ApplyLateCheckoutUseCase } from './use-cases/applyLateCheckout.use.case';
+import { ExtendStayUseCase } from './use-cases/extendStay.use.case';
+import { RemoveLateCheckoutUseCase } from './use-cases/removeLateCheckout.use.case';
 
 @Module({
   imports: [
@@ -35,6 +38,9 @@ import { PaymentsModule } from '../payments/payments.module';
     ReservationRepository,
     CreateReservationUseCase,
     UpdateReservationUseCase,
+    ApplyLateCheckoutUseCase,
+    RemoveLateCheckoutUseCase,
+    ExtendStayUseCase,
     CanceledReservationState,
     CheckedOutReservationState,
     CheckedInReservationState,

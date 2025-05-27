@@ -23,4 +23,30 @@ export {
   SummaryMovementsData,
 } from './movement.interface';
 
+export {
+  AnnualAdministratorStatisticsData,
+  MonthlyEarningsAndExpensesData,
+  RoomOccupancyMapData,
+  ListRoom,
+  RecentReservationsData,
+  NextPendingPaymentsData,
+  OccupationStatisticsPercentageData,
+  MonthlyBookingTrendData,
+  SummaryFinanceData,
+  CustomerOriginSummaryData,
+  MonthlyCustomerOriginData,
+  Top10CountriesProvincesData,
+  TodayRecepcionistStatisticsData,
+  Top5TodayCheckInData,
+  Top5TodayCheckOutData,
+  PriorityLevel,
+  Top5PriorityPendingAmenitiesData,
+  AmenitiesByPriorityData,
+  PriorityAmenitiesGroup,
+  RoomAmenityDetail,
+  TodayAvailableRoomsData,
+  WeekReservationsData,
+  FullReservationsData,
+} from './dashboard.interface';
+
 export { HttpResponse } from './https-response.interface';
