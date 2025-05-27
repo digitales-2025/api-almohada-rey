@@ -32,7 +32,9 @@ export class ReportsRepository {
           gte: new Date(startDate),
           lt: new Date(endDate),
         },
-        status: 'CHECKED_IN',
+        status: {
+          in: ['CHECKED_IN', 'CHECKED_OUT', 'CONFIRMED'],
+        },
       },
       select: { id: true, checkInDate: true },
     });
