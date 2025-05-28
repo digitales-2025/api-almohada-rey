@@ -656,7 +656,6 @@ export class DashboardService {
             room: {
               roomTypeId: roomType.id,
             },
-            isActive: true,
           },
           select: {
             checkInDate: true,
@@ -756,7 +755,9 @@ export class DashboardService {
             gte: startDate,
             lte: endDate,
           },
-          isActive: true,
+          status: {
+            not: 'CANCELED', // Excluir reservaciones canceladas
+          },
         },
         select: {
           reservationDate: true,

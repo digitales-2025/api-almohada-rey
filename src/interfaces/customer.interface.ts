@@ -30,6 +30,11 @@ export type CustomerData = Pick<
   companyAddress?: string;
 };
 
+export type ResponseApiCustomer = {
+  name: string;
+  dni: string;
+};
+
 export type HistoryCustomerData = Pick<Customer, 'id' | 'name'> & {
   reservations: {
     id: string;
