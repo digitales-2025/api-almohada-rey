@@ -15,7 +15,7 @@ export class MustChangePasswordGuard implements CanActivate {
 
     const cookies = request.cookies;
 
-    if (!cookies.access_token) {
+    if (!cookies.ar_token) {
       throw new BadRequestException('Token not found');
     }
 

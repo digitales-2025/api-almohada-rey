@@ -109,7 +109,6 @@ export class WarehouseController {
     @Param('id') id: string,
     @Query('movementId') movementId?: string,
   ): Promise<WarehouseData> {
-    console.log('Controller: Buscando warehouse con ID:', id);
     return this.warehouseService.findOne(id, movementId);
   }
 
