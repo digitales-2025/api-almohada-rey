@@ -4,10 +4,11 @@ import { WarehouseController } from './warehouse.controller';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { PaginationModule } from 'src/pagination/pagination.module';
 import { MovementsModule } from '../movements/movements.module';
+import { WarehouseExcelReport } from './warehouse.excel.report';
 
 @Module({
   controllers: [WarehouseController],
-  providers: [WarehouseService],
+  providers: [WarehouseService, WarehouseExcelReport],
   imports: [PrismaModule, PaginationModule, forwardRef(() => MovementsModule)],
   exports: [WarehouseService],
 })
