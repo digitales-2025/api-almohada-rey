@@ -91,17 +91,17 @@ export class WarehouseController {
   }
 
   @ApiOperation({ summary: 'Get warehouse by id' })
+  @ApiParam({
+    name: 'id',
+    description: 'Warehouse ID',
+    type: String,
+    required: true,
+  })
   @ApiQuery({
     name: 'movementId',
     description: 'Movement ID to filter the warehouse data',
     type: String,
     required: false,
-  })
-  @ApiQuery({
-    name: 'id',
-    description: 'Warehouse ID',
-    type: String,
-    required: true,
   })
   @ApiOkResponse({ description: 'Get warehouse by id' })
   @Get(':id')
@@ -109,6 +109,7 @@ export class WarehouseController {
     @Param('id') id: string,
     @Query('movementId') movementId?: string,
   ): Promise<WarehouseData> {
+    console.log('Controller: Buscando warehouse con ID:', id);
     return this.warehouseService.findOne(id, movementId);
   }
 
