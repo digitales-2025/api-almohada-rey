@@ -34,6 +34,7 @@ pipeline {
     stages {
         stage("Build & push image") {
             steps {
+                sh 'cp deploy/.dockerignore .'
                 script {
                     withDockerRegistry(credentialsId: "${REGISTRY_CREDENTIALS}") {
                         def image = docker.build("${FULL_REGISTRY_URL}:${BUILD_NUMBER}", "-f deploy/Dockerfile.dev .")
@@ -41,6 +42,7 @@ pipeline {
                         image.push("latest")
                     }
                 }
+                sh 'rm .dockerignore'
             }
         }
         stage("Restart backend service") {
