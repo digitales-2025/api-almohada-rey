@@ -1,4 +1,5 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { WarehouseService } from './warehouse.service';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 import { StockData, SummaryWarehouseData, WarehouseData } from 'src/interfaces';
@@ -91,17 +92,17 @@ export class WarehouseController {
   }
 
   @ApiOperation({ summary: 'Get warehouse by id' })
+  @ApiParam({
+    name: 'id',
+    description: 'Warehouse ID',
+    type: String,
+    required: true,
+  })
   @ApiQuery({
     name: 'movementId',
     description: 'Movement ID to filter the warehouse data',
     type: String,
     required: false,
-  })
-  @ApiQuery({
-    name: 'id',
-    description: 'Warehouse ID',
-    type: String,
-    required: true,
   })
   @ApiOkResponse({ description: 'Get warehouse by id' })
   @Get(':id')
@@ -147,5 +148,46 @@ export class WarehouseController {
     @Query('paymentDetailId') paymentDetailId?: string,
   ): Promise<StockData[]> {
     return this.warehouseService.findProductsStockByType(type, paymentDetailId);
+  }
+
+  @Get(':id/excel')
+  @ApiOperation({
+    summary: 'Descargar Excel de stock del almacén',
+    description:
+      'Genera y descarga un archivo Excel con el inventario actual del almacén.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID del almacén',
+    type: String,
+    required: true,
+  })
+  @ApiOkResponse({
+    description: 'Archivo Excel con el inventario del almacén',
+    schema: { type: 'string', format: 'binary' },
+  })
+  async downloadWarehouseStockExcel(
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    // Llama al service para obtener el Excel
+    const workbook = await this.warehouseService.getWarehouseStockExcel(id);
+
+    // Obtiene los datos del almacén para incluir el código en el nombre del archivo
+    const warehouse = await this.warehouseService.findOne(id);
+
+    // Configura la respuesta como un archivo Excel para descarga
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=stock_almacen_${warehouse.code}_${new Date().toISOString().split('T')[0]}.xlsx`,
+    );
+
+    // Escribe el workbook directamente en la respuesta
+    await workbook.xlsx.write(res);
+    res.end();
   }
 }

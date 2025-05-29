@@ -18,7 +18,7 @@ export class RefreshTokenStrategy extends PassportStrategy(
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         (req: Request) => {
-          return req.cookies?.refresh_token; // Extraer el refresh token de la cookie HttpOnly
+          return req.cookies?.ar_refresh; // Extraer el refresh token de la cookie HttpOnly
         },
       ]),
       secretOrKey: configService.get('JWT_REFRESH_SECRET'), // Secreto para validar el refresh token
@@ -27,7 +27,7 @@ export class RefreshTokenStrategy extends PassportStrategy(
   }
 
   async validate(req: Request, payload: JwtPayload) {
-    const refreshToken = req.cookies?.refresh_token; // Extraer el refresh token de la cookie
+    const refreshToken = req.cookies?.ar_refresh; // Extraer el refresh token de la cookie
     // 1. Verificación: El refresh token existe
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh token is missing');

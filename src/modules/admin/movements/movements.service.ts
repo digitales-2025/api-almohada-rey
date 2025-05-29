@@ -824,8 +824,8 @@ export class MovementsService {
         currentWarehouse.id,
         id,
         user,
+        warehouseId !== currentWarehouse.id ? warehouseId : undefined,
       );
-
       // Actualizar la cabecera si hubo cambios
       if (headerChanges) {
         const updateData: any = {
@@ -1345,13 +1345,19 @@ export class MovementsService {
     newDetails: CreateMovementDetailDto[],
     type: TypeMovements,
     currentType: TypeMovements,
-    warehouseId: string,
+    currentWarehouseId: string,
     movementsId: string,
     user: UserData,
+    newWarehouseId?: string, // Nuevo parámetro opcional para el almacén nuevo
   ) {
     const currentDetailMap = new Map(
       currentDetails.map((d) => [d.product.id, d]),
     );
+
+    // Determinar el almacén a usar (el nuevo o el actual)
+    const targetWarehouseId = newWarehouseId || currentWarehouseId;
+    const isWarehouseChanged =
+      newWarehouseId && newWarehouseId !== currentWarehouseId;
 
     // Procesar los nuevos detalles (que son nuevos o modificados)
     for (const detail of newDetails) {
@@ -1363,8 +1369,13 @@ export class MovementsService {
         const isUnitCostChanged = detail.unitCost !== existingDetail.unitCost;
         const isTypeChanged = type !== currentType;
 
-        if (isQuantityChanged || isUnitCostChanged || isTypeChanged) {
-          // Si hay cambios, revertir el detalle en el stock
+        if (
+          isQuantityChanged ||
+          isUnitCostChanged ||
+          isTypeChanged ||
+          isWarehouseChanged
+        ) {
+          // Si hay cambios, revertir el detalle en el almacén original
           await this.revertStockChanges(
             [
               {
@@ -1374,7 +1385,7 @@ export class MovementsService {
               },
             ],
             currentType,
-            warehouseId,
+            currentWarehouseId, // Siempre usar el almacén original para revertir
           );
 
           if (isQuantityChanged || isUnitCostChanged) {
@@ -1387,27 +1398,27 @@ export class MovementsService {
                 subtotal: detail.quantity * detail.unitCost,
               },
             });
-
-            // Luego aplicar los nuevos cambios al stock
-            await this.processMovementDetail(
-              [
-                {
-                  productId: detail.productId,
-                  quantity: detail.quantity,
-                  unitCost: detail.unitCost,
-                },
-              ],
-              type,
-              warehouseId,
-              user,
-            );
           }
+
+          // Aplicar los cambios al nuevo almacén (o al original si no cambió)
+          await this.processMovementDetail(
+            [
+              {
+                productId: detail.productId,
+                quantity: detail.quantity,
+                unitCost: detail.unitCost,
+              },
+            ],
+            type,
+            targetWarehouseId, // Usar el almacén destino
+            user,
+          );
         }
 
         // Eliminar el detalle de la lista de detalles existentes
         currentDetailMap.delete(detail.productId);
       } else {
-        // Crear el detalle
+        // Crear el detalle nuevo
         await this.prisma.movementsDetail.create({
           data: {
             quantity: detail.quantity,
@@ -1418,7 +1429,7 @@ export class MovementsService {
           },
         });
 
-        // Aplicar los cambios al stock
+        // Aplicar los cambios al stock en el almacén destino
         await this.processMovementDetail(
           [
             {
@@ -1428,7 +1439,7 @@ export class MovementsService {
             },
           ],
           type,
-          warehouseId,
+          targetWarehouseId, // Usar el almacén destino
           user,
         );
       }
@@ -1445,8 +1456,8 @@ export class MovementsService {
             unitCost: detail.unitCost,
           },
         ],
-        type,
-        warehouseId,
+        currentType, // Usar el tipo original para revertir
+        currentWarehouseId, // Usar el almacén original para revertir
       );
 
       // Eliminar el detalle después de revertir los cambios de stock
