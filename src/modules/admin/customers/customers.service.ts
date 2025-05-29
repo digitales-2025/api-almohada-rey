@@ -16,6 +16,7 @@ import {
   UserPayload,
 } from 'src/interfaces';
 import { handleException } from 'src/utils';
+import { HttpService } from '@nestjs/axios';
 import {
   AuditActionType,
   CustomerDocumentType,
@@ -30,10 +31,15 @@ import { DeleteCustomerDto } from './dto/delete-customer.dto';
 import { Customer } from './entity/customer.entity';
 import { CustomerRepository } from './repository/customer.repository';
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
-import { HistoryCustomerData } from 'src/interfaces/customer.interface';
+import {
+  HistoryCustomerData,
+  ResponseApiCustomer,
+} from 'src/interfaces/customer.interface';
 import * as excelJs from 'exceljs';
 import { PaginationService } from 'src/pagination/pagination.service';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
+import { lastValueFrom } from 'rxjs';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class CustomersService {
@@ -41,20 +47,12 @@ export class CustomersService {
   private readonly errorHandler: BaseErrorHandler;
   constructor(
     private readonly prisma: PrismaService,
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
     private readonly audit: AuditService,
     private readonly customerRepository: CustomerRepository,
     private readonly paginationService: PaginationService,
   ) {}
-
-  /**
-   * Validar la longitud del RUC
-   * @param ruc RUC a validar
-   */
-  private validateLengthRuc(ruc: string): void {
-    if (ruc.length !== 11) {
-      throw new BadRequestException('The length of the RUC is incorrect');
-    }
-  }
 
   /**
    * Buscar un cliente por su número de documento
@@ -102,32 +100,6 @@ export class CustomersService {
 
     return customerDB;
   }
-
-  /**
-   * Buscar un cliente por su email
-   * @param email Email del cliente
-   * @param id Id del cliente
-   */
-  // async findByEmail(email: string, id?: string) {
-  //   const customerDB = await this.prisma.customer.findUnique({
-  //     where: { email },
-  //     select: {
-  //       id: true,
-  //       email: true,
-  //       isActive: true,
-  //     },
-  //   });
-  //   if (!!customerDB && customerDB.id !== id) {
-  //     if (!!customerDB && !customerDB.isActive) {
-  //       throw new BadRequestException(
-  //         'This email is already in use but the customer is inactive',
-  //       );
-  //     }
-  //     if (customerDB) {
-  //       throw new BadRequestException('This email is already in use');
-  //     }
-  //   }
-  // }
 
   /**
    * Crear un nuevo cliente
@@ -264,6 +236,83 @@ export class CustomersService {
 
       handleException(error, 'Error creating a customer');
     }
+  }
+
+  /**
+   * Consultar datos de un cliente por su DNI usando la API de Perú
+   * @param dni Número de DNI a consultar
+   * @returns Datos del cliente obtenidos desde la API de Perú
+   */
+  async getDataByDni(dni: string): Promise<ResponseApiCustomer> {
+    const token = this.configService.get<string>('API_PERU_TOKEN');
+    const baseUrl = this.configService.get<string>('API_PERU_BASE_URL');
+
+    if (!token) {
+      throw new Error('API Peru token is not configured');
+    }
+
+    const url = `${baseUrl}/dni/${dni}?api_token=${token}`;
+
+    try {
+      const response$ = this.httpService.get(url);
+      const response = await lastValueFrom(response$);
+      const data = response.data?.data;
+
+      if (!data || !data.nombres) {
+        throw new Error('DNI no encontrado o inválido.');
+      }
+
+      // Concatenar nombres y apellidos para formar el nombre completo
+      const fullName =
+        `${data.nombres || ''} ${data.apellido_paterno || ''} ${data.apellido_materno || ''}`.trim();
+
+      // Convertir a formato capitalizado (primera letra de cada palabra en mayúscula)
+      const capitalizedName = this.capitalizeWithAccents(fullName);
+
+      return {
+        name: capitalizedName,
+        dni: data.numero,
+      };
+    } catch (error) {
+      this.logger.error(
+        'Error consultando DNI en API Peru:',
+        error.response?.data || error.message,
+      );
+
+      if (error.response?.status === 401) {
+        throw new Error('Token de API Peru inválido o expirado');
+      }
+
+      if (error.response?.status === 404) {
+        throw new Error('DNI no encontrado en la base de datos de RENIEC');
+      }
+
+      throw new Error('No se pudo obtener los datos del DNI desde API Peru');
+    }
+  }
+
+  /**
+   * Convierte un texto a formato capitalizado preservando las tildes y caracteres especiales
+   * @param text Texto a convertir
+   * @returns Texto capitalizado
+   */
+  private capitalizeWithAccents(text: string): string {
+    if (!text) return '';
+
+    return text
+      .toLowerCase()
+      .split(' ')
+      .map((word) => {
+        if (word.length === 0) return word;
+
+        // Convertir la primera letra a mayúscula preservando tildes
+        const firstChar = word.charAt(0).toUpperCase();
+        const restOfWord = word.slice(1);
+
+        return firstChar + restOfWord;
+      })
+      .join(' ')
+      .trim();
   }
 
   /**

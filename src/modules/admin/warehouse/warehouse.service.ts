@@ -12,7 +12,7 @@ import { SummaryWarehouseData, WarehouseData } from 'src/interfaces';
 import { handleException } from 'src/utils';
 import { PaginationService } from 'src/pagination/pagination.service';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
-import { ProductType } from '@prisma/client';
+import { WarehouseType } from '@prisma/client';
 import { StockData } from 'src/interfaces/warehouse.interface';
 
 @Injectable()
@@ -74,7 +74,9 @@ export class WarehouseService {
    * @param type Tipo de almacén a buscar
    * @returns Almacén encontrado o error si no existe
    */
-  async findWarehouseByType(type: ProductType): Promise<SummaryWarehouseData> {
+  async findWarehouseByType(
+    type: WarehouseType,
+  ): Promise<SummaryWarehouseData> {
     try {
       const warehouse = await this.prisma.warehouse.findFirst({
         where: { type },
@@ -282,7 +284,7 @@ export class WarehouseService {
    * @returns Lista de datos de stock filtrados por tipo de producto
    */
   async findProductsStockByType(
-    type: ProductType,
+    type: WarehouseType,
     paymentDetailId?: string,
   ): Promise<StockData[]> {
     let warehouse = await this.prisma.warehouse.findFirst({

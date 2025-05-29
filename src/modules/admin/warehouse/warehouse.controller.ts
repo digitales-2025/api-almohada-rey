@@ -12,7 +12,7 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Auth } from '../auth/decorators';
-import { ProductType } from '@prisma/client';
+import { WarehouseType } from '@prisma/client';
 
 @ApiTags('Admin Warehouse')
 @ApiBadRequestResponse({ description: 'Bad Request' })
@@ -115,14 +115,14 @@ export class WarehouseController {
   @ApiOperation({ summary: 'Get warehouse by type' })
   @ApiParam({
     name: 'type',
-    enum: ProductType,
-    enumName: 'ProductType',
-    description: 'Tipo de almacén (COMMERCIAL o INTERNAL_USE)',
+    enum: WarehouseType,
+    enumName: 'WarehouseType',
+    description: 'Tipo de almacén (COMMERCIAL,INTERNAL_USE o DEPOSIT)',
   })
   @ApiOkResponse({ description: 'Get warehouse by type' })
   @Get('all/type/:type')
   findAllByType(
-    @Param('type') type: ProductType,
+    @Param('type') type: WarehouseType,
   ): Promise<SummaryWarehouseData> {
     return this.warehouseService.findWarehouseByType(type);
   }
@@ -130,9 +130,9 @@ export class WarehouseController {
   @ApiOperation({ summary: 'Get stock of products by warehouse type' })
   @ApiParam({
     name: 'type',
-    enum: ProductType,
-    enumName: 'ProductType',
-    description: 'Tipo de almacén (COMMERCIAL o INTERNAL_USE)',
+    enum: WarehouseType,
+    enumName: 'WarehouseType',
+    description: 'Tipo de almacén (COMMERCIAL, INTERNAL_USE o DEPOSIT)',
   })
   @ApiQuery({
     name: 'paymentDetailId',
@@ -143,7 +143,7 @@ export class WarehouseController {
   @ApiOkResponse({ description: 'Get stock of products by warehouse type' })
   @Get('stock/product/:type')
   findProductsStockByType(
-    @Param('type') type: ProductType,
+    @Param('type') type: WarehouseType,
     @Query('paymentDetailId') paymentDetailId?: string,
   ): Promise<StockData[]> {
     return this.warehouseService.findProductsStockByType(type, paymentDetailId);

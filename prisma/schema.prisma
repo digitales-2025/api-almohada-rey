@@ -403,10 +403,17 @@ model MovementsDetail {
   updatedAt DateTime @updatedAt
 }
 
+enum WarehouseType {
+  COMMERCIAL
+  INTERNAL_USE
+  DEPOSIT
+}
+
+
 model Warehouse {
   id   String      @id @unique @default(uuid())
   code String      @unique
-  type ProductType
+  type WarehouseType
 
   stock Stock[] @relation("WarehouseStock")
 
