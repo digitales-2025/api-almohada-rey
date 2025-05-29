@@ -21,14 +21,7 @@ COPY package.json .
 RUN pnpm i --ignore-scripts
 
 # Build binary
-COPY prisma ./prisma
-COPY src ./src
-COPY test ./test
-COPY nest-cli.json .
-COPY package.json .
-COPY pnpm-lock.yaml .
-COPY tsconfig.build.json .
-COPY tsconfig.json .
+COPY . .
 RUN pnpx prisma generate
 RUN pnpm run build
 
@@ -42,17 +35,13 @@ RUN pnpm config set store-dir /pnpm/.pnpm-store
 
 WORKDIR /app
 
-COPY --from=prod /app/dist dist
-COPY --from=prod /app/prisma prisma
+COPY --from=prod /app/dist ./dist
+COPY --from=prod /app/prisma ./prisma
 COPY --from=prod /app/package.json .
 COPY --from=prod /app/pnpm-lock.yaml .
 COPY deploy/start.sh .
 
 RUN pnpm i --prod
 USER node
-
-RUN ls -la /app
-RUN ls -la /app/dist
-RUN ls -la /app/dist/src
 
 CMD ["sh", "start.sh"]
