@@ -1245,7 +1245,7 @@ export class DashboardService {
             gte: startOfDay,
             lte: endOfDay,
           },
-          isActive: true,
+
           status: {
             in: ['CHECKED_IN', 'CHECKED_OUT'],
           },
@@ -1270,7 +1270,6 @@ export class DashboardService {
             gte: startOfDay,
             lte: endOfDay,
           },
-          isActive: true,
           status: 'CHECKED_OUT',
         },
       });
