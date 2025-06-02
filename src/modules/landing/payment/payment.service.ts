@@ -16,19 +16,22 @@ export class PaymentService {
   private readonly authHeader: string;
   private readonly hmacSecretKey: string;
   private readonly endpoint: string;
+  private readonly password: string;
 
   constructor(private configService: ConfigService) {
     const username = this.configService.get<string>('IZIPAY_PAYMENT_USERNAME');
-    const password = this.configService.get<string>('IZIPAY_PAYMENT_PASSWORD');
-    this.hmacSecretKey = this.configService.get<string>('IZIPAY_HMAC_KEY');
+    this.password = this.configService.get<string>('IZIPAY_PAYMENT_PASSWORD');
+    this.hmacSecretKey = this.configService
+      .get<string>('IZIPAY_HMAC_KEY')
+      .trim(); // .trim() por si acaso
     this.endpoint = this.configService.get<string>('IZIPAY_PAYMENT_ENDPOINT');
 
-    if (!username || !password || !this.hmacSecretKey || !this.endpoint) {
+    if (!username || !this.password || !this.hmacSecretKey || !this.endpoint) {
       throw new Error('Faltan variables de entorno necesarias para Izipay');
     }
 
     this.authHeader =
-      'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
+      'Basic ' + Buffer.from(`${username}:${this.password}`).toString('base64');
   }
 
   /**
@@ -112,44 +115,168 @@ export class PaymentService {
     });
   }
 
-  /**
-   * Valida la respuesta del pago usando HMAC-SHA256
-   * @param param0 Parametros para validar el pago
-   * @returns boolean
-   */
-  validatePayment({
-    hashKey,
-    hash,
-    rawClientAnswer,
-  }: {
-    hashKey: 'sha256_hmac' | 'password';
-    hash: string;
-    rawClientAnswer: object;
-  }): boolean {
-    if (!hashKey || !hash || !rawClientAnswer) {
-      throw new BadRequestException('Datos incompletos para validar el pago');
+  validatePayment(validatePaymentDto): boolean {
+    console.log(
+      'validatePaymentDto recibido:',
+      JSON.stringify(validatePaymentDto, null, 2),
+    );
+
+    // Verificar si los datos vienen anidados
+    let hashKey, hash, rawClientAnswer;
+
+    console.log('Tipo de dato recibido:', typeof validatePaymentDto);
+    console.log(
+      '¿Es un objeto?',
+      validatePaymentDto !== null && typeof validatePaymentDto === 'object',
+    );
+
+    if (
+      validatePaymentDto.rawClientAnswer &&
+      typeof validatePaymentDto.rawClientAnswer === 'object' &&
+      validatePaymentDto.rawClientAnswer.hashKey
+    ) {
+      // Si los datos vienen anidados en rawClientAnswer y rawClientAnswer es un objeto
+      console.log(
+        'Estructura anidada detectada, extrayendo datos de rawClientAnswer',
+      );
+      hashKey = validatePaymentDto.rawClientAnswer.hashKey;
+      hash = validatePaymentDto.rawClientAnswer.hash;
+      rawClientAnswer = validatePaymentDto.rawClientAnswer.rawClientAnswer;
+
+      console.log('Datos extraídos (anidados):');
+      console.log('- hashKey:', hashKey);
+      console.log('- hash:', hash);
+      console.log('- ¿rawClientAnswer existe?', !!rawClientAnswer);
+    } else {
+      // Extracción directa del objeto principal
+      ({ hashKey, hash, rawClientAnswer } = validatePaymentDto);
+
+      console.log('Datos extraídos (directos):');
+      console.log('- hashKey:', hashKey);
+      console.log('- hash:', hash);
+      console.log('- ¿rawClientAnswer existe?', !!rawClientAnswer);
     }
 
-    const message = JSON.stringify(rawClientAnswer);
-    const secret =
-      hashKey === 'sha256_hmac' ? this.hmacSecretKey : this.authHeader;
+    let generatedHash = '';
 
-    const generatedHash = this.generateHmacSha256(message, secret);
+    if (!hashKey) {
+      console.log('Error: hashKey no proporcionado');
+      console.log('Intentando buscar hashKey en otras ubicaciones...');
 
-    if (generatedHash === hash) {
+      // Intenta buscar hashKey en otras posibles ubicaciones
+      if (
+        validatePaymentDto.rawClientAnswer &&
+        validatePaymentDto.rawClientAnswer.hashAlgorithm
+      ) {
+        hashKey = validatePaymentDto.rawClientAnswer.hashAlgorithm;
+        console.log(
+          'hashKey encontrado en rawClientAnswer.hashAlgorithm:',
+          hashKey,
+        );
+      }
+
+      if (!hashKey) {
+        throw new BadRequestException('Payment hash is required');
+      }
+    }
+
+    console.log('Usando hashKey:', hashKey);
+    console.log('Hash a verificar:', hash);
+
+    if (hashKey === 'sha256_hmac') {
+      console.log('Usando método sha256_hmac para validar');
+      console.log(
+        'HMAC Secret Key:',
+        this.hmacSecretKey
+          ? 'existe (longitud: ' + this.hmacSecretKey.length + ')'
+          : 'no existe',
+      );
+
+      // Para sha256_hmac, verificamos si rawClientAnswer es string para procesarlo correctamente
+      if (typeof rawClientAnswer === 'string') {
+        console.log('rawClientAnswer es una cadena, usando directamente');
+        generatedHash = this.generateHmacSha256(
+          rawClientAnswer,
+          this.hmacSecretKey,
+        );
+      } else {
+        console.log('rawClientAnswer no es una cadena, convirtiendo a JSON');
+        generatedHash = this.generateHmacSha256(
+          rawClientAnswer,
+          this.hmacSecretKey,
+        );
+      }
+      console.log('Hash generado con sha256_hmac:', generatedHash);
+    } else if (hashKey === 'password') {
+      console.log('Usando método password para validar');
+      console.log(
+        'Password:',
+        this.password
+          ? 'existe (longitud: ' + this.password.length + ')'
+          : 'no existe',
+      );
+
+      // Para password, usamos el string JSON del objeto rawClientAnswer
+      const rawClientAnswerStr =
+        typeof rawClientAnswer === 'string'
+          ? rawClientAnswer
+          : JSON.stringify(rawClientAnswer);
+
+      console.log(
+        'rawClientAnswer convertido a string (primeros 100 chars):',
+        rawClientAnswerStr.substring(0, 100) + '...',
+      );
+
+      generatedHash = this.generateHmacSha256(
+        rawClientAnswerStr,
+        this.password,
+      );
+      console.log('Hash generado con password:', generatedHash);
+    } else {
+      console.log(`Tipo de hash no soportado: ${hashKey}`);
+      this.logger.warn(`Tipo de hash no soportado: ${hashKey}`);
+      return false;
+    }
+
+    console.log(
+      `Comparando hashes - Recibido: ${hash}, Generado: ${generatedHash}`,
+    );
+    const isValid = hash === generatedHash;
+    console.log('¿Los hashes coinciden?', isValid);
+
+    if (isValid) {
+      console.log('Validación exitosa');
       return true;
     } else {
-      throw new BadRequestException('Hash de verificación inválido');
+      console.log('Validación fallida - Hash mismatch');
+      this.logger.error(
+        `Hash mismatch: esperado=${hash}, generado=${generatedHash}`,
+      );
+      throw new BadRequestException('Payment hash mismatch');
     }
   }
 
   /**
-   * Genera un hash HMAC-SHA256 para validar la respuesta del pago
-   * @param message Mensaje a firmar
-   * @param secretKey Clave secreta para generar el HMAC
-   * @returns HMAC SHA256 del mensaje
+   * Genera un hash HMAC-SHA256
+   * @param message Mensaje a hashear (string u objeto)
+   * @param secretKey Llave secreta
+   * @returns Hash en formato hexadecimal
    */
-  private generateHmacSha256(message: string, secretKey: string): string {
-    return crypto.createHmac('sha256', secretKey).update(message).digest('hex');
+  generateHmacSha256(
+    message: string | Record<string, any>,
+    secretKey: string,
+  ): string {
+    try {
+      const messageStr =
+        typeof message === 'string' ? message : JSON.stringify(message);
+
+      return crypto
+        .createHmac('sha256', secretKey)
+        .update(messageStr)
+        .digest('hex');
+    } catch (error) {
+      this.logger.error('Error generando HMAC-SHA256:', error);
+      throw new InternalServerErrorException('Error al generar hash');
+    }
   }
 }

@@ -57,16 +57,18 @@ export class PaymentController {
       const isValid = this.paymentService.validatePayment(body);
       res.status(HttpStatus.OK).send({ isValid });
     } catch (error) {
+      console.error('[❌ Error en validación]:', error);
+
       if (
         error instanceof BadRequestException ||
         error instanceof InternalServerErrorException
       ) {
-        res.status(error.getStatus()).send({ message: error.message });
-      } else {
-        res
-          .status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .send({ message: 'Internal server error' });
+        return res.status(error.getStatus()).send({ error: error.message });
       }
+
+      return res
+        .status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .send({ error: 'Internal server error' });
     }
   }
 }
