@@ -70,6 +70,7 @@ ungrouped:
 											full_registry_url: FULL_REGISTRY_URL,
 											project_name: PROJECT_NAME,
 											project_stage: PROJECT_STAGE,
+											project_service: PROJECT_SERVICE,
 										],
 									)
 								}
@@ -84,7 +85,7 @@ ungrouped:
 				}
 				stage("Setup target") {
 					steps {
-						dir ("+devops") {
+						dir ("+devops/+$PROJECT_STAGE") {
 							ansiblePlaybook(
 								credentialsId: SSH_CRED,
 								inventory: "inventory.yml",
@@ -102,7 +103,7 @@ ungrouped:
 		}
 		stage("Up services") {
 			steps {
-				dir ("+devops") {
+				dir ("+devops/+$PROJECT_STAGE") {
 					ansiblePlaybook(
 						credentialsId: SSH_CRED,
 						inventory: "inventory.yml",
