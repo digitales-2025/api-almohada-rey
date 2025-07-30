@@ -21,7 +21,8 @@ pipeline {
 		SSH_CRED = "ssh-id_docker_admin"
 
 		// ansible variables
-		PROJECT_SERVICES  = "backend,frontend,landing"  // Comma-separated list
+		// PROJECT_SERVICES  = "backend,frontend,landing"  // FIXME: reenable landing
+		PROJECT_SERVICES  = "backend,frontend"  // Comma-separated list
 	}
 	stages {
 		stage("Create ansible inventory") {
