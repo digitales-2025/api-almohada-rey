@@ -109,7 +109,7 @@ ungrouped:
 						playbook: "../ansible/start_service.yml",
 						extraVars: [
 							remote_folder_path: REMOTE_FOLDER,
-							project_services: PROJECT_SERVICES
+							project_services: PROJECT_SERVICES,
 							project_stage: PROJECT_STAGE,
 							project_service: PROJECT_SERVICE,
 						],
