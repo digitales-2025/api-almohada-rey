@@ -38,9 +38,9 @@ ungrouped:
 		}
 		stage("Build & Push") {
 			parallel {
-				stage("frontend") {
+				stage("backend") {
 					environment {
-						PROJECT_SERVICE   = "frontend"
+						PROJECT_SERVICE   = "backend"
 						PROJECT_TRIPLET   = "${PROJECT_NAME}-${PROJECT_SERVICE}-${PROJECT_STAGE}"
 						FULL_REGISTRY_URL = "${REGISTRY_URL}/${REGISTRY_USER}/${PROJECT_TRIPLET}"
 					}
@@ -110,6 +110,7 @@ ungrouped:
 						playbook: "../ansible/start_service.yml",
 						extraVars: [
 							remote_folder_path: REMOTE_FOLDER,
+							project_name: PROJECT_NAME,
 							project_services: PROJECT_SERVICES,
 							project_stage: PROJECT_STAGE,
 							project_service: PROJECT_SERVICE,
