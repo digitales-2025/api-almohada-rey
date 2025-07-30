@@ -110,7 +110,7 @@ ungrouped:
 						extraVars: [
 							remote_folder_path: REMOTE_FOLDER,
 							project_services: PROJECT_SERVICES
-							project_stage: PROJECT_STAGE
+							project_stage: PROJECT_STAGE,
 							project_service: PROJECT_SERVICE,
 						],
 					)
