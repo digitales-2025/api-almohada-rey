@@ -24,10 +24,6 @@
         mode: '0644'
         force: true
 
-    - name: Debug project_services
-      debug:
-        var: project_services
-
     - name: Start service with docker compose
       community.docker.docker_compose_v2:
         project_src: "{{ remote_folder }}"

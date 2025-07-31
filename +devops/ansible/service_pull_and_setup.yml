@@ -4,7 +4,8 @@
   hosts: all
   vars:
     remote_folder: "{{ _remote_folder }}"
-    image_tag: "{{ _build_reference }}"
+    image_tag: "{{ _image_tag }}"
+    project_name: "{{ _project_name }}"
     full_registry_url: "{{ _full_registry_url }}"
     # e.g. backend
     project_service: "{{ _project_service }}"
