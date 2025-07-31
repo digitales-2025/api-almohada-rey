@@ -28,7 +28,7 @@ RUN pnpm run build
 
 FROM base
 
-RUN apk install curl
+RUN apk add curl
 
 COPY --from=prod /pnpm /pnpm
 ENV PNPM_HOME="/pnpm"
