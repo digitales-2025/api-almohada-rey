@@ -15,7 +15,6 @@ pipeline {
 		REGISTRY_URL         = "docker.io"
 		REGISTRY_USER        = "digitalesacide"
 
-		// FIXME: SSH credentials
 		SSH_CRED = "ssh-id_docker_admin"
 
 		// ansible variables
