@@ -358,7 +358,7 @@ export class AuthService {
         ar_token: newAccessToken,
       });
     } catch (error) {
-      console.error('Error refreshing token: ', error);
+      console.error('Error refreshing token:', error);
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
