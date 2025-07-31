@@ -1,0 +1,34 @@
+repositories:
+    - path: /mnt/borg-repository/repo
+    - path: ssh://user@host.your-storagebox.de:23/./borg-repository/trazo
+      ssh_command: ssh -i /root/.ssh/hetzner -p 23
+      extra_borg_options:
+        create: --remote-path=borg1
+        extract: --remote-path=borg1
+        list: --remote-path=borg1
+        prune: --remote-path=borg1
+        check: --remote-path=borg1
+
+one_file_system: true
+
+postgresql_databases:
+  - name: ${PG_DB}
+    hostname: ${PG_HOST}
+    username: ${PG_USER}
+    password: ${PG_PASSWORD}
+
+compression: lz4
+archive_name_format: 'backup-{now}'
+
+keep_hourly: 3
+keep_daily: 7
+keep_weekly: 4
+keep_monthly: 2
+
+before_everything:
+    - echo "Starting a backup job."
+after_everything:
+    - echo "Backup created."
+on_error:
+    - echo "Error while creating a backup."
+
