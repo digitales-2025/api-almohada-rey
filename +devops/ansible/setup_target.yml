@@ -6,11 +6,11 @@
     #
     # -- required --
     #
-    remote_folder: "{{ remote_folder }}"
+    remote_folder: "{{ _remote_folder }}"
     # e.g. trazo
-    project_name: "{{ project_name }}"
+    project_name: "{{ _project_name }}"
     # e.g. develop
-    project_stage: "{{ project_stage }}"
+    project_stage: "{{ _project_stage }}"
     #
     # -- generated --
     #

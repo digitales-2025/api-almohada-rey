@@ -66,12 +66,12 @@ ungrouped:
 										vaultCredentialsId: "ansible-vault-almohada-key",
 										extras: "--extra-vars '@vault.yml'",
 										extraVars: [
-											remote_folder: REMOTE_FOLDER,
-											image_tag: BUILD_REF,
-											full_registry_url: FULL_REGISTRY_URL,
-											project_name: PROJECT_NAME,
-											project_stage: PROJECT_STAGE,
-											project_service: PROJECT_SERVICE,
+											_remote_folder: REMOTE_FOLDER,
+											_image_tag: BUILD_REF,
+											_full_registry_url: FULL_REGISTRY_URL,
+											_project_name: PROJECT_NAME,
+											_project_stage: PROJECT_STAGE,
+											_project_service: PROJECT_SERVICE,
 										],
 									)
 								}
@@ -92,9 +92,9 @@ ungrouped:
 								inventory: "inventory.yml",
 								playbook: "../ansible/setup_target.yml",
 								extraVars: [
-									remote_folder: REMOTE_FOLDER,
-									project_name: PROJECT_NAME,
-									project_stage: PROJECT_STAGE,
+									_remote_folder: REMOTE_FOLDER,
+									_project_name: PROJECT_NAME,
+									_project_stage: PROJECT_STAGE,
 								],
 							)
 						}
@@ -113,11 +113,11 @@ ungrouped:
 						inventory: "inventory.yml",
 						playbook: "../ansible/start_service.yml",
 						extraVars: [
-							remote_folder_path: REMOTE_FOLDER,
-							project_name: PROJECT_NAME,
-							project_services: PROJECT_SERVICES,
-							project_stage: PROJECT_STAGE,
-							project_service: PROJECT_SERVICE,
+							_remote_folder_path: REMOTE_FOLDER,
+							_project_name: PROJECT_NAME,
+							_project_services: PROJECT_SERVICES,
+							_project_stage: PROJECT_STAGE,
+							_project_service: PROJECT_SERVICE,
 						],
 					)
 				}

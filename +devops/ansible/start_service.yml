@@ -3,16 +3,16 @@
   become: false
   hosts: all
   vars:
-    remote_folder: "{{ remote_folder_path }}"
+    remote_folder: "{{ _remote_folder_path }}"
     # e.g. almohada
-    project_name: "{{ project_name }}"
+    project_name: "{{ _project_name }}"
     # e.g. develop
-    project_stage: "{{ project_stage }}"
+    project_stage: "{{ _project_stage }}"
     # e.g. backend
-    project_service: "{{ project_service }}"
+    project_service: "{{ _project_service }}"
     # Convert comma-separated string to list
     # Should receive something like "backend,frontend" from Jenkinsfile
-    project_services: "{{ project_services.split(',') }}"
+    project_services: "{{ _project_services.split(',') }}"
 
   tasks:
     - name: Copy docker compose file to service directory
