@@ -3,24 +3,18 @@
   become: false
   hosts: all
   vars:
-    remote_folder: "{{ remote_folder_path }}"
+    remote_folder: "{{ _remote_folder_path }}"
+    # e.g. almohada
+    project_name: "{{ _project_name }}"
     # e.g. develop
-    project_stage: "{{ project_stage }}"
+    project_stage: "{{ _project_stage }}"
     # e.g. backend
-    project_service: "{{ project_service }}"
+    project_service: "{{ _project_service }}"
     # Convert comma-separated string to list
     # Should receive something like "backend,frontend" from Jenkinsfile
-    project_services: "{{ project_services.split(',') }}"
+    project_services: "{{ _project_services.split(',') }}"
 
   tasks:
-    - name: Setup base docker compose file
-      template:
-        src: ../docker/docker-compose.base.yml.j2
-        dest: "{{ remote_folder }}/docker-compose.base.yml"
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
-        mode: '0644'
-
     - name: Copy docker compose file to service directory
       template:
         src: ../docker/docker-compose.{{ project_service }}.yml.j2

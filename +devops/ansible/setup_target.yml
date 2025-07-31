@@ -6,11 +6,11 @@
     #
     # -- required --
     #
-    remote_folder: "{{ remote_folder }}"
+    remote_folder: "{{ _remote_folder }}"
     # e.g. trazo
-    project_name: "{{ project_name }}"
+    project_name: "{{ _project_name }}"
     # e.g. develop
-    project_stage: "{{ project_stage }}"
+    project_stage: "{{ _project_stage }}"
     #
     # -- generated --
     #
@@ -41,7 +41,7 @@
           POSTGRES_DB={{ db_name }}
 
           # EF connection string
-          ConnectionStrings__DefaultConnection="Host={{ db_host_name }};Database={{ db_name }};Username={{ db_username }};Password={{ db_password }};"
+          DATABASE_URL="postgresql://{{ db_username }}:{{ db_password }}@{{ db_host_name }}:5432/{{ db_name }}?schema=public"
         dest: "{{ remote_folder }}/.env.database"
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
