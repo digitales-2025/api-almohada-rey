@@ -1,0 +1,63 @@
+import { forwardRef, Module } from '@nestjs/common';
+import { ReservationService } from './reservation.service';
+import { ReservationController } from './reservation.controller';
+import { ReservationRepository } from './repository/reservation.repository';
+import { CreateReservationUseCase } from './use-cases/createReservation.use-case';
+import { AuditModule } from '../audit/audit.module';
+import { RoomModule } from '../room/room.module';
+import { UpdateReservationUseCase } from './use-cases/updateReservation.use-case';
+import {
+  CanceledReservationState,
+  CheckedInReservationState,
+  CheckedOutReservationState,
+  ConfirmedReservationState,
+  PendingReservationState,
+  ReservationStateFactory,
+} from './states';
+import { ChangeReservationStatusUseCase } from './use-cases/changeReservationStatus.use.case';
+import { DeactivateReservationsUseCase } from './use-cases/deactivateReservations.use-case';
+import { ReactivateReservationsUseCase } from './use-cases/reactivateReservations.use-case';
+import { CreateReservationUseCaseForLanding } from './use-cases/createReservationForLanding.use-case';
+import { ConfirmPaymentLandingUseCase } from './use-cases/confirm-payment-landing.use-case';
+import { WebsocketsModule } from 'src/modules/websockets/websockets.module';
+import { PaymentsModule } from '../payments/payments.module';
+import { ApplyLateCheckoutUseCase } from './use-cases/applyLateCheckout.use.case';
+import { ExtendStayUseCase } from './use-cases/extendStay.use.case';
+import { RemoveLateCheckoutUseCase } from './use-cases/removeLateCheckout.use.case';
+
+@Module({
+  imports: [
+    AuditModule,
+    RoomModule,
+    forwardRef(() => WebsocketsModule),
+    forwardRef(() => PaymentsModule),
+  ],
+  controllers: [ReservationController],
+  providers: [
+    ReservationService,
+    ReservationRepository,
+    CreateReservationUseCase,
+    UpdateReservationUseCase,
+    ApplyLateCheckoutUseCase,
+    RemoveLateCheckoutUseCase,
+    ExtendStayUseCase,
+    CanceledReservationState,
+    CheckedOutReservationState,
+    CheckedInReservationState,
+    ConfirmedReservationState,
+    PendingReservationState,
+    ReservationStateFactory,
+    ChangeReservationStatusUseCase,
+    DeactivateReservationsUseCase,
+    ReactivateReservationsUseCase,
+    CreateReservationUseCaseForLanding,
+    ConfirmPaymentLandingUseCase,
+  ],
+  exports: [
+    ReservationService,
+    ReservationRepository,
+    ReservationStateFactory,
+    ConfirmPaymentLandingUseCase,
+  ],
+})
+export class ReservationModule {}

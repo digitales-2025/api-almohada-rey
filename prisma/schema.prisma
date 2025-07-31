@@ -1,0 +1,440 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String      @id @unique @default(uuid())
+  name               String
+  userRol            UserRolType
+  email              String
+  password           String
+  phone              String?
+  isSuperAdmin       Boolean     @default(false)
+  lastLogin          DateTime    @default(now()) @db.Timestamptz(6)
+  isActive           Boolean     @default(true)
+  mustChangePassword Boolean     @default(true)
+  isLandingUser      Boolean     @default(false) // Indicates if the user was created through the landing page and if that's the case, notify the admin to complete the missing data
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+
+  // Relación con auditorías (acciones realizadas por este usuario)
+  auditsPerformed Audit[] @relation("AuditPerformedBy")
+
+  // Relación con checklists de limpieza (personal que supervisa la limpieza)
+  cleaningChecklists CleaningChecklist[] @relation("CleaningChecklistUser")
+
+  reservations Reservation[]
+
+  @@unique([email, isActive])
+}
+
+enum UserRolType {
+  ADMIN
+  RECEPCIONIST
+}
+
+model Audit {
+  id            String          @id @unique @default(uuid())
+  entityId      String
+  entityType    String // Representa el nombre del modelo (ej: User, Rol, etc.)
+  action        AuditActionType // Representa la acción (CREATE, UPDATE, DELETE)
+  performedBy   User            @relation("AuditPerformedBy", fields: [performedById], references: [id])
+  performedById String
+  createdAt     DateTime        @default(now()) @db.Timestamptz(6)
+}
+
+enum AuditActionType {
+  CREATE
+  UPDATE
+  DELETE
+  REACTIVATE
+  UPDATE_STATUS
+}
+
+model Customer {
+  id             String                @id @default(uuid())
+  name           String
+  address        String? //Admin is required, landing is not
+  birthPlace     String? //Admin is required, landing is not
+  birthDate      String?
+  country        String? //Admin is required, landing is not
+  department     String?
+  province       String?
+  phone          String
+  occupation     String? //Admin is required, landing is not
+  documentType   CustomerDocumentType
+  documentNumber String                @unique
+  email          String?               //@unique
+  maritalStatus  CustomerMaritalStatus? //Admin is required, landing is not
+  companyName    String?
+  ruc            String?
+  companyAddress String?
+  isActive       Boolean               @default(true)
+  createdAt      DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime              @updatedAt
+
+  createdByLandingPage Boolean?        @default(false) // Indicates if the customer was created through the landing page and if that's the case, notify the admin to complete the missing data
+  mustCompleteData    Boolean?        @default(false) // Indicates if the admin was created by the landing page and if that's the case, notify the admin to complete the missing data
+  reservations Reservation[]
+}
+
+enum CustomerDocumentType {
+  DNI
+  PASSPORT
+  FOREIGNER_CARD
+}
+
+enum CustomerMaritalStatus {
+  SINGLE
+  MARRIED
+  DIVORCED
+  WIDOWED
+}
+
+enum FloorTypes {
+  LAMINATING
+  CARPETING
+}
+
+model RoomTypes {
+  id     String @id @default(uuid())
+  name   String
+  nameEn String? //Translation in English for the landing page
+  guests Int
+  price  Float
+
+  description String
+  descriptionEn String //Translation in English, mandatory for the landing page always
+
+  bed           String
+  bedEn         String? //Translation in English for the landing page
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime        @updatedAt
+  ImageRoomType ImageRoomType[]
+  Room          Room[]
+}
+
+model ImageRoomType {
+  id         String    @id @default(uuid())
+  imageUrl   String
+  isMain     Boolean   @default(false)
+  roomTypeId String
+  RoomTypes  RoomTypes @relation(fields: [roomTypeId], references: [id])
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt
+}
+
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  CLEANING
+  INCOMPLETE
+}
+
+model Room {
+  id                String              @id @default(uuid())
+  roomTypeId        String
+  RoomTypes         RoomTypes           @relation(fields: [roomTypeId], references: [id])
+  number            Int                 @unique
+  trashBin          Boolean             @default(true) // Trash bin (Tacho)
+  towel             Boolean             @default(true) // Towel (Toalla)
+  toiletPaper       Boolean             @default(true) // Toilet paper (Papel higiénico)
+  showerSoap        Boolean             @default(true) // Shower soap (Jabón de ducha)
+  handSoap          Boolean             @default(true) // Hand soap (Jabón de lavado)
+  lamp              Boolean             @default(true) // Lamp (Lámpara)
+  status            RoomStatus
+  tv                String //trasferencia
+  area              Float //trasferencia
+  floorType         FloorTypes //trasferencia
+  isActive          Boolean             @default(true)
+  createdAt         DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime            @updatedAt
+  CleaningChecklist CleaningChecklist[] //aun no considerar
+  paymentDetail     PaymentDetail[]     @relation("PaymentDetailRoom")
+
+  reservations Reservation[]
+}
+
+model CleaningChecklist {
+  id           String  @id @default(uuid())
+  date         String
+  roomId       String // ID of room (Habitación)
+  Room         Room    @relation(fields: [roomId], references: [id])
+  staffName    String // Name of staff (Nombre del personal)
+  userCheck    User    @relation("CleaningChecklistUser", fields: [userCheckId], references: [id])
+  userCheckId  String
+  observations String? // Observations or comments (Observaciones)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+}
+
+enum ReservationStatus {
+  PENDING //CONFIRMED
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELED
+}
+
+model Reservation {
+  id                  String            @id @default(uuid())
+  customer            Customer?        @relation(fields: [customerId], references: [id]) //Required for the admin, but optional for the landing page
+  customerId          String?           //Required for the admin, but optional for the landing page
+  room                Room              @relation(fields: [roomId], references: [id])
+  roomId              String
+  user                User?             @relation(fields: [userId], references: [id]) //Required for the admin, but optional for the landing page
+  userId              String?           //Required for the admin, but optional for the landing page
+  reservationDate     DateTime          @default(now()) @db.Timestamptz(6)
+  checkInDate         DateTime          @db.Timestamptz(6)
+  checkOutDate        DateTime          @db.Timestamptz(6)
+  status              ReservationStatus
+  origin              String? // Origin place from the customer //Required for the admin, but optional for the landing page 
+  reason              String? // Reason for reservation //Mandatory for the admin, but optional for the landing page
+  guests              Json? // List of companions
+  requestedGuestNumber Int? // Number of guests requested in the landing
+  observations        String? // Additional notes
+  appliedLateCheckOut Boolean           @default(false) // Flag to indicate if late check-out is applied
+  didAcceptExtraServices Boolean   @default(false) // Accept extra services
+  didAcceptTerms     Boolean   @default(false)  // Accept terms and conditions
+
+  payment Payment[] @relation("PaymentReservation")
+
+  // Pendiente de eliminar pagos
+  isPendingDeletePayment Boolean @default(false) // Flag to indicate if the payment is pending deletion
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+
+  createdByLandingPage Boolean?        @default(false) // Indicates if the reservation was created through the landing page and if that's the case, notify the admin to complete the missing data
+}
+
+model Payment {
+  id            String              @id @default(uuid())
+  code          String              @unique
+  date          String?
+  amount        Float
+  status        PaymentDetailStatus @default(PENDING)
+  amountPaid    Float               @default(0)
+  reservation   Reservation         @relation("PaymentReservation", fields: [reservationId], references: [id])
+  reservationId String
+
+  observations String?
+
+  paymentDetail PaymentDetail[] @relation("PaymentDetailPayment")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+}
+
+enum PaymentDetailType {
+  ROOM_RESERVATION
+  LATE_CHECKOUT
+  EXTRA_SERVICE
+}
+
+enum PaymentDetailMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  TRANSFER
+  YAPE
+  PLIN
+  PAYPAL
+  IZI_PAY
+  PENDING_PAYMENT
+}
+
+enum PaymentDetailStatus {
+  PENDING
+  PAID
+}
+
+model PaymentDetail {
+  id          String              @id @default(uuid())
+  paymentDate String
+  description String
+  type        PaymentDetailType
+  method      PaymentDetailMethod
+  status      PaymentDetailStatus @default(PENDING)
+
+  transactionNumber String? @unique // Número de transacción en caso de pagos por la landing page
+
+  // Si es que el payment detail es para compra de productos
+  product           Product?         @relation("PaymentDetailProduct", fields: [productId], references: [id])
+  productId         String?
+  movementsDetail   MovementsDetail? @relation("PaymentMovementDetail", fields: [movementsDetailId], references: [id])
+  movementsDetailId String?
+
+  // Si el payment es del tipo servicio extra
+  service   Service? @relation("PaymentDetailService", fields: [serviceId], references: [id])
+  serviceId String?
+  quantity  Int?
+
+  // Si el payment es del tipo reserva de la habitación
+  room   Room?   @relation("PaymentDetailRoom", fields: [roomId], references: [id])
+  roomId String?
+  days   Int?
+
+  unitPrice Float
+  subtotal  Float
+
+  payment   Payment @relation("PaymentDetailPayment", fields: [paymentId], references: [id])
+  paymentId String
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+}
+
+model Product {
+  id       String      @id @default(uuid())
+  code     String      @unique
+  name     String      @unique
+  unitCost Float
+  type     ProductType
+  isActive Boolean     @default(true)
+
+  paymentDetail   PaymentDetail[]   @relation("PaymentDetailProduct")
+  movementsDetail MovementsDetail[] @relation("ProductsMovementsDetail")
+  stock           Stock[]           @relation("ProductStock")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+}
+
+enum ProductType {
+  COMMERCIAL
+  INTERNAL_USE
+}
+
+model Service {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String
+  code        String   @unique
+  price       Float
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt
+
+  paymentDetail PaymentDetail[] @relation("PaymentDetailService")
+}
+
+model HotelExpense {
+  id             String               @id @default(uuid())
+  description    String
+  category       ExpenseCategory
+  paymentMethod  ExpensePaymentMethod
+  amount         Float
+  date           String
+  documentType   ExpenseDocumentType? // Optional
+  documentNumber String?
+  createdAt      DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime             @updatedAt
+}
+
+enum ExpenseCategory {
+  FIXED
+  VARIABLE
+  OTHER
+}
+
+enum ExpensePaymentMethod {
+  CASH
+  TRANSFER
+  CARD
+}
+
+enum ExpenseDocumentType {
+  RECEIPT // Boleta
+  INVOICE // Factura
+  OTHER
+}
+
+model Movements {
+  id         String @id @unique @default(uuid())
+  codeUnique String @unique
+
+  dateMovement      String
+  type              TypeMovements
+  typePurchaseOrder ExpenseDocumentType?
+  documentNumber    String?
+
+  description String?
+
+  warehouse   Warehouse @relation("WarehouseMovements", fields: [warehouseId], references: [id])
+  warehouseId String
+
+  movementsDetail MovementsDetail[] @relation("MovementsDetailMovements")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+}
+
+enum TypeMovements {
+  INPUT
+  OUTPUT
+}
+
+model MovementsDetail {
+  id String @id @unique @default(uuid())
+
+  quantity Float
+  unitCost Float
+  subtotal Float
+
+  product   Product @relation("ProductsMovementsDetail", fields: [productId], references: [id])
+  productId String
+
+  paymentDetail PaymentDetail[] @relation("PaymentMovementDetail")
+
+  movements   Movements @relation("MovementsDetailMovements", fields: [movementsId], references: [id])
+  movementsId String
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+}
+
+enum WarehouseType {
+  COMMERCIAL
+  INTERNAL_USE
+  DEPOSIT
+}
+
+
+model Warehouse {
+  id   String      @id @unique @default(uuid())
+  code String      @unique
+  type WarehouseType
+
+  stock Stock[] @relation("WarehouseStock")
+
+  movements Movements[] @relation("WarehouseMovements")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+}
+
+model Stock {
+  id        String @id @unique @default(uuid())
+  quantity  Float
+  unitCost  Float
+  totalCost Float
+
+  warehouse   Warehouse @relation("WarehouseStock", fields: [warehouseId], references: [id])
+  warehouseId String
+
+  product   Product @relation("ProductStock", fields: [productId], references: [id])
+  productId String
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+}

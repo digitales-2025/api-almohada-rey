@@ -1,0 +1,128 @@
+pipeline {
+	agent any
+	environment {
+		BUILD_REF = sh(script: "echo -n '${BUILD_TAG}' | sha256sum | cut -c1-12", returnStdout: true).trim()
+
+		PROJECT_NAME    = "almohada"
+		PROJECT_SERVICE = "unset"  // MUST BE SPECIFIED
+		PROJECT_STAGE   = "develop"
+		PROJECT_TRIPLET = "..." // MUST BE SPECIFIED
+
+		REMOTE_USER   = "docker_admin"
+		REMOTE_IP     = "116.203.105.37"
+		REMOTE_FOLDER = "/opt/docker/compose/projects/${PROJECT_NAME}-${PROJECT_STAGE}/"
+
+		REGISTRY_CREDENTIALS = "dockerhub-digitalesacide-credentials"
+		REGISTRY_URL         = "docker.io"
+		REGISTRY_USER        = "digitalesacide"
+		FULL_REGISTRY_URL    = "..." // MUST BE SPECIFIED
+
+		// SSH credentials
+		SSH_CRED = "ssh-id_docker_admin"
+
+		// ansible variables
+		// PROJECT_SERVICES  = "backend,frontend,landing"  // FIXME: reenable landing
+		PROJECT_SERVICES  = "backend,frontend"  // Comma-separated list
+	}
+	stages {
+		stage("Create ansible inventory") {
+			steps {
+				dir ("+devops/+$PROJECT_STAGE") {
+					writeFile(file: "inventory.yml", text: """
+ungrouped:
+  hosts:
+    ${REMOTE_IP}:
+      ansible_user: ${REMOTE_USER}
+""")
+				}
+			}
+		}
+		stage("Build & Push") {
+			parallel {
+				stage("backend") {
+					environment {
+						PROJECT_SERVICE   = "backend"
+						PROJECT_TRIPLET   = "${PROJECT_NAME}-${PROJECT_SERVICE}-${PROJECT_STAGE}"
+						FULL_REGISTRY_URL = "${REGISTRY_URL}/${REGISTRY_USER}/${PROJECT_TRIPLET}"
+					}
+					stages {
+						stage("Build & Push") {
+							steps {
+								script {
+									withDockerRegistry(credentialsId: "${REGISTRY_CREDENTIALS}") {
+										def image = docker.build("${FULL_REGISTRY_URL}:${BUILD_REF}", "-f +devops/docker/Dockerfile .")
+										image.push()
+									}
+								}
+							}
+						}
+						stage("Fetch image at server") {
+							steps {
+								dir ("+devops/+$PROJECT_STAGE") {
+									ansiblePlaybook(
+										credentialsId: SSH_CRED,
+										inventory: "inventory.yml",
+										playbook: "../ansible/service_pull_and_setup.yml",
+										vaultCredentialsId: "ansible-vault-almohada-key",
+										extras: "--extra-vars '@vault.yml'",
+										extraVars: [
+											_remote_folder: REMOTE_FOLDER,
+											_image_tag: BUILD_REF,
+											_full_registry_url: FULL_REGISTRY_URL,
+											_project_name: PROJECT_NAME,
+											_project_stage: PROJECT_STAGE,
+											_project_service: PROJECT_SERVICE,
+										],
+									)
+								}
+							}
+						}
+					}
+					post {
+						always {
+							sh "docker rmi ${FULL_REGISTRY_URL}:${BUILD_REF} || true"
+						}
+					}
+				}
+				stage("Setup target") {
+					steps {
+						dir ("+devops/+$PROJECT_STAGE") {
+							ansiblePlaybook(
+								credentialsId: SSH_CRED,
+								inventory: "inventory.yml",
+								playbook: "../ansible/setup_target.yml",
+								extraVars: [
+									_remote_folder: REMOTE_FOLDER,
+									_project_name: PROJECT_NAME,
+									_project_stage: PROJECT_STAGE,
+								],
+							)
+						}
+					}
+				}
+			}
+		}
+		stage("Up services") {
+			environment {
+				PROJECT_SERVICE   = "backend"
+			}
+			steps {
+				dir ("+devops/+$PROJECT_STAGE") {
+					ansiblePlaybook(
+						credentialsId: SSH_CRED,
+						inventory: "inventory.yml",
+						playbook: "../ansible/start_service.yml",
+						extraVars: [
+							_remote_folder_path: REMOTE_FOLDER,
+							_project_name: PROJECT_NAME,
+							_project_services: PROJECT_SERVICES,
+							_project_stage: PROJECT_STAGE,
+							_project_service: PROJECT_SERVICE,
+						],
+					)
+				}
+			}
+		}
+	}
+}
+
