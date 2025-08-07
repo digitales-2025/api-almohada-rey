@@ -5,19 +5,16 @@ pipeline {
 
 		PROJECT_NAME    = "almohada"
 		PROJECT_SERVICE = "unset"  // MUST BE SPECIFIED
-		PROJECT_STAGE   = "develop"
-		PROJECT_TRIPLET = "..." // MUST BE SPECIFIED
+		PROJECT_STAGE   = "production"
 
 		REMOTE_USER   = "docker_admin"
-		REMOTE_IP     = "116.203.105.37"
+		REMOTE_IP     = "161.132.54.242"
 		REMOTE_FOLDER = "/opt/docker/compose/projects/${PROJECT_NAME}-${PROJECT_STAGE}/"
 
 		REGISTRY_CREDENTIALS = "dockerhub-digitalesacide-credentials"
 		REGISTRY_URL         = "docker.io"
 		REGISTRY_USER        = "digitalesacide"
-		FULL_REGISTRY_URL    = "..." // MUST BE SPECIFIED
 
-		// SSH credentials
 		SSH_CRED = "ssh-id_docker_admin"
 
 		// ansible variables
@@ -117,6 +114,7 @@ ungrouped:
 							_project_services: PROJECT_SERVICES,
 							_project_stage: PROJECT_STAGE,
 							_project_service: PROJECT_SERVICE,
+							_docker_base: "../+production",
 						],
 					)
 				}
@@ -124,4 +122,3 @@ ungrouped:
 		}
 	}
 }
-
