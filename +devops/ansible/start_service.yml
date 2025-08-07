@@ -13,11 +13,12 @@
     # Convert comma-separated string to list
     # Should receive something like "backend,frontend" from Jenkinsfile
     project_services: "{{ _project_services.split(',') }}"
+    docker_base: "{{ _docker_base | default('../docker') }}"
 
   tasks:
     - name: Copy docker compose file to service directory
       template:
-        src: ../docker/docker-compose.{{ project_service }}.yml.j2
+        src: '{{ docker_base }}/docker-compose.{{ project_service }}.yml.j2'
         dest: "{{ remote_folder }}/docker-compose.{{ project_service }}.yml"
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
