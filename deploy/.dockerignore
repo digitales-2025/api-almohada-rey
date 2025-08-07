@@ -1,8 +1,0 @@
-.husky
-.git
-node_modules
-dist
-.env.example
-deploy/Dockerfile.dev
-deploy/Jenkins.*
-

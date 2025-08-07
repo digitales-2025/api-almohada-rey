@@ -1,0 +1,30 @@
+---
+- name: Setup borgmatic
+  become: false
+  hosts: all
+  vars:
+    #
+    # -- required --
+    #
+    remote_folder: "{{ _remote_folder }}"
+    project_name: "{{ _project_name }}"
+    project_stage: "{{ _project_stage }}"
+
+  tasks:
+    - name: Ensure borg directory exists
+      file:
+        path: "{{ remote_folder }}/borg"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: Setup borg files
+      template:
+        src: ../+production/borg.yml
+        dest: "{{ remote_folder }}/borg-config.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+
+

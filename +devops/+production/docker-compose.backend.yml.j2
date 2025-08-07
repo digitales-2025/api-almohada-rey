@@ -30,4 +30,32 @@ services:
       retries: 2
       start_period: 50s
 
+  {{ project_name }}-borgmatic-{{ project_stage }}:
+    image: ghcr.io/borgmatic-collective/borgmatic
+    container_name: {{ project_name }}-borgmatic-{{ project_stage }}
+    restart: unless-stopped
+    depends_on:
+      {{ project_name }}-db-{{ project_stage }}:
+        condition: service_healthy
+    volumes:
+      - ./borg/repository:/mnt/borg-repository
+      - ./borg/borgmatic.d:/etc/borgmatic.d/
+      - ./borg/.config/borg:/root/.config/borg
+      - ./borg/.ssh:/root/.ssh
+      - ./borg/.cache/borg:/root/.cache/borg
+      - ./borg/.state/borgmatic:/root/.local/state/borgmatic
+      - ~/.ssh/hetzner:/root/.ssh/hetzner
+      - ~/.ssh/hetzner.pub:/root/.ssh/hetzner.pub
+    env_file:
+      - ./.env.database
+    environment:
+      - TZ=America/Lima
+      - PG_DB=$${POSTGRES_DB}
+      - PG_HOST={{ project_name }}-db-{{ project_stage }}
+      - PG_USER=$${POSTGRES_USER}
+      - PG_PASSWORD=$${POSTGRES_PASSWORD}
+      - BORG_PASSPHRASE=${BORG_PASSPHRASE}
+      - RUN_ON_STARTUP=true
+    networks:
+      - {{ project_name }}-network-{{ project_stage}}
 
