@@ -5,6 +5,8 @@ import {
   ApiOkResponse,
   ApiBadRequestResponse,
   ApiParam,
+  ApiUnauthorizedResponse,
+  ApiInternalServerErrorResponse,
 } from '@nestjs/swagger';
 import { RucService } from './ruc.service';
 import { ResponseApiRuc } from 'src/interfaces/ruc.interface';
@@ -13,9 +15,18 @@ import {
   RucCacheStatsDto,
   ClearCacheResponseDto,
 } from './dto/ruc-cache-stats.dto';
+import { Auth } from '../auth/decorators';
 
 @ApiTags('RUC')
-@Controller('ruc')
+@ApiTags('Admin Customers')
+@ApiUnauthorizedResponse({ description: 'Unauthorized' })
+@ApiInternalServerErrorResponse({ description: 'Internal server error' })
+@ApiBadRequestResponse({ description: 'Bad request' })
+@Controller({
+  path: 'ruc',
+  version: '1',
+})
+@Auth()
 export class RucController {
   constructor(private readonly rucService: RucService) {}
 

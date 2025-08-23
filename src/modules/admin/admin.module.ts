@@ -13,6 +13,7 @@ import { MovementsModule } from './movements/movements.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { CustomersModule } from './customers/customers.module';
 import { RucModule } from './ruc/ruc.module';
+import { CustomerReservationHistoryModule } from './customer-reservation-history/customer-reservation-history.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { RucModule } from './ruc/ruc.module';
     DashboardModule,
     CustomersModule,
     RucModule,
+    CustomerReservationHistoryModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],

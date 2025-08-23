@@ -79,9 +79,10 @@ model Customer {
   createdAt      DateTime               @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime               @updatedAt
 
-  createdByLandingPage Boolean?      @default(false) // Indicates if the customer was created through the landing page and if that's the case, notify the admin to complete the missing data
-  mustCompleteData     Boolean?      @default(false) // Indicates if the admin was created by the landing page and if that's the case, notify the admin to complete the missing data
+  createdByLandingPage Boolean?                     @default(false) // Indicates if the customer was created through the landing page and if that's the case, notify the admin to complete the missing data
+  mustCompleteData     Boolean?                     @default(false) // Indicates if the admin was created by the landing page and if that's the case, notify the admin to complete the missing data
   reservations         Reservation[]
+  reservationHistory   CustomerReservationHistory[]
 }
 
 enum CustomerDocumentType {
@@ -494,4 +495,15 @@ model RepresentanteLegal {
   rucCache RucCache @relation("RucRepresentantes", fields: [rucCacheId], references: [id])
 
   @@map("representante_legal")
+}
+
+model CustomerReservationHistory {
+  id         String   @id @unique @default(uuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  date       String
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt
+
+  @@map("customer_reservation_history")
 }
