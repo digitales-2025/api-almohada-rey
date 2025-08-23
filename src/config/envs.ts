@@ -24,6 +24,10 @@ type GeneralEnvVars = {
 
   //sEEDS
   SEED_LANDING_PASSWORD: string;
+
+  // API PERU
+  API_PERU_TOKEN: string;
+  API_PERU_BASE_URL: string;
 };
 
 const schema = z
@@ -44,6 +48,8 @@ const schema = z
     MAIL_USER: z.string(),
     MAIL_PASS: z.string(),
     SEED_LANDING_PASSWORD: z.string(),
+    API_PERU_TOKEN: z.string(),
+    API_PERU_BASE_URL: z.string(),
   })
   .passthrough() satisfies z.ZodType<Partial<GeneralEnvVars>>;
 
@@ -70,4 +76,6 @@ export const generalEnvs: GeneralEnvVars = {
   MAIL_USER: envVars.MAIL_USER,
   MAIL_PASS: envVars.MAIL_PASS,
   SEED_LANDING_PASSWORD: envVars.SEED_LANDING_PASSWORD,
+  API_PERU_TOKEN: envVars.API_PERU_TOKEN,
+  API_PERU_BASE_URL: envVars.API_PERU_BASE_URL,
 };
