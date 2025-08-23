@@ -244,6 +244,20 @@ export class CustomersService {
    * @returns Datos del cliente obtenidos desde la API de Perú
    */
   async getDataByDni(dni: string): Promise<ResponseApiCustomer> {
+    // Primero consultar en la base de datos local
+    const cachedData = await this.prisma.apiPeruCache.findUnique({
+      where: { dni },
+    });
+
+    if (cachedData) {
+      this.logger.log(`DNI ${dni} encontrado en caché local`);
+      return {
+        name: cachedData.name,
+        dni: cachedData.dni,
+      };
+    }
+
+    // Si no está en caché, consultar la API de Perú
     const token = this.configService.get<string>('API_PERU_TOKEN');
     const baseUrl = this.configService.get<string>('API_PERU_BASE_URL');
 
@@ -251,23 +265,42 @@ export class CustomersService {
       throw new Error('API Peru token is not configured');
     }
 
-    const url = `${baseUrl}/dni/${dni}?api_token=${token}`;
+    const url = `${baseUrl}/api/dni`;
 
     try {
-      const response$ = this.httpService.get(url);
+      const response$ = this.httpService.post(
+        url,
+        { dni },
+        {
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
       const response = await lastValueFrom(response$);
       const data = response.data?.data;
 
-      if (!data || !data.nombres) {
+      if (!data || !data.nombre_completo) {
         throw new Error('DNI no encontrado o inválido.');
       }
 
-      // Concatenar nombres y apellidos para formar el nombre completo
-      const fullName =
-        `${data.nombres || ''} ${data.apellido_paterno || ''} ${data.apellido_materno || ''}`.trim();
+      // Usar el nombre completo que viene de la API
+      const fullName = data.nombre_completo;
 
       // Convertir a formato capitalizado (primera letra de cada palabra en mayúscula)
       const capitalizedName = this.capitalizeWithAccents(fullName);
+
+      // Guardar en la base de datos para futuras consultas
+      await this.prisma.apiPeruCache.create({
+        data: {
+          dni: data.numero,
+          name: capitalizedName,
+        },
+      });
+
+      this.logger.log(`DNI ${dni} consultado en API Peru y guardado en caché`);
 
       return {
         name: capitalizedName,
