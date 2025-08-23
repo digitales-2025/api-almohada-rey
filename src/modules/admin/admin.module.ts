@@ -11,6 +11,8 @@ import { PaymentsModule } from './payments/payments.module';
 import { WarehouseModule } from './warehouse/warehouse.module';
 import { MovementsModule } from './movements/movements.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { CustomersModule } from './customers/customers.module';
+import { RucModule } from './ruc/ruc.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
     WarehouseModule,
     MovementsModule,
     DashboardModule,
+    CustomersModule,
+    RucModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],
