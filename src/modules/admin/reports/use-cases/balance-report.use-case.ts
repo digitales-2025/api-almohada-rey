@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import { BalanceData } from '../interfaces/balance';
+import { colors } from 'src/utils/colors/colors.utils';
 
 @Injectable()
 export class BalanceReportUseCase {
@@ -61,29 +62,41 @@ export class BalanceReportUseCase {
     subtituloRow.eachCell((cell, colNumber) => {
       if (colNumber === 2) {
         // INGRESOS
-        cell.font = { bold: true, size: 12 };
+        cell.font = {
+          bold: true,
+          size: 12,
+          color: { argb: colors.headerText },
+        };
         cell.fill = {
           type: 'pattern',
           pattern: 'solid',
-          fgColor: { argb: 'FFD6FFDA' },
+          fgColor: { argb: `FF${colors.SUCCESS}` },
         };
         sheet.mergeCells(`B${subtituloRow.number}:E${subtituloRow.number}`);
       } else if (colNumber === 7) {
         // GASTOS
-        cell.font = { bold: true, size: 12 };
+        cell.font = {
+          bold: true,
+          size: 12,
+          color: { argb: colors.headerText },
+        };
         cell.fill = {
           type: 'pattern',
           pattern: 'solid',
-          fgColor: { argb: 'FFFFDDDD' },
+          fgColor: { argb: `FF${colors.WARNING}` },
         };
         sheet.mergeCells(`G${subtituloRow.number}:L${subtituloRow.number}`);
       } else if (colNumber === 13) {
         // BALANCE
-        cell.font = { bold: true, size: 12 };
+        cell.font = {
+          bold: true,
+          size: 12,
+          color: { argb: colors.headerText },
+        };
         cell.fill = {
           type: 'pattern',
           pattern: 'solid',
-          fgColor: { argb: 'FFDADAFF' },
+          fgColor: { argb: `FF${colors.PRIMARY}` },
         };
       }
       cell.alignment = { horizontal: 'center' };
@@ -583,12 +596,12 @@ export class BalanceReportUseCase {
     resultadoFinalRow.getCell(1).fill = {
       type: 'pattern',
       pattern: 'solid',
-      fgColor: { argb: 'FFDADAFF' }, // Púrpura claro para resultado
+      fgColor: { argb: `FF${colors.PRIMARY}` }, // Dorado corporativo para resultado
     };
     resultadoFinalRow.getCell(2).fill = {
       type: 'pattern',
       pattern: 'solid',
-      fgColor: { argb: 'FFDADAFF' },
+      fgColor: { argb: `FF${colors.PRIMARY}` },
     };
     currentRow++;
 

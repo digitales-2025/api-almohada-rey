@@ -897,4 +897,154 @@ export class ReportsRepository {
 
     return result;
   }
+
+  /**
+   * Obtiene estadísticas de razones de reserva para un mes y año específico
+   * @param month Mes numérico (1-12)
+   * @param year Año (YYYY)
+   * @returns Estadísticas de razones de reserva
+   */
+  async getReservationReasonsStats(
+    month: number,
+    year: number,
+  ): Promise<{
+    reasons: Array<{
+      reason: string;
+      arrivals: number;
+      overnights: number;
+      guests: number;
+      averageStayDuration: number;
+      percentageOfTotal: number;
+    }>;
+    totalArrivals: number;
+    totalOvernights: number;
+    totalGuests: number;
+  }> {
+    const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
+    const endDate =
+      month === 12
+        ? `${year + 1}-01-01`
+        : `${year}-${(month + 1).toString().padStart(2, '0')}-01`;
+
+    // Obtener reservas con razones en el rango especificado
+    const reservations = await this.prisma.reservation.findMany({
+      where: {
+        checkInDate: {
+          gte: new Date(startDate),
+          lt: new Date(endDate),
+        },
+        reason: {
+          not: null,
+        },
+      },
+      select: {
+        id: true,
+        reason: true,
+        checkInDate: true,
+        checkOutDate: true,
+        guests: true,
+      },
+    });
+
+    // Agrupar por razón
+    const reasonsMap: Record<
+      string,
+      {
+        arrivals: number;
+        overnights: number;
+        guests: number;
+        totalStayDuration: number;
+      }
+    > = {};
+
+    reservations.forEach((reservation) => {
+      const reason = reservation.reason.toLowerCase();
+
+      if (!reasonsMap[reason]) {
+        reasonsMap[reason] = {
+          arrivals: 0,
+          overnights: 0,
+          guests: 0,
+          totalStayDuration: 0,
+        };
+      }
+
+      // Calcular duración de estadía
+      const checkIn = new Date(reservation.checkInDate);
+      const checkOut = new Date(reservation.checkOutDate);
+      const stayDuration = Math.max(
+        1,
+        Math.ceil(
+          (checkOut.getTime() - checkIn.getTime()) / (1000 * 3600 * 24),
+        ),
+      );
+
+      // Calcular número de huéspedes
+      let guestCount = 1;
+      if (reservation.guests) {
+        try {
+          let guestsArray;
+          if (typeof reservation.guests === 'string') {
+            guestsArray = JSON.parse(reservation.guests);
+          } else {
+            guestsArray = reservation.guests;
+          }
+          if (Array.isArray(guestsArray)) {
+            guestCount += guestsArray.length;
+          }
+        } catch (error) {
+          console.error('Error al parsear campo guests:', error);
+        }
+      }
+
+      // Actualizar estadísticas
+      reasonsMap[reason].arrivals += 1;
+      reasonsMap[reason].overnights += stayDuration * guestCount;
+      reasonsMap[reason].guests += guestCount;
+      reasonsMap[reason].totalStayDuration += stayDuration;
+    });
+
+    // Calcular totales
+    const totalArrivals = Object.values(reasonsMap).reduce(
+      (sum, stats) => sum + stats.arrivals,
+      0,
+    );
+    const totalOvernights = Object.values(reasonsMap).reduce(
+      (sum, stats) => sum + stats.overnights,
+      0,
+    );
+    const totalGuests = Object.values(reasonsMap).reduce(
+      (sum, stats) => sum + stats.guests,
+      0,
+    );
+
+    // Formatear resultados
+    const reasons = Object.entries(reasonsMap)
+      .map(([reason, stats]) => ({
+        reason: reason.charAt(0).toUpperCase() + reason.slice(1), // Capitalizar primera letra
+        arrivals: stats.arrivals,
+        overnights: stats.overnights,
+        guests: stats.guests,
+        averageStayDuration: parseFloat(
+          (stats.arrivals > 0
+            ? stats.totalStayDuration / stats.arrivals
+            : 0
+          ).toFixed(2),
+        ),
+        percentageOfTotal: parseFloat(
+          (totalArrivals > 0
+            ? (stats.arrivals / totalArrivals) * 100
+            : 0
+          ).toFixed(1),
+        ),
+      }))
+      .sort((a, b) => b.arrivals - a.arrivals); // Ordenar por número de arribos
+
+    return {
+      reasons,
+      totalArrivals,
+      totalOvernights,
+      totalGuests,
+    };
+  }
 }
