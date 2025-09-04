@@ -55,15 +55,10 @@ export class BetterAuthAdapter {
     sessionToken: string,
   ): Promise<SessionValidationResult> {
     if (!sessionToken?.trim()) {
-      this.logger.debug('No session token provided');
       return { session: null, user: null };
     }
 
     try {
-      this.logger.debug(
-        `Validating session with token: ${sessionToken.substring(0, 10)}...`,
-      );
-
       // Usar Better Auth API directamente para validar la sesión
       const result = await auth.api.getSession({
         headers: new Headers({
@@ -72,16 +67,12 @@ export class BetterAuthAdapter {
       });
 
       if (result && result.user) {
-        this.logger.debug(
-          `Session validated successfully for user: ${this.maskEmail(result.user.email)}`,
-        );
         return {
           user: result.user as AuthUser,
           session: result as AuthSession,
         };
       }
 
-      this.logger.debug('No valid session found');
       return { session: null, user: null };
     } catch (error) {
       this.logger.error('Error validating session:', error);
@@ -127,9 +118,6 @@ export class BetterAuthAdapter {
 
     try {
       const normalizedEmail = email.toLowerCase().trim();
-      this.logger.debug(
-        `Attempting sign in for: ${this.maskEmail(normalizedEmail)}`,
-      );
 
       const result = await auth.api.signInEmail({
         body: {
@@ -193,9 +181,6 @@ export class BetterAuthAdapter {
 
     try {
       const normalizedEmail = email.toLowerCase().trim();
-      this.logger.debug(
-        `Attempting sign in with cookies for: ${this.maskEmail(normalizedEmail)}`,
-      );
 
       // Crear URL para el endpoint de sign-in de Better Auth
       const url = new URL(
@@ -227,7 +212,6 @@ export class BetterAuthAdapter {
         for (const cookie of setCookies) {
           response.append('Set-Cookie', cookie);
         }
-        this.logger.debug('Cookies configured successfully');
       }
 
       if (betterAuthResponse.ok) {
@@ -287,9 +271,6 @@ export class BetterAuthAdapter {
 
     try {
       const normalizedEmail = email.toLowerCase().trim();
-      this.logger.debug(
-        `Attempting sign up for: ${this.maskEmail(normalizedEmail)}`,
-      );
 
       const result = await auth.api.signUpEmail({
         body: {
@@ -330,15 +311,10 @@ export class BetterAuthAdapter {
 
   async signOut(sessionToken: string): Promise<boolean> {
     if (!sessionToken?.trim()) {
-      this.logger.debug('No session token provided for sign out');
       return false;
     }
 
     try {
-      this.logger.debug(
-        `Signing out session: ${sessionToken.substring(0, 10)}...`,
-      );
-
       await auth.api.signOut({
         headers: new Headers({
           cookie: `${BETTER_AUTH_COOKIE_NAME}=${sessionToken}`,
@@ -361,13 +337,8 @@ export class BetterAuthAdapter {
     sessionToken?: string,
   ): Promise<boolean> {
     try {
-      this.logger.debug('Attempting to sign out and clear cookies');
-
       // Si hay un token de sesión, cerramos sesión en el servidor
       if (sessionToken?.trim()) {
-        this.logger.debug(
-          `Signing out session: ${sessionToken.substring(0, 10)}...`,
-        );
         await auth.api.signOut({
           headers: new Headers({
             cookie: `${BETTER_AUTH_COOKIE_NAME}=${sessionToken}`,
@@ -390,10 +361,6 @@ export class BetterAuthAdapter {
 
       response.clearCookie(BETTER_AUTH_COOKIE_NAME, cookieOptions);
 
-      this.logger.debug(
-        `Auth cookies cleared successfully with options: ${JSON.stringify(cookieOptions)}`,
-      );
-      this.logger.log('User signed out successfully with cookies cleared');
       return true;
     } catch (error: unknown) {
       this.logger.error('Error signing out with cookies:', error);
@@ -423,8 +390,6 @@ export class BetterAuthAdapter {
           path: '/',
         };
         response.clearCookie(BETTER_AUTH_COOKIE_NAME, basicOptions);
-
-        this.logger.debug('Auth cookies cleared with fallback method');
       } catch (e) {
         this.logger.error('Failed to clear cookies even with fallback', e);
       }
@@ -456,18 +421,11 @@ export class BetterAuthAdapter {
       const signUpResult = await this.signUp(normalizedEmail, password, name);
 
       if (signUpResult.user) {
-        this.logger.debug(
-          `User synced to Better Auth: ${this.maskEmail(normalizedEmail)}`,
-        );
         return true;
       }
 
-      this.logger.debug(
-        `User already exists in Better Auth: ${this.maskEmail(normalizedEmail)}`,
-      );
       return true;
     } catch {
-      this.logger.debug(`User sync failed for ${this.maskEmail(email)}`);
       return false;
     }
   }
@@ -490,8 +448,6 @@ export class BetterAuthAdapter {
     }
 
     try {
-      this.logger.debug('Updating password for authenticated user');
-
       // Usar el API de Better Auth para cambiar la contraseña
       await auth.api.changePassword({
         body: {
@@ -525,9 +481,6 @@ export class BetterAuthAdapter {
 
     try {
       const normalizedEmail = email.toLowerCase().trim();
-      this.logger.debug(
-        `Verifying password for: ${this.maskEmail(normalizedEmail)}`,
-      );
 
       // Intentar hacer sign in para verificar la contraseña
       const result = await auth.api.signInEmail({
@@ -539,9 +492,6 @@ export class BetterAuthAdapter {
 
       return !!result.user;
     } catch {
-      this.logger.debug(
-        `Password verification failed for ${this.maskEmail(email)}`,
-      );
       return false;
     }
   }
@@ -555,8 +505,6 @@ export class BetterAuthAdapter {
       throw new Error('Parámetros de entrada inválidos');
     }
     try {
-      this.logger.debug('Hashing password');
-
       const ctx = await auth.$context;
 
       const hashedPassword = await ctx.password.hash(password.trim());

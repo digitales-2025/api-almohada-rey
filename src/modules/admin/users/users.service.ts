@@ -771,10 +771,6 @@ export class UsersService {
   ): Promise<HttpResponse<string>> {
     try {
       const { email, password } = sendEmailDto;
-      this.logger.debug(
-        `[sendNewPassword] Processing password reset for: ${email}`,
-      );
-
       // Verificaciones previas
       const userDB = await this.findByEmail(email);
       if (!userDB) {
@@ -801,11 +797,6 @@ export class UsersService {
       }
 
       // ACTUALIZACIÓN NATIVA CON BETTER AUTH
-      // Usar Better Auth para actualizar la contraseña de manera nativa
-      this.logger.debug(
-        `[sendNewPassword] Updating password natively with Better Auth for user: ${userDB.id}`,
-      );
-
       // Obtener el hash de la contraseña usando Better Auth
       const hashedPassword =
         await this.betterAuthAdapter.hashPassword(password);
@@ -827,9 +818,6 @@ export class UsersService {
           where: { id: existingAccount.id },
           data: { password: hashedPassword },
         });
-        this.logger.debug(
-          `[sendNewPassword] Password updated in existing account: ${existingAccount.id}`,
-        );
       } else {
         // Crear nueva cuenta si no existe
         await this.prisma.account.create({
@@ -840,15 +828,9 @@ export class UsersService {
             password: hashedPassword,
           },
         });
-        this.logger.debug(
-          `[sendNewPassword] New account created for user: ${userDB.id}`,
-        );
       }
 
       // Enviar email con la nueva contraseña
-      this.logger.debug(
-        `[sendNewPassword] Sending email with new password to: ${email}`,
-      );
       const emailResponse = await this.eventEmitter.emitAsync(
         'user.new-password',
         {

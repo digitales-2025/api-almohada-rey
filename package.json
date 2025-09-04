@@ -20,7 +20,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "prepare": "husky || true",
-    "seed": "ts-node -r tsconfig-paths/register src/scripts/seed.ts"
+    "seed": "ts-node -r tsconfig-paths/register src/scripts/seed.ts",
+    "seed:manual": "echo '⚠️  Los seeds ahora se ejecutan automáticamente al iniciar la aplicación. Este comando es solo para casos especiales.' && ts-node -r tsconfig-paths/register src/scripts/seed.ts"
   },
   "lint-staged": {
     "*.{js,ts,jsx,tsx}": [

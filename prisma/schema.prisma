@@ -9,7 +9,7 @@ datasource db {
 
 // Usuario principal con todos los campos
 model User {
-  id            String   @id @default(cuid())
+  id            String   @id @default(uuid())
   name          String
   email         String   @unique
   emailVerified Boolean?
@@ -525,7 +525,7 @@ model Account {
   password              String?
 
   //boilerplate
-  id        String    @id @default(cuid())
+  id        String    @id @default(uuid())
   isActive  Boolean   @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -538,7 +538,7 @@ model Account {
 }
 
 model Session {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   userId    String
   token     String   @unique
   expiresAt DateTime

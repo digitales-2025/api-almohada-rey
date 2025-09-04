@@ -7,15 +7,8 @@ export class BetterAuthMiddleware implements NestMiddleware {
   private readonly logger = new Logger(BetterAuthMiddleware.name);
 
   async use(req: Request, res: Response, next: NextFunction) {
-    this.logger.debug(
-      `🔍 Middleware intercepted: ${req.method} ${req.path} - Original URL: ${req.originalUrl}`,
-    );
-    this.logger.debug(`🔍 Request headers:`, Object.keys(req.headers));
-    this.logger.debug(`🔍 Cookie header:`, req.headers.cookie || 'NO COOKIES');
-
     // Solo procesar rutas que empiecen con /api/auth
     if (!req.path.startsWith('/api/auth')) {
-      this.logger.debug(`⏭️ Skipping non-auth route: ${req.path}`);
       return next();
     }
 
@@ -44,7 +37,6 @@ export class BetterAuthMiddleware implements NestMiddleware {
 
       // Copiar todas las headers (incluyendo set-cookie para sesiones)
       betterAuthResponse.headers.forEach((value, key) => {
-        this.logger.debug(`📤 Setting header: ${key} = ${value}`);
         res.setHeader(key, value);
       });
 

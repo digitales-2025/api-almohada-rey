@@ -124,8 +124,6 @@ export class PrismaService
       const result = await this.$transaction(async (tx) => {
         return await operation(tx as PrismaTransaction);
       });
-      const duration = Date.now() - startTime;
-      this.logger.debug(`Transaction completed in ${duration}ms`);
       return result;
     } catch (error) {
       const duration = Date.now() - startTime;

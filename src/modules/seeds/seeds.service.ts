@@ -124,8 +124,6 @@ export class SeedsService {
           });
         } else {
           // Usar Better Auth nativo para crear usuario básico
-          this.logger.debug('Creating super admin user with Better Auth...');
-
           const signUpResult = await this.betterAuthAdapter.signUp(
             superAdminSeed.email,
             superAdminSeed.password,
@@ -139,8 +137,6 @@ export class SeedsService {
             );
           }
 
-          this.logger.debug('Better Auth user created successfully');
-
           // Actualizar usuario con campos personalizados
           superadminUser = await prisma.user.update({
             where: { id: signUpResult.user.id },
@@ -152,8 +148,6 @@ export class SeedsService {
               isActive: true,
             },
           });
-
-          this.logger.debug('User profile created successfully');
         }
 
         return {
@@ -212,8 +206,6 @@ export class SeedsService {
           });
         } else {
           // Usar Better Auth nativo para crear usuario básico
-          this.logger.debug('Creating landing user with Better Auth...');
-
           const signUpResult = await this.betterAuthAdapter.signUp(
             landingDefaultUserSeed.email,
             landingDefaultUserSeed.password,
@@ -227,8 +219,6 @@ export class SeedsService {
             );
           }
 
-          this.logger.debug('Better Auth landing user created successfully');
-
           // Actualizar usuario con campos personalizados
           landingUser = await prisma.user.update({
             where: { id: signUpResult.user.id },
@@ -241,8 +231,6 @@ export class SeedsService {
               isActive: true,
             },
           });
-
-          this.logger.debug('Landing user profile created successfully');
         }
 
         return {
