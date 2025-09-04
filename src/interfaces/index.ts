@@ -1,4 +1,9 @@
-export { UserPayload, UserData, UserDataLogin } from './user.type';
+export {
+  UserPayload,
+  UserData,
+  UserDataLogin,
+  UserDataWithPassword,
+} from './user.type';
 
 export { CustomerData, ResponseApiCustomer } from './customer.interface';
 

@@ -5,6 +5,7 @@ import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { generalEnvs } from './config';
 import { IoAdapter } from '@nestjs/platform-socket.io';
+import { SeedsService } from './modules/seeds/seeds.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -12,10 +13,13 @@ async function bootstrap() {
   // Configurar el adaptador WebSocket
   app.useWebSocketAdapter(new IoAdapter(app)); // Añadido para WebSockets
   app.enableCors({
-    origin: [generalEnvs.WEB_URL],
+    origin: [generalEnvs.WEB_URL, generalEnvs.FRONTEND_URL].filter(Boolean), // Filtra valores undefined
     credentials: true,
   });
   app.use(cookieParser());
+
+  // Better Auth se maneja ahora via BetterAuthMiddleware - ya no necesitamos esto aquí
+  // app.use('/api/auth', auth.handler);
 
   app.enableVersioning({
     type: VersioningType.URI,
@@ -90,6 +94,15 @@ async function bootstrap() {
   Logger.log(
     `System local uri: http://localhost:${generalEnvs.PORT ?? 4000}/api`,
   );
+
+  // Ejecutar seeds automáticamente al iniciar la aplicación
+  try {
+    const seedsService = app.get(SeedsService);
+    await seedsService.generateInit();
+    Logger.log('✅ Seeds ejecutados automáticamente al iniciar la aplicación');
+  } catch (error) {
+    Logger.error('❌ Error ejecutando seeds automáticamente:', error.message);
+  }
 
   await app.listen(parseInt(generalEnvs.PORT));
 }

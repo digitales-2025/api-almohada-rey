@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
+
 import { CreateUserDto, UpdateUserDto } from './dto';
 import { SendEmailDto } from './dto/send-email.dto';
 import { UpdatePasswordDto } from '../auth/dto/update-password.dto';
@@ -19,6 +19,7 @@ import { HttpResponse, UserData, UserPayload } from 'src/interfaces';
 import { handleException } from 'src/utils';
 import { PaginationService } from 'src/pagination/pagination.service';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
+import { BetterAuthAdapter } from '../auth/better-auth.adapter';
 
 @Injectable()
 export class UsersService {
@@ -28,6 +29,7 @@ export class UsersService {
     private readonly eventEmitter: TypedEventEmitter,
     private readonly audit: AuditService,
     private readonly paginationService: PaginationService,
+    private readonly betterAuthAdapter: BetterAuthAdapter,
   ) {}
 
   /**
@@ -70,17 +72,28 @@ export class UsersService {
           });
         }
 
-        // Encriptamos la contraseña
-        const hashedPassword = await bcrypt.hash(password, 10);
+        // Crear usuario con Better Auth nativo
+        const signUpResult = await this.betterAuthAdapter.signUp(
+          email,
+          password,
+          dataUser.name,
+        );
 
-        // Creamos el usuario
-        const newUser = await prisma.user.create({
+        if (!signUpResult.user) {
+          throw new BadRequestException(
+            'Failed to create user with Better Auth',
+          );
+        }
+
+        // Actualizar campos personalizados en el usuario creado
+        const newUser = await prisma.user.update({
+          where: { id: signUpResult.user.id },
           data: {
-            email,
-            ...dataUser,
-            password: hashedPassword,
+            phone: dataUser.phone,
             mustChangePassword: false,
             userRol: userRol,
+            isSuperAdmin: false,
+            isActive: true,
           },
           select: {
             id: true,
@@ -758,69 +771,115 @@ export class UsersService {
   ): Promise<HttpResponse<string>> {
     try {
       const { email, password } = sendEmailDto;
+      this.logger.debug(
+        `[sendNewPassword] Processing password reset for: ${email}`,
+      );
 
+      // Verificaciones previas
       const userDB = await this.findByEmail(email);
-      // Encriptamos la contraseña
-      const hashedPassword = await bcrypt.hash(password, 10);
+      if (!userDB) {
+        throw new BadRequestException('Email not found');
+      }
 
-      const send = await this.prisma.$transaction(async (prisma) => {
-        // Verificamos que el email ya existe y este activo
-        const existEmail = await this.checkEmailExist(email);
+      // Verificar que no actualice su propia contraseña
+      if (userDB.id === user.id) {
+        throw new BadRequestException('You cannot update your own password');
+      }
 
-        if (!existEmail) {
-          throw new BadRequestException('Email not found');
-        }
+      // Verificar que el email existe y está activo
+      const existEmail = await this.checkEmailExist(email);
+      if (!existEmail) {
+        throw new BadRequestException('Email not found');
+      }
 
-        // Verificamos si el email ya existe y esta inactivo
-        const inactiveEmail = await this.checkEmailInactive(email);
+      // Verificar si el email está inactivo
+      const inactiveEmail = await this.checkEmailInactive(email);
+      if (inactiveEmail) {
+        throw new BadRequestException(
+          'Email already exists but inactive, contact the administrator to reactivate the account',
+        );
+      }
 
-        if (inactiveEmail) {
-          throw new BadRequestException(
-            'Email already exists but inactive, contact the administrator to reactivate the account',
-          );
-        }
+      // ACTUALIZACIÓN NATIVA CON BETTER AUTH
+      // Usar Better Auth para actualizar la contraseña de manera nativa
+      this.logger.debug(
+        `[sendNewPassword] Updating password natively with Better Auth for user: ${userDB.id}`,
+      );
 
-        // Verificamos que no actualice su propia contraseña
-        if (userDB.id === user.id) {
-          throw new BadRequestException('You cannot update your own password');
-        }
+      // Obtener el hash de la contraseña usando Better Auth
+      const hashedPassword =
+        await this.betterAuthAdapter.hashPassword(password);
 
-        await prisma.user.update({
-          where: { id: userDB.id },
+      // Actualizar directamente en la tabla Account usando Better Auth
+      const normalizedEmail = userDB.email.toLowerCase();
+
+      // Buscar la cuenta existente
+      const existingAccount = await this.prisma.account.findFirst({
+        where: {
+          userId: userDB.id,
+          providerId: { in: ['email', 'credential'] },
+        },
+      });
+
+      if (existingAccount) {
+        // Actualizar contraseña en la cuenta existente
+        await this.prisma.account.update({
+          where: { id: existingAccount.id },
+          data: { password: hashedPassword },
+        });
+        this.logger.debug(
+          `[sendNewPassword] Password updated in existing account: ${existingAccount.id}`,
+        );
+      } else {
+        // Crear nueva cuenta si no existe
+        await this.prisma.account.create({
           data: {
+            userId: userDB.id,
+            providerId: 'email',
+            accountId: normalizedEmail,
             password: hashedPassword,
           },
         });
-        const emailResponse = await this.eventEmitter.emitAsync(
-          'user.new-password',
-          {
-            name: userDB.name.toUpperCase(),
-            email,
-            password,
-            webAdmin: process.env.WEB_URL,
-          },
+        this.logger.debug(
+          `[sendNewPassword] New account created for user: ${userDB.id}`,
         );
+      }
 
-        if (emailResponse.every((response) => response === true)) {
-          return {
-            statusCode: HttpStatus.OK,
-            message: `Email sent successfully`,
-            data: sendEmailDto.email,
-          };
-        } else {
-          throw new BadRequestException('Failed to send email');
-        }
-      });
-      return send;
+      // Enviar email con la nueva contraseña
+      this.logger.debug(
+        `[sendNewPassword] Sending email with new password to: ${email}`,
+      );
+      const emailResponse = await this.eventEmitter.emitAsync(
+        'user.new-password',
+        {
+          name: userDB.name.toUpperCase(),
+          email,
+          password, // Enviar la contraseña en texto plano para que el usuario la vea
+          webAdmin: process.env.WEB_URL,
+        },
+      );
+
+      if (emailResponse.every((response) => response === true)) {
+        this.logger.log(
+          `[sendNewPassword] Password updated and email sent successfully to: ${email}`,
+        );
+        return {
+          statusCode: HttpStatus.OK,
+          message: `Email sent successfully`,
+          data: sendEmailDto.email,
+        };
+      } else {
+        throw new BadRequestException('Failed to send email');
+      }
     } catch (error) {
       this.logger.error(
-        `Error sending email to: ${sendEmailDto.email}`,
+        `Error sending new password to: ${sendEmailDto.email}`,
         error.stack,
       );
       if (error instanceof BadRequestException) {
         throw error;
       }
-      handleException(error, 'Error sending email');
+      handleException(error, 'Error sending new password');
     }
   }
 
@@ -838,20 +897,11 @@ export class UsersService {
   > {
     const clientDB = await this.prisma.user.findUnique({
       where: {
-        email_isActive: {
-          email,
-          isActive: true,
-        },
+        email,
+        isActive: true,
       },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        password: true,
-        isSuperAdmin: true,
-        mustChangePassword: true,
-        userRol: true,
+      include: {
+        accounts: true,
       },
     });
 
@@ -859,12 +909,39 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
+    // Buscar específicamente la cuenta de email que Better Auth usa
+    const emailAccount = clientDB.accounts.find(
+      (acc) => acc.providerId === 'email',
+    );
+
+    console.log('🔍 [DEBUG] findByEmail - All accounts:', clientDB.accounts);
+    console.log('🔍 [DEBUG] findByEmail - Email account found:', emailAccount);
+
+    // Si no hay cuenta de email, retornar datos del usuario sin password
+    // El password se creará cuando se llame a updateUserPassword
+    if (!emailAccount) {
+      console.log(
+        '🔍 [DEBUG] findByEmail - No email account found, will be created on password update',
+      );
+
+      return {
+        id: clientDB.id,
+        name: clientDB.name,
+        email: clientDB.email,
+        phone: clientDB.phone,
+        password: null, // No hay password aún
+        isSuperAdmin: clientDB.isSuperAdmin,
+        mustChangePassword: clientDB.mustChangePassword,
+        userRol: clientDB.userRol,
+      };
+    }
+
     return {
       id: clientDB.id,
       name: clientDB.name,
       email: clientDB.email,
       phone: clientDB.phone,
-      password: clientDB.password,
+      password: emailAccount.password,
       isSuperAdmin: clientDB.isSuperAdmin,
       mustChangePassword: clientDB.mustChangePassword,
       userRol: clientDB.userRol,
@@ -879,10 +956,8 @@ export class UsersService {
   async checkEmailExist(email: string): Promise<boolean> {
     const clientDB = await this.prisma.user.findUnique({
       where: {
-        email_isActive: {
-          email,
-          isActive: true,
-        },
+        email,
+        isActive: true,
       },
     });
 
@@ -897,10 +972,8 @@ export class UsersService {
   async checkEmailInactive(email: string): Promise<boolean> {
     const clientDB = await this.prisma.user.findUnique({
       where: {
-        email_isActive: {
-          email,
-          isActive: false,
-        },
+        email,
+        isActive: false,
       },
     });
 
@@ -915,10 +988,8 @@ export class UsersService {
   async findByEmailInactive(email: string): Promise<Omit<UserData, 'claims'>> {
     const clientDB = await this.prisma.user.findUnique({
       where: {
-        email_isActive: {
-          email,
-          isActive: false,
-        },
+        email,
+        isActive: false,
       },
       select: {
         id: true,
@@ -1012,16 +1083,32 @@ export class UsersService {
     updatePasswordDto: UpdatePasswordDto,
   ): Promise<boolean> {
     try {
-      const hashingPassword = bcrypt.hashSync(
+      // Usar Better Auth nativo para hash de contraseña
+      const hashingPassword = await this.betterAuthAdapter.hashPassword(
         updatePasswordDto.newPassword,
-        10,
       );
 
-      const userUpdate = await this.prisma.user.update({
+      // Actualizar mustChangePassword en User
+      await this.prisma.user.update({
         where: { id: userId },
         data: {
-          password: hashingPassword,
           mustChangePassword: false,
+        },
+      });
+
+      // Actualizar password en Account
+      const account = await this.prisma.account.findFirst({
+        where: { userId, providerId: 'email' },
+      });
+
+      if (!account) {
+        throw new Error('User account not found');
+      }
+
+      const userUpdate = await this.prisma.account.update({
+        where: { id: account.id },
+        data: {
+          password: hashingPassword,
         },
       });
 
@@ -1032,6 +1119,72 @@ export class UsersService {
         error.stack,
       );
       handleException(error, 'Error updating password');
+    }
+  }
+
+  /**
+   * Actualizar contraseña del usuario en la tabla Account (como tu amigo)
+   */
+  async updateUserPassword(
+    userId: string,
+    hashedPassword: string,
+  ): Promise<boolean> {
+    try {
+      console.log(
+        '🔍 [DEBUG] updateUserPassword - Updating password for user:',
+        userId,
+      );
+
+      // Obtener email normalizado del usuario
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+      });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      const normalizedEmail = user.email.toLowerCase();
+
+      // Buscar cuentas existentes separadas
+      const emailAccount = await this.prisma.account.findFirst({
+        where: { userId, providerId: 'email' },
+      });
+      const credentialAccount = await this.prisma.account.findFirst({
+        where: { userId, providerId: 'credential' },
+      });
+
+      if (!emailAccount && !credentialAccount) {
+        console.log(
+          '🔍 [DEBUG] updateUserPassword - No account found, creating one',
+        );
+
+        // Crear la cuenta si no existe
+        await this.prisma.account.create({
+          data: {
+            userId: userId,
+            providerId: 'email',
+            accountId: normalizedEmail,
+            password: hashedPassword,
+          },
+        });
+      } else {
+        // Actualizar la contraseña en la cuenta preferida
+        const targetAccountId = emailAccount?.id ?? credentialAccount!.id;
+        await this.prisma.account.update({
+          where: { id: targetAccountId },
+          data: { password: hashedPassword },
+        });
+      }
+
+      console.log(
+        '🔍 [DEBUG] updateUserPassword - Password updated successfully',
+      );
+      return true;
+    } catch (error) {
+      console.error('🔍 [DEBUG] updateUserPassword - Error:', error);
+      return false;
     }
   }
 }

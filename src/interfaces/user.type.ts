@@ -18,6 +18,8 @@ export type UserData = Omit<
   'isActive' | 'mustChangePassword' | 'lastLogin'
 >;
 
+export type UserDataWithPassword = Omit<UserPayload, 'isActive' | 'lastLogin'>;
+
 export type UserDataLogin = Pick<
   UserPayload,
   'id' | 'name' | 'email' | 'phone' | 'userRol'

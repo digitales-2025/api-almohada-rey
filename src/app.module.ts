@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -20,6 +20,7 @@ import { ReservationModule as LandingReservationModule } from './modules/landing
 import { ExpenseModule } from './modules/admin/expense/expense.module';
 import { WarehouseModule } from './modules/admin/warehouse/warehouse.module';
 import { ReportsModule } from './modules/admin/reports/reports.module';
+import { BetterAuthMiddleware } from './modules/admin/auth/better-auth.middleware';
 
 @Module({
   imports: [
@@ -46,6 +47,10 @@ import { ReportsModule } from './modules/admin/reports/reports.module';
     ReportsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, BetterAuthMiddleware],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(BetterAuthMiddleware).forRoutes('api/auth/*'); // Solo aplicar a rutas de auth
+  }
+}

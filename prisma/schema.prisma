@@ -7,31 +7,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Usuario principal con todos los campos
 model User {
-  id                 String      @id @unique @default(uuid())
-  name               String
-  userRol            UserRolType
-  email              String
-  password           String
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  emailVerified Boolean?
+  image         String?
+
+  // Campos personalizados (opcionales para Better Auth)
   phone              String?
-  isSuperAdmin       Boolean     @default(false)
-  lastLogin          DateTime    @default(now()) @db.Timestamptz(6)
-  isActive           Boolean     @default(true)
-  mustChangePassword Boolean     @default(true)
-  isLandingUser      Boolean     @default(false) // Indicates if the user was created through the landing page and if that's the case, notify the admin to complete the missing data
+  userRol            UserRolType?
+  isSuperAdmin       Boolean      @default(false)
+  lastLogin          DateTime     @default(now()) @db.Timestamptz(6)
+  isActive           Boolean      @default(true)
+  mustChangePassword Boolean      @default(true)
+  isLandingUser      Boolean      @default(false)
 
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt
 
-  // Relación con auditorías (acciones realizadas por este usuario)
-  auditsPerformed Audit[] @relation("AuditPerformedBy")
+  // Relaciones de Better Auth
+  accounts Account[]
+  sessions Session[]
 
-  // Relación con checklists de limpieza (personal que supervisa la limpieza)
+  // Todas tus relaciones existentes
+  auditsPerformed    Audit[]             @relation("AuditPerformedBy")
   cleaningChecklists CleaningChecklist[] @relation("CleaningChecklistUser")
-
-  reservations Reservation[]
-
-  @@unique([email, isActive])
+  reservations       Reservation[]
 }
 
 enum UserRolType {
@@ -192,8 +195,8 @@ model Reservation {
   customerId             String? //Required for the admin, but optional for the landing page
   room                   Room              @relation(fields: [roomId], references: [id])
   roomId                 String
-  user                   User?             @relation(fields: [userId], references: [id]) //Required for the admin, but optional for the landing page
-  userId                 String? //Required for the admin, but optional for the landing page
+  userProfile            User?             @relation(fields: [userProfileId], references: [id]) //Required for the admin, but optional for the landing page
+  userProfileId          String? //Required for the admin, but optional for the landing page
   reservationDate        DateTime          @default(now()) @db.Timestamptz(6)
   checkInDate            DateTime          @db.Timestamptz(6)
   checkOutDate           DateTime          @db.Timestamptz(6)
@@ -506,4 +509,54 @@ model CustomerReservationHistory {
   updatedAt  DateTime @updatedAt
 
   @@map("customer_reservation_history")
+}
+
+// Tablas requeridas por Better Auth
+model Account {
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+
+  //boilerplate
+  id        String    @id @default(cuid())
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@map("accounts")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  updatedAt DateTime
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
