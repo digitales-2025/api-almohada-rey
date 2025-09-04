@@ -1,68 +1,157 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
   <%- include("./shared/head.ejs") %>
-  <table width="100%" border="0" cellspacing="0" cellpadding="0">
-    <tr>
-      <td align="center">
-        <table width="600" border="0" cellspacing="0" cellpadding="0">
-          <tr>
-            <td align="center">
-              <h2>Hola, <strong><%= locals.name %></strong></h2>
-              <p>
-                Estamos encantados de que te hayas unido a <%= locals.business
-                %>. Tu cuenta ha sido creada y estás listo para comenzar.
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td align="left">
-              <p>Aquí están tus credenciales temporales de inicio de sesión:</p>
-              <table
-                style="padding-left: 20px"
-                width="100%"
-                border="0"
-                cellspacing="0"
-                cellpadding="0"
-              >
-                <tr>
-                  <td><strong>Email:</strong> <%= locals.email %></td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>Contraseña temporal:</strong>
-                    <%= locals.password %>
-                  </td>
-                </tr>
-              </table>
-              <p>
-                Para garantizar la seguridad de tu cuenta, te pedimos que
-                <span style="color: #f29c3e; font-style: italic"
-                  >cambies esta contraseña</span
-                >
-                tan pronto como inicies sesión.
-              </p>
-              <p>
-                Puedes acceder a tu cuenta haciendo clic en el botón de abajo:
-              </p>
-              <p>
-                <a target="_blank" href="<%= locals.webAdmin %>"
-                  >Iniciar sesión</a
-                >
-              </p>
-              <p>
-                Si necesitas ayuda o tienes alguna pregunta, no dudes en ponerte
-                en contacto con nosotros.
-              </p>
-              <p>
-                Gracias por unirte a nosotros. ¡Estamos emocionados de trabajar
-                contigo!
-              </p>
-              <p>Saludos,<br />El equipo de <%= locals.business %></p>
-            </td>
-          </tr>
-          <%- include("./shared/footer.ejs") %>
-        </table>
-      </td>
-    </tr>
-  </table>
+  <body>
+    <table
+      width="100%"
+      border="0"
+      cellspacing="0"
+      cellpadding="0"
+      style="background-color: #fcfcfc"
+    >
+      <tr>
+        <td align="center" style="padding: 40px 20px">
+          <div class="email-container">
+            <!-- Header -->
+            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+              <tr>
+                <td class="email-header">
+                  <h1>¡Bienvenido a <%= locals.business %>!</h1>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Content -->
+            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+              <tr>
+                <td class="email-content">
+                  <h2>Hola, <strong><%= locals.name %></strong></h2>
+
+                  <p>
+                    Estamos encantados de que te hayas unido a
+                    <strong><%= locals.business %></strong>. Tu cuenta ha sido
+                    creada y estás listo para comenzar.
+                  </p>
+
+                  <p>
+                    Aquí están tus credenciales temporales de inicio de sesión:
+                  </p>
+
+                  <!-- Credentials Info Table -->
+                  <table
+                    class="info-table"
+                    width="100%"
+                    border="0"
+                    cellspacing="0"
+                    cellpadding="0"
+                  >
+                    <tr>
+                      <td style="padding: 12px 0">
+                        <strong>Email:</strong>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0">
+                        <div
+                          style="
+                            background-color: #ffffff;
+                            border: 1px solid #e5e5e5;
+                            border-radius: 6px;
+                            padding: 12px;
+                            font-family: 'Courier New', monospace;
+                            font-size: 14px;
+                            color: #393939;
+                          "
+                        >
+                          <%= locals.email %>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 12px 0">
+                        <strong>Contraseña temporal:</strong>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0">
+                        <div
+                          style="
+                            background-color: #ffffff;
+                            border: 2px solid #ad935c;
+                            border-radius: 6px;
+                            padding: 12px;
+                            font-family: 'Courier New', monospace;
+                            font-size: 16px;
+                            font-weight: 600;
+                            color: #393939;
+                            text-align: center;
+                            letter-spacing: 1px;
+                          "
+                        >
+                          <%= locals.password %>
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <div class="alert alert-warning">
+                    <p style="margin: 0; font-size: 14px">
+                      <strong>Importante:</strong> Para garantizar la seguridad
+                      de tu cuenta, te pedimos que
+                      <span style="color: #ad935c; font-weight: 600"
+                        >cambies esta contraseña</span
+                      >
+                      tan pronto como inicies sesión.
+                    </p>
+                  </div>
+
+                  <p>
+                    Puedes acceder a tu cuenta haciendo clic en el siguiente
+                    botón:
+                  </p>
+
+                  <div style="text-align: center; margin: 32px 0">
+                    <a
+                      href="<%= locals.webAdmin %>"
+                      target="_blank"
+                      class="btn"
+                    >
+                      Iniciar Sesión
+                    </a>
+                  </div>
+
+                  <p>
+                    Si necesitas ayuda o tienes alguna pregunta, no dudes en
+                    ponerte en contacto con nosotros.
+                  </p>
+
+                  <p
+                    style="
+                      margin-top: 32px;
+                      font-size: 18px;
+                      color: #ad935c;
+                      font-weight: 600;
+                    "
+                  >
+                    Gracias por unirte a nosotros. ¡Estamos emocionados de
+                    trabajar contigo!
+                  </p>
+
+                  <p style="margin-top: 24px">
+                    Saludos,<br />
+                    <strong>El equipo de <%= locals.business %></strong>
+                  </p>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Footer -->
+            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+              <%- include("./shared/footer.ejs") %>
+            </table>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </body>
 </html>
