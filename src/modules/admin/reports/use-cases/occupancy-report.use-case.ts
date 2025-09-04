@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import { OccupancyStatsResponse } from '../interfaces/occupancy';
+import { ReportsRepository } from '../repositories/reports.repository';
+import { colors } from 'src/utils/colors/colors.utils';
 
 @Injectable()
 export class OccupancyReportUseCase {
+  constructor(private readonly reportsRepository: ReportsRepository) {}
+
   async execute(
     data: OccupancyStatsResponse | null | undefined,
     { month, year }: { month: number; year: number },
@@ -57,20 +61,6 @@ export class OccupancyReportUseCase {
       'Noviembre',
       'Diciembre',
     ];
-
-    // -- Definir colores de tema --
-    const colors = {
-      headerBg: 'FF4472C4', // Azul principal
-      headerText: 'FFFFFFFF', // Blanco
-      titleBg: 'FF5B9BD5', // Azul claro
-      subTitleBg: 'FFD6E6F4', // Azul muy claro
-      alternateBg: 'FFF2F2F2', // Gris claro para filas alternadas
-      highlightBg: 'FFFFDECE', // Amarillo claro para destacados
-      arrivalsColor: 'FF70AD47', // Verde para arribos
-      overnightsColor: 'FFE84234', // Rojo para pernoctaciones
-      borderColor: 'FFB4B4B4', // Gris para bordes
-      totalsBg: 'FFDAEEF3', // Azul pálido para totales
-    };
 
     // -- Título principal --
     const title = `INFORME DE PERNOCTACIONES - ${monthNames[month].toUpperCase()} ${year}`;
@@ -487,6 +477,127 @@ export class OccupancyReportUseCase {
     sheet.addRow([]);
     sheet.addRow([]);
 
+    // -- Razones de Reserva --
+    const reasonsTitle =
+      'RAZONES DE RESERVA - ANÁLISIS PARA TOMA DE DECISIONES';
+    sheet.mergeCells(`A${sheet.rowCount}:H${sheet.rowCount}`);
+    const reasonsTitleCell = sheet.getCell(`A${sheet.rowCount}`);
+    reasonsTitleCell.value = reasonsTitle;
+    reasonsTitleCell.font = {
+      bold: true,
+      size: 14,
+      color: { argb: colors.headerText },
+    };
+    reasonsTitleCell.alignment = {
+      horizontal: 'center',
+      vertical: 'middle',
+    };
+    reasonsTitleCell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: colors.titleBg },
+    };
+    sheet.getRow(sheet.rowCount).height = 24;
+
+    // Encabezados para razones
+    sheet.addRow([
+      'Razón de Reserva',
+      'Arribos',
+      'Pernoctaciones',
+      'Huéspedes',
+      'Estancia Media',
+      '% del Total',
+      'Prioridad',
+    ]);
+
+    // Aplicar estilo a los encabezados de razones
+    const reasonsHeaderRow = sheet.lastRow;
+    reasonsHeaderRow?.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: colors.headerText } };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: colors.headerBg },
+      };
+      cell.border = {
+        top: { style: 'thin', color: { argb: colors.borderColor } },
+        left: { style: 'thin', color: { argb: colors.borderColor } },
+        bottom: { style: 'thin', color: { argb: colors.borderColor } },
+        right: { style: 'thin', color: { argb: colors.borderColor } },
+      };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
+    sheet.getRow(sheet.rowCount).height = 24;
+
+    // Obtener datos de razones reales del repositorio
+    const reasonsData = await this.getReasonsData(month, year);
+
+    // Insertar datos de razones
+    reasonsData.forEach((reason, index) => {
+      const reasonRow = sheet.addRow([
+        reason.reason,
+        reason.arrivals,
+        reason.overnights,
+        reason.guests,
+        reason.averageStayDuration,
+        `${reason.percentageOfTotal}%`,
+        this.getPriorityLevel(reason.percentageOfTotal),
+      ]);
+
+      // Alternar colores de fondo
+      const fillColor = index % 2 === 0 ? 'FFFFFFFF' : colors.alternateBg;
+      reasonRow.eachCell((cell, colNumber) => {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: fillColor },
+        };
+        cell.border = {
+          top: { style: 'thin', color: { argb: colors.borderColor } },
+          left: { style: 'thin', color: { argb: colors.borderColor } },
+          bottom: { style: 'thin', color: { argb: colors.borderColor } },
+          right: { style: 'thin', color: { argb: colors.borderColor } },
+        };
+
+        // Alineación según la columna
+        if (colNumber === 1) {
+          cell.alignment = { horizontal: 'left', vertical: 'middle' };
+          cell.font = { bold: true };
+        } else if (colNumber === 6) {
+          // Columna de porcentaje
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          if (reason.percentageOfTotal > 30) {
+            cell.font = { bold: true, color: { argb: `FF${colors.SUCCESS}` } }; // Verde corporativo para alto porcentaje
+          } else if (reason.percentageOfTotal > 15) {
+            cell.font = {
+              bold: true,
+              color: { argb: `FF${colors.DARK_GOLD}` },
+            }; // Dorado oscuro para medio porcentaje
+          }
+        } else if (colNumber === 7) {
+          // Columna de prioridad
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          const priority = this.getPriorityLevel(reason.percentageOfTotal);
+          if (priority === 'Alta') {
+            cell.font = { bold: true, color: { argb: `FF${colors.WARNING}` } }; // Rojo corporativo para alta prioridad
+          } else if (priority === 'Media') {
+            cell.font = {
+              bold: true,
+              color: { argb: `FF${colors.DARK_GOLD}` },
+            }; // Dorado oscuro para media prioridad
+          } else {
+            cell.font = { bold: true, color: { argb: `FF${colors.SUCCESS}` } }; // Verde corporativo para baja prioridad
+          }
+        } else {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        }
+      });
+    });
+
+    // Añadir filas en blanco
+    sheet.addRow([]);
+    sheet.addRow([]);
+
     // -- Resumen global --
     const globalSummaryTitle = 'RESUMEN GLOBAL';
     sheet.mergeCells(`A${sheet.rowCount}:H${sheet.rowCount}`);
@@ -603,5 +714,46 @@ export class OccupancyReportUseCase {
     }
 
     return result;
+  }
+
+  /**
+   * Obtiene datos de razones de reserva del repositorio
+   * @private
+   */
+  private async getReasonsData(
+    month: number,
+    year: number,
+  ): Promise<
+    Array<{
+      reason: string;
+      arrivals: number;
+      overnights: number;
+      guests: number;
+      averageStayDuration: number;
+      percentageOfTotal: number;
+    }>
+  > {
+    try {
+      const reasonsStats =
+        await this.reportsRepository.getReservationReasonsStats(month, year);
+      return reasonsStats.reasons;
+    } catch (error) {
+      console.error('Error obteniendo estadísticas de razones:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Determina el nivel de prioridad basado en el porcentaje
+   * @private
+   */
+  private getPriorityLevel(percentage: number): string {
+    if (percentage > 30) {
+      return 'Alta';
+    } else if (percentage > 15) {
+      return 'Media';
+    } else {
+      return 'Baja';
+    }
   }
 }

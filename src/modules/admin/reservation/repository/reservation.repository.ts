@@ -166,4 +166,29 @@ export class ReservationRepository extends BaseRepository<Reservation> {
 
     return reservations.map((reservation) => reservation.id);
   }
+
+  /**
+   * Obtiene todas las razones únicas de las reservas activas
+   * @returns Lista de razones únicas ordenadas alfabéticamente
+   */
+  async getAllReasons(): Promise<{ reason: string }[]> {
+    const reasons = await this.prisma.reservation.findMany({
+      where: {
+        reason: {
+          not: null,
+        },
+      },
+      select: {
+        reason: true,
+      },
+      distinct: ['reason'],
+      orderBy: {
+        reason: 'asc',
+      },
+    });
+
+    return reasons
+      .map((item) => ({ reason: item.reason }))
+      .filter((item) => item.reason);
+  }
 }

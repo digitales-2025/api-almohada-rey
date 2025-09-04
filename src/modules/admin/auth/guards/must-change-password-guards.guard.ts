@@ -13,20 +13,18 @@ export class MustChangePasswordGuard implements CanActivate {
   ): boolean | Promise<boolean> | Observable<boolean> {
     const request = context.switchToHttp().getRequest();
 
-    const cookies = request.cookies;
-
-    if (!cookies.ar_token) {
-      throw new BadRequestException('Token not found');
-    }
-
     try {
       const user = request.user;
+      if (!user) {
+        throw new BadRequestException('User not found in request');
+      }
+
       if (user.mustChangePassword) {
         throw new BadRequestException('You must change your password');
       }
       return true;
     } catch (error) {
-      throw new BadRequestException('Token invalid', error);
+      throw new BadRequestException('Session invalid', error);
     }
   }
 }

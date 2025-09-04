@@ -244,6 +244,20 @@ export class CustomersService {
    * @returns Datos del cliente obtenidos desde la API de Perú
    */
   async getDataByDni(dni: string): Promise<ResponseApiCustomer> {
+    // Primero consultar en la base de datos local
+    const cachedData = await this.prisma.apiPeruCache.findUnique({
+      where: { dni },
+    });
+
+    if (cachedData) {
+      this.logger.log(`DNI ${dni} encontrado en caché local`);
+      return {
+        name: cachedData.name,
+        dni: cachedData.dni,
+      };
+    }
+
+    // Si no está en caché, consultar la API de Perú
     const token = this.configService.get<string>('API_PERU_TOKEN');
     const baseUrl = this.configService.get<string>('API_PERU_BASE_URL');
 
@@ -251,23 +265,42 @@ export class CustomersService {
       throw new Error('API Peru token is not configured');
     }
 
-    const url = `${baseUrl}/dni/${dni}?api_token=${token}`;
+    const url = `${baseUrl}/api/dni`;
 
     try {
-      const response$ = this.httpService.get(url);
+      const response$ = this.httpService.post(
+        url,
+        { dni },
+        {
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
       const response = await lastValueFrom(response$);
       const data = response.data?.data;
 
-      if (!data || !data.nombres) {
+      if (!data || !data.nombre_completo) {
         throw new Error('DNI no encontrado o inválido.');
       }
 
-      // Concatenar nombres y apellidos para formar el nombre completo
-      const fullName =
-        `${data.nombres || ''} ${data.apellido_paterno || ''} ${data.apellido_materno || ''}`.trim();
+      // Usar el nombre completo que viene de la API
+      const fullName = data.nombre_completo;
 
       // Convertir a formato capitalizado (primera letra de cada palabra en mayúscula)
       const capitalizedName = this.capitalizeWithAccents(fullName);
+
+      // Guardar en la base de datos para futuras consultas
+      await this.prisma.apiPeruCache.create({
+        data: {
+          dni: data.numero,
+          name: capitalizedName,
+        },
+      });
+
+      this.logger.log(`DNI ${dni} consultado en API Peru y guardado en caché`);
 
       return {
         name: capitalizedName,
@@ -1141,6 +1174,30 @@ export class CustomersService {
             }
 
             rowData[fieldName] = value;
+          } else if (colIndex - 1 >= 16) {
+            // Para columnas a partir de la Q (índice 16), guardar como fechas de historial
+            let value: unknown = cell.value;
+
+            // Manejar diferentes tipos de valores de celda
+            if (value && typeof value === 'object') {
+              if ('result' in value) {
+                value = value.result;
+              } else if ('text' in value && value.text) {
+                value = value.text;
+              } else if ('richText' in value) {
+                value = String(cell.text);
+              }
+            }
+
+            // Si es una fecha, formatearla como string YYYY-MM-DD
+            if (value instanceof Date) {
+              value = value.toISOString().split('T')[0];
+            }
+
+            // Solo guardar si hay un valor
+            if (value && String(value).trim()) {
+              rowData[`history_date_${colIndex - 16}`] = value;
+            }
           }
         });
 
@@ -1197,7 +1254,14 @@ export class CustomersService {
           }
 
           // Si no es duplicado, crear el cliente
-          await this.createCustomerWithoutValidation(customerData, user);
+          const newCustomer = await this.createCustomerWithoutValidation(
+            customerData,
+            user,
+          );
+
+          // Procesar fechas de reservas anteriores si existen
+          await this.processReservationHistoryDates(row, newCustomer.id);
+
           successful++;
         } catch (error) {
           failed++;
@@ -1426,6 +1490,52 @@ export class CustomersService {
     instructionsData.forEach((row) => {
       sheet.addRow(row);
     });
+
+    // Añadir espacio antes de la información de fechas de reservas
+    sheet.addRow([]);
+    sheet.addRow([]);
+
+    // INFORMACIÓN SOBRE FECHAS DE RESERVAS ANTERIORES
+    sheet.addRow(['FECHAS DE RESERVAS ANTERIORES', '', '', '']);
+    const historyHeaderRow = sheet.lastRow;
+    historyHeaderRow.getCell(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF70AD47' },
+    };
+    historyHeaderRow.getCell(1).font = {
+      bold: true,
+      color: { argb: 'FFFFFFFF' },
+    };
+    historyHeaderRow.getCell(1).alignment = { horizontal: 'center' };
+    sheet.mergeCells(`A${historyHeaderRow.number}:D${historyHeaderRow.number}`);
+
+    // Instrucciones para fechas de reservas anteriores
+    sheet.addRow(['COLUMNA', 'DESCRIPCIÓN', 'OBLIGATORIO', 'FORMATO']);
+    sheet.addRow([
+      'Q en adelante',
+      'Fechas de reservas anteriores del cliente',
+      'No',
+      'YYYY-MM-DD (ej: 2023-12-25)',
+    ]);
+    sheet.addRow([
+      '',
+      'Se pueden agregar múltiples fechas en columnas consecutivas',
+      'No',
+      'Una fecha por columna',
+    ]);
+    sheet.addRow([
+      '',
+      'Solo se procesarán fechas válidas (formato YYYY-MM-DD)',
+      'No',
+      'Las fechas inválidas serán ignoradas',
+    ]);
+    sheet.addRow([
+      '',
+      'Estas fechas se guardarán en el historial del cliente',
+      'No',
+      'Para consultas futuras',
+    ]);
 
     // Añadir espacio antes de la tabla de traducciones
     sheet.addRow([]);
@@ -1727,6 +1837,74 @@ export class CustomersService {
     }
 
     return customerDto;
+  }
+
+  /**
+   * Procesar fechas de reservas anteriores desde las columnas del Excel
+   * @param row Fila del Excel con los datos
+   * @param customerId ID del cliente creado
+   */
+  private async processReservationHistoryDates(
+    row: Record<string, unknown>,
+    customerId: string,
+  ): Promise<void> {
+    try {
+      // Procesar columnas a partir de la M (índice 12) en busca de fechas válidas
+      const validDates: string[] = [];
+
+      // Iterar desde la columna Q (índice 16) hasta el final
+      for (let i = 0; i < 50; i++) {
+        // Límite de 50 columnas para evitar bucles infinitos
+        const columnKey = `history_date_${i}`;
+        const dateValue = row[columnKey];
+
+        if (dateValue && typeof dateValue === 'string' && dateValue.trim()) {
+          const trimmedDate = dateValue.trim();
+
+          // Validar formato de fecha YYYY-MM-DD
+          if (this.isValidDateFormat(trimmedDate)) {
+            validDates.push(trimmedDate);
+          }
+        }
+      }
+
+      // Crear registros de historial para cada fecha válida
+      if (validDates.length > 0) {
+        await this.prisma.customerReservationHistory.createMany({
+          data: validDates.map((date) => ({
+            customerId,
+            date,
+          })),
+        });
+
+        this.logger.log(
+          `Creado historial de reservas para cliente ${customerId}: ${validDates.length} fechas`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Error procesando fechas de historial para cliente ${customerId}: ${error.message}`,
+        error.stack,
+      );
+      // No lanzar error para no interrumpir la importación
+    }
+  }
+
+  /**
+   * Validar si una cadena tiene formato de fecha YYYY-MM-DD
+   * @param dateString Cadena a validar
+   * @returns true si es una fecha válida
+   */
+  private isValidDateFormat(dateString: string): boolean {
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(dateString)) {
+      return false;
+    }
+
+    const date = new Date(dateString);
+    return (
+      !isNaN(date.getTime()) && date.toISOString().split('T')[0] === dateString
+    );
   }
 
   /**

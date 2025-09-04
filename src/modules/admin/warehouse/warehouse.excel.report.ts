@@ -1,24 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import { WarehouseData } from 'src/interfaces';
+import { colors } from 'src/utils/colors/colors.utils';
 
 @Injectable()
 export class WarehouseExcelReport {
   private readonly logger = new Logger(WarehouseExcelReport.name);
-
-  // Colores corporativos actualizados
-  private readonly COLORS = {
-    PRIMARY: 'AF8C4F', // Dorado corporativo
-    SECONDARY: '27272A', // Gris oscuro corporativo
-    LIGHT_GOLD: 'E6D4B7', // Dorado claro para fondos
-    DARK_GOLD: '8B6914', // Dorado oscuro para acentos
-    WHITE: 'FFFFFF', // Blanco
-    LIGHT_GRAY: 'F5F5F5', // Gris muy claro
-    MEDIUM_GRAY: '6B7280', // Gris medio
-    BORDER: 'D1D5DB', // Gris para bordes
-    SUCCESS: '059669', // Verde para valores positivos
-    WARNING: 'DC2626', // Rojo para alertas
-  };
 
   // Stock mínimo según el tipo de almacén
   private readonly MIN_STOCK = {
@@ -70,7 +57,7 @@ export class WarehouseExcelReport {
 
       const worksheet = workbook.addWorksheet('Reporte de Stock', {
         properties: {
-          tabColor: { argb: this.COLORS.PRIMARY },
+          tabColor: { argb: colors.PRIMARY },
         },
         pageSetup: {
           paperSize: 9, // A4
@@ -103,23 +90,23 @@ export class WarehouseExcelReport {
       titleCell.font = {
         bold: true,
         size: 24,
-        color: { argb: this.COLORS.WHITE },
+        color: { argb: colors.WHITE },
         name: 'Calibri',
       };
       titleCell.fill = {
         type: 'pattern',
         pattern: 'solid',
-        fgColor: { argb: this.COLORS.SECONDARY },
+        fgColor: { argb: colors.SECONDARY },
       };
       titleCell.alignment = {
         horizontal: 'center',
         vertical: 'middle',
       };
       titleCell.border = {
-        top: { style: 'thick', color: { argb: this.COLORS.PRIMARY } },
-        bottom: { style: 'thick', color: { argb: this.COLORS.PRIMARY } },
-        left: { style: 'thick', color: { argb: this.COLORS.PRIMARY } },
-        right: { style: 'thick', color: { argb: this.COLORS.PRIMARY } },
+        top: { style: 'thick', color: { argb: colors.PRIMARY } },
+        bottom: { style: 'thick', color: { argb: colors.PRIMARY } },
+        left: { style: 'thick', color: { argb: colors.PRIMARY } },
+        right: { style: 'thick', color: { argb: colors.PRIMARY } },
       };
       titleRow.height = 35;
 
@@ -152,14 +139,14 @@ export class WarehouseExcelReport {
       subtitleCell.font = {
         bold: true,
         size: 14,
-        color: { argb: this.COLORS.PRIMARY },
+        color: { argb: colors.PRIMARY },
         name: 'Calibri',
       };
       subtitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
       subtitleCell.border = {
-        left: { style: 'thick', color: { argb: this.COLORS.PRIMARY } },
-        right: { style: 'thick', color: { argb: this.COLORS.PRIMARY } },
-        bottom: { style: 'thin', color: { argb: this.COLORS.BORDER } },
+        left: { style: 'thick', color: { argb: colors.PRIMARY } },
+        right: { style: 'thick', color: { argb: colors.PRIMARY } },
+        bottom: { style: 'thin', color: { argb: colors.BORDER } },
       };
       subtitleRow.height = 25;
 
@@ -170,14 +157,14 @@ export class WarehouseExcelReport {
       dateCell.font = {
         italic: true,
         size: 11,
-        color: { argb: this.COLORS.MEDIUM_GRAY },
+        color: { argb: colors.MEDIUM_GRAY },
         name: 'Calibri',
       };
       dateCell.alignment = { horizontal: 'center', vertical: 'middle' };
       dateCell.border = {
-        left: { style: 'thick', color: { argb: this.COLORS.PRIMARY } },
-        right: { style: 'thick', color: { argb: this.COLORS.PRIMARY } },
-        bottom: { style: 'thick', color: { argb: this.COLORS.PRIMARY } },
+        left: { style: 'thick', color: { argb: colors.PRIMARY } },
+        right: { style: 'thick', color: { argb: colors.PRIMARY } },
+        bottom: { style: 'thick', color: { argb: colors.PRIMARY } },
       };
       dateRow.height = 20;
 
@@ -194,20 +181,20 @@ export class WarehouseExcelReport {
       infoHeaderCell.font = {
         bold: true,
         size: 12,
-        color: { argb: this.COLORS.WHITE },
+        color: { argb: colors.WHITE },
         name: 'Calibri',
       };
       infoHeaderCell.fill = {
         type: 'pattern',
         pattern: 'solid',
-        fgColor: { argb: this.COLORS.PRIMARY },
+        fgColor: { argb: colors.PRIMARY },
       };
       infoHeaderCell.alignment = { horizontal: 'center', vertical: 'middle' };
       infoHeaderCell.border = {
-        top: { style: 'medium', color: { argb: this.COLORS.PRIMARY } },
-        bottom: { style: 'medium', color: { argb: this.COLORS.PRIMARY } },
-        left: { style: 'medium', color: { argb: this.COLORS.PRIMARY } },
-        right: { style: 'medium', color: { argb: this.COLORS.PRIMARY } },
+        top: { style: 'medium', color: { argb: colors.PRIMARY } },
+        bottom: { style: 'medium', color: { argb: colors.PRIMARY } },
+        left: { style: 'medium', color: { argb: colors.PRIMARY } },
+        right: { style: 'medium', color: { argb: colors.PRIMARY } },
       };
       infoHeaderRow.height = 25;
 
@@ -227,19 +214,19 @@ export class WarehouseExcelReport {
         const cell = worksheet.getCell(7, col);
         cell.font = {
           bold: true,
-          color: { argb: this.COLORS.SECONDARY },
+          color: { argb: colors.SECONDARY },
           name: 'Calibri',
         };
         cell.fill = {
           type: 'pattern',
           pattern: 'solid',
-          fgColor: { argb: this.COLORS.LIGHT_GRAY },
+          fgColor: { argb: colors.LIGHT_GRAY },
         };
         cell.border = {
-          top: { style: 'thin', color: { argb: this.COLORS.BORDER } },
-          bottom: { style: 'thin', color: { argb: this.COLORS.BORDER } },
-          left: { style: 'medium', color: { argb: this.COLORS.PRIMARY } },
-          right: { style: 'thin', color: { argb: this.COLORS.BORDER } },
+          top: { style: 'thin', color: { argb: colors.BORDER } },
+          bottom: { style: 'thin', color: { argb: colors.BORDER } },
+          left: { style: 'medium', color: { argb: colors.PRIMARY } },
+          right: { style: 'thin', color: { argb: colors.BORDER } },
         };
       });
 
@@ -247,14 +234,14 @@ export class WarehouseExcelReport {
       [2, 5].forEach((col) => {
         const cell = worksheet.getCell(7, col);
         cell.font = {
-          color: { argb: this.COLORS.SECONDARY },
+          color: { argb: colors.SECONDARY },
           name: 'Calibri',
         };
         cell.border = {
-          top: { style: 'thin', color: { argb: this.COLORS.BORDER } },
-          bottom: { style: 'thin', color: { argb: this.COLORS.BORDER } },
-          left: { style: 'thin', color: { argb: this.COLORS.BORDER } },
-          right: { style: 'thin', color: { argb: this.COLORS.BORDER } },
+          top: { style: 'thin', color: { argb: colors.BORDER } },
+          bottom: { style: 'thin', color: { argb: colors.BORDER } },
+          left: { style: 'thin', color: { argb: colors.BORDER } },
+          right: { style: 'thin', color: { argb: colors.BORDER } },
         };
       });
 
@@ -262,12 +249,12 @@ export class WarehouseExcelReport {
       [3, 6, 7].forEach((col) => {
         const cell = worksheet.getCell(7, col);
         cell.border = {
-          top: { style: 'thin', color: { argb: this.COLORS.BORDER } },
-          bottom: { style: 'thin', color: { argb: this.COLORS.BORDER } },
+          top: { style: 'thin', color: { argb: colors.BORDER } },
+          bottom: { style: 'thin', color: { argb: colors.BORDER } },
           right:
             col === 7
-              ? { style: 'medium', color: { argb: this.COLORS.PRIMARY } }
-              : { style: 'thin', color: { argb: this.COLORS.BORDER } },
+              ? { style: 'medium', color: { argb: colors.PRIMARY } }
+              : { style: 'thin', color: { argb: colors.BORDER } },
         };
       });
 
@@ -286,20 +273,20 @@ export class WarehouseExcelReport {
       tableHeaderCell.font = {
         bold: true,
         size: 12,
-        color: { argb: this.COLORS.WHITE },
+        color: { argb: colors.WHITE },
         name: 'Calibri',
       };
       tableHeaderCell.fill = {
         type: 'pattern',
         pattern: 'solid',
-        fgColor: { argb: this.COLORS.SECONDARY },
+        fgColor: { argb: colors.SECONDARY },
       };
       tableHeaderCell.alignment = { horizontal: 'center', vertical: 'middle' };
       tableHeaderCell.border = {
-        top: { style: 'medium', color: { argb: this.COLORS.SECONDARY } },
-        bottom: { style: 'medium', color: { argb: this.COLORS.SECONDARY } },
-        left: { style: 'medium', color: { argb: this.COLORS.SECONDARY } },
-        right: { style: 'medium', color: { argb: this.COLORS.SECONDARY } },
+        top: { style: 'medium', color: { argb: colors.SECONDARY } },
+        bottom: { style: 'medium', color: { argb: colors.SECONDARY } },
+        left: { style: 'medium', color: { argb: colors.SECONDARY } },
+        right: { style: 'medium', color: { argb: colors.SECONDARY } },
       };
       tableHeaderRow.height = 25;
 
@@ -319,20 +306,20 @@ export class WarehouseExcelReport {
       headerRow.eachCell((cell) => {
         cell.font = {
           bold: true,
-          color: { argb: this.COLORS.WHITE },
+          color: { argb: colors.WHITE },
           size: 11,
           name: 'Calibri',
         };
         cell.fill = {
           type: 'pattern',
           pattern: 'solid',
-          fgColor: { argb: this.COLORS.PRIMARY },
+          fgColor: { argb: colors.PRIMARY },
         };
         cell.border = {
-          top: { style: 'medium', color: { argb: this.COLORS.PRIMARY } },
-          left: { style: 'thin', color: { argb: this.COLORS.WHITE } },
-          bottom: { style: 'medium', color: { argb: this.COLORS.PRIMARY } },
-          right: { style: 'thin', color: { argb: this.COLORS.WHITE } },
+          top: { style: 'medium', color: { argb: colors.PRIMARY } },
+          left: { style: 'thin', color: { argb: colors.WHITE } },
+          bottom: { style: 'medium', color: { argb: colors.PRIMARY } },
+          right: { style: 'thin', color: { argb: colors.WHITE } },
         };
         cell.alignment = {
           horizontal: 'center',
@@ -368,16 +355,16 @@ export class WarehouseExcelReport {
 
         // Estilo alternado para filas
         const isEven = index % 2 === 0;
-        const rowColor = isEven ? this.COLORS.WHITE : this.COLORS.LIGHT_GRAY;
+        const rowColor = isEven ? colors.WHITE : colors.LIGHT_GRAY;
 
         dataRow.height = 24;
         dataRow.eachCell((cell, colNumber) => {
           // Configuración base para todas las celdas
           cell.border = {
-            top: { style: 'thin', color: { argb: this.COLORS.BORDER } },
-            left: { style: 'thin', color: { argb: this.COLORS.BORDER } },
-            bottom: { style: 'thin', color: { argb: this.COLORS.BORDER } },
-            right: { style: 'thin', color: { argb: this.COLORS.BORDER } },
+            top: { style: 'thin', color: { argb: colors.BORDER } },
+            left: { style: 'thin', color: { argb: colors.BORDER } },
+            bottom: { style: 'thin', color: { argb: colors.BORDER } },
+            right: { style: 'thin', color: { argb: colors.BORDER } },
           };
 
           cell.fill = {
@@ -387,7 +374,7 @@ export class WarehouseExcelReport {
           };
 
           cell.font = {
-            color: { argb: this.COLORS.SECONDARY },
+            color: { argb: colors.SECONDARY },
             name: 'Calibri',
           };
 
@@ -416,17 +403,17 @@ export class WarehouseExcelReport {
               if (stockStatus === 'ÓPTIMO') {
                 cell.font = {
                   ...cell.font,
-                  color: { argb: this.COLORS.SUCCESS },
+                  color: { argb: colors.SUCCESS },
                 };
               } else if (stockStatus === 'BAJO') {
                 cell.font = {
                   ...cell.font,
-                  color: { argb: this.COLORS.WARNING },
+                  color: { argb: colors.WARNING },
                 };
               } else {
                 cell.font = {
                   ...cell.font,
-                  color: { argb: this.COLORS.PRIMARY },
+                  color: { argb: colors.PRIMARY },
                 };
               }
               break;
@@ -457,20 +444,20 @@ export class WarehouseExcelReport {
       totalRow.eachCell((cell, colNumber) => {
         cell.font = {
           bold: true,
-          color: { argb: this.COLORS.WHITE },
+          color: { argb: colors.WHITE },
           size: 12,
           name: 'Calibri',
         };
         cell.fill = {
           type: 'pattern',
           pattern: 'solid',
-          fgColor: { argb: this.COLORS.SECONDARY },
+          fgColor: { argb: colors.SECONDARY },
         };
         cell.border = {
-          top: { style: 'double', color: { argb: this.COLORS.PRIMARY } },
-          left: { style: 'medium', color: { argb: this.COLORS.PRIMARY } },
-          bottom: { style: 'double', color: { argb: this.COLORS.PRIMARY } },
-          right: { style: 'medium', color: { argb: this.COLORS.PRIMARY } },
+          top: { style: 'double', color: { argb: colors.PRIMARY } },
+          left: { style: 'medium', color: { argb: colors.PRIMARY } },
+          bottom: { style: 'double', color: { argb: colors.PRIMARY } },
+          right: { style: 'medium', color: { argb: colors.PRIMARY } },
         };
 
         if (colNumber === 1) {
@@ -496,20 +483,20 @@ export class WarehouseExcelReport {
       statsHeaderCell.font = {
         bold: true,
         size: 12,
-        color: { argb: this.COLORS.PRIMARY }, // Cambio a color principal
+        color: { argb: colors.PRIMARY }, // Cambio a color principal
         name: 'Calibri',
       };
       statsHeaderCell.fill = {
         type: 'pattern',
         pattern: 'solid',
-        fgColor: { argb: this.COLORS.WHITE }, // Cambio a fondo blanco
+        fgColor: { argb: colors.WHITE }, // Cambio a fondo blanco
       };
       statsHeaderCell.alignment = { horizontal: 'center', vertical: 'middle' };
       statsHeaderCell.border = {
-        top: { style: 'medium', color: { argb: this.COLORS.PRIMARY } },
-        bottom: { style: 'medium', color: { argb: this.COLORS.PRIMARY } },
-        left: { style: 'medium', color: { argb: this.COLORS.PRIMARY } },
-        right: { style: 'medium', color: { argb: this.COLORS.PRIMARY } },
+        top: { style: 'medium', color: { argb: colors.PRIMARY } },
+        bottom: { style: 'medium', color: { argb: colors.PRIMARY } },
+        left: { style: 'medium', color: { argb: colors.PRIMARY } },
+        right: { style: 'medium', color: { argb: colors.PRIMARY } },
       };
       statsHeaderRow.height = 25;
 
@@ -537,19 +524,19 @@ export class WarehouseExcelReport {
         const cell = worksheet.getCell(statsRowNum + 1, col);
         cell.font = {
           bold: true,
-          color: { argb: this.COLORS.SECONDARY },
+          color: { argb: colors.SECONDARY },
           name: 'Calibri',
         };
         cell.fill = {
           type: 'pattern',
           pattern: 'solid',
-          fgColor: { argb: this.COLORS.LIGHT_GOLD },
+          fgColor: { argb: colors.LIGHT_GOLD },
         };
         cell.border = {
-          top: { style: 'thin', color: { argb: this.COLORS.BORDER } },
-          bottom: { style: 'thin', color: { argb: this.COLORS.BORDER } },
-          left: { style: 'medium', color: { argb: this.COLORS.PRIMARY } },
-          right: { style: 'thin', color: { argb: this.COLORS.BORDER } },
+          top: { style: 'thin', color: { argb: colors.BORDER } },
+          bottom: { style: 'thin', color: { argb: colors.BORDER } },
+          left: { style: 'medium', color: { argb: colors.PRIMARY } },
+          right: { style: 'thin', color: { argb: colors.BORDER } },
         };
       });
 
@@ -557,17 +544,17 @@ export class WarehouseExcelReport {
         const cell = worksheet.getCell(statsRowNum + 1, col);
         cell.font = {
           bold: true,
-          color: { argb: this.COLORS.PRIMARY },
+          color: { argb: colors.PRIMARY },
           name: 'Calibri',
         };
         cell.border = {
-          top: { style: 'thin', color: { argb: this.COLORS.BORDER } },
-          bottom: { style: 'thin', color: { argb: this.COLORS.BORDER } },
-          left: { style: 'thin', color: { argb: this.COLORS.BORDER } },
+          top: { style: 'thin', color: { argb: colors.BORDER } },
+          bottom: { style: 'thin', color: { argb: colors.BORDER } },
+          left: { style: 'thin', color: { argb: colors.BORDER } },
           right:
             col === 6
-              ? { style: 'medium', color: { argb: this.COLORS.PRIMARY } }
-              : { style: 'thin', color: { argb: this.COLORS.BORDER } },
+              ? { style: 'medium', color: { argb: colors.PRIMARY } }
+              : { style: 'thin', color: { argb: colors.BORDER } },
         };
       });
 
@@ -587,7 +574,7 @@ export class WarehouseExcelReport {
       worksheet.mergeCells(`A${footerRowNum}:G${footerRowNum}`);
       const separatorCell = worksheet.getCell(`A${footerRowNum}`);
       separatorCell.border = {
-        top: { style: 'medium', color: { argb: this.COLORS.PRIMARY } },
+        top: { style: 'medium', color: { argb: colors.PRIMARY } },
       };
 
       // Información de la empresa
@@ -600,7 +587,7 @@ export class WarehouseExcelReport {
       footerCell.font = {
         italic: true,
         size: 12,
-        color: { argb: this.COLORS.MEDIUM_GRAY },
+        color: { argb: colors.MEDIUM_GRAY },
         name: 'Calibri',
       };
       footerCell.alignment = { horizontal: 'center' };
@@ -614,7 +601,7 @@ export class WarehouseExcelReport {
       timestampCell.font = {
         italic: true,
         size: 11,
-        color: { argb: this.COLORS.MEDIUM_GRAY },
+        color: { argb: colors.MEDIUM_GRAY },
         name: 'Calibri',
       };
       timestampCell.alignment = { horizontal: 'center' };

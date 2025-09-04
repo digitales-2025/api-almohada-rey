@@ -28,14 +28,15 @@ export class AuthController {
   async login(
     @Body() loginAuthDto: LoginAuthDto,
     @Res() res: Response,
+    @Req() req: Request,
   ): Promise<void> {
-    return this.authService.login(loginAuthDto, res);
+    return this.authService.login(loginAuthDto, res, req);
   }
 
   @ApiCreatedResponse({ description: 'Logout user' })
   @Post('logout')
-  async logout(@Res() res: Response): Promise<void> {
-    return this.authService.logout(res);
+  async logout(@Req() req: Request, @Res() res: Response): Promise<void> {
+    return this.authService.logout(req, res);
   }
 
   @ApiCreatedResponse({ description: 'Update password' })

@@ -11,6 +11,9 @@ import { PaymentsModule } from './payments/payments.module';
 import { WarehouseModule } from './warehouse/warehouse.module';
 import { MovementsModule } from './movements/movements.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { CustomersModule } from './customers/customers.module';
+import { RucModule } from './ruc/ruc.module';
+import { CustomerReservationHistoryModule } from './customer-reservation-history/customer-reservation-history.module';
 
 @Module({
   imports: [
@@ -24,6 +27,9 @@ import { DashboardModule } from './dashboard/dashboard.module';
     WarehouseModule,
     MovementsModule,
     DashboardModule,
+    CustomersModule,
+    RucModule,
+    CustomerReservationHistoryModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],

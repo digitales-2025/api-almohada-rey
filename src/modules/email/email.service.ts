@@ -6,10 +6,10 @@ import { getFirstWord } from 'src/utils';
 
 const infoBusiness = {
   business: 'La Almohada del Rey',
-  url: 'https://almohada-rey.com',
-  phone: '+51 999 999 998',
-  address: '1234 Street',
-  contact: 'contacto@gmail.com',
+  url: 'https://admin.hotelalmohadadelrey.com',
+  phone: '+51 958 959 958',
+  address: 'Calle Mollendo N° 37 - Urbanización Municipal., Arequipa, Peru',
+  contact: 'gestion.almohadadelrey@gmail.com',
 };
 
 @Injectable()
