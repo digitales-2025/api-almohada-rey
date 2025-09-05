@@ -3,9 +3,9 @@ import { generalEnvs } from 'src/config';
 
 export const landingDefaultUserSeed = {
   name: 'Landing',
-  email: 'landing@user.com',
+  email: 'landing@almohadarey.com',
   password: generalEnvs.SEED_LANDING_PASSWORD,
-  phone: '0987654321',
+  phone: '+51958959958',
   mustChangePassword: false,
   userRol: UserRolType.ADMIN,
 };

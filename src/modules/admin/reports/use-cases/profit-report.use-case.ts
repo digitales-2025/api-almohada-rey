@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import { ProfitData } from '../interfaces/profit-fields';
+import { colors } from 'src/utils/colors/colors.utils';
 
 @Injectable()
 export class ProfitReportUseCase {
@@ -31,7 +32,16 @@ export class ProfitReportUseCase {
     sheet.mergeCells('A1:E1');
     const titleCell = sheet.getCell('A1');
     titleCell.value = title;
-    titleCell.font = { bold: true, size: 14 };
+    titleCell.font = {
+      bold: true,
+      size: 14,
+      color: { argb: colors.headerText },
+    };
+    titleCell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: colors.titleBg },
+    };
     titleCell.alignment = { horizontal: 'center' };
 
     // -- Encabezados de columnas --
@@ -47,17 +57,20 @@ export class ProfitReportUseCase {
 
     // -- Estilo de encabezados --
     sheet.getRow(3).eachCell((cell) => {
-      cell.font = { bold: true };
+      cell.font = {
+        bold: true,
+        color: { argb: colors.headerText },
+      };
       cell.fill = {
         type: 'pattern',
         pattern: 'solid',
-        fgColor: { argb: 'FFD3D3D3' },
+        fgColor: { argb: colors.headerBg },
       };
       cell.border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' },
+        top: { style: 'thin', color: { argb: colors.borderColor } },
+        left: { style: 'thin', color: { argb: colors.borderColor } },
+        bottom: { style: 'thin', color: { argb: colors.borderColor } },
+        right: { style: 'thin', color: { argb: colors.borderColor } },
       };
     });
 
@@ -108,15 +121,36 @@ export class ProfitReportUseCase {
       totalExtras,
       totalGeneral,
     ]);
-    totalRow.font = { bold: true };
 
-    // Destacar el total general
+    // Aplicar estilo corporativo a toda la fila de totales
+    totalRow.eachCell((cell) => {
+      cell.font = {
+        bold: true,
+        color: { argb: colors.headerText },
+      };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: colors.totalsBg },
+      };
+      cell.border = {
+        top: { style: 'thin', color: { argb: colors.borderColor } },
+        left: { style: 'thin', color: { argb: colors.borderColor } },
+        bottom: { style: 'thin', color: { argb: colors.borderColor } },
+        right: { style: 'thin', color: { argb: colors.borderColor } },
+      };
+    });
+
+    // Destacar el total general con color verde (ganancias positivas)
     const totalGeneralCell = sheet.getCell(`E${totalRow.number}`);
-    totalGeneralCell.font = { bold: true, color: { argb: 'FF0000FF' } };
+    totalGeneralCell.font = {
+      bold: true,
+      color: { argb: colors.headerText },
+    };
     totalGeneralCell.fill = {
       type: 'pattern',
       pattern: 'solid',
-      fgColor: { argb: 'FFEEEEEE' },
+      fgColor: { argb: `FF${colors.SUCCESS}` },
     };
 
     // -- Formato de moneda para todos los valores --

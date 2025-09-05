@@ -11,10 +11,7 @@ type GeneralEnvVars = {
   WEBSOCKET_PORT: string;
   DATABASE_URL: string;
   WEB_URL: string;
-  JWT_SECRET: string;
   JWT_EXPIRES_IN: string;
-  JWT_REFRESH_SECRET: string;
-  JWT_REFRESH_EXPIRES_IN: string;
   COOKIE_EXPIRES_IN: string;
   COOKIE_REFRESH_EXPIRES_IN: string;
   MAIL_HOST: string;
@@ -24,6 +21,15 @@ type GeneralEnvVars = {
 
   //sEEDS
   SEED_LANDING_PASSWORD: string;
+
+  // API PERU
+  API_PERU_TOKEN: string;
+  API_PERU_BASE_URL: string;
+
+  // BETTER AUTH
+  BACKEND_URL?: string;
+  BETTER_AUTH_DOMAIN?: string;
+  FRONTEND_URL?: string;
 };
 
 const schema = z
@@ -33,10 +39,7 @@ const schema = z
     WEBSOCKET_PORT: z.string(),
     DATABASE_URL: z.string(),
     WEB_URL: z.string(),
-    JWT_SECRET: z.string(),
     JWT_EXPIRES_IN: z.string(),
-    JWT_REFRESH_SECRET: z.string(),
-    JWT_REFRESH_EXPIRES_IN: z.string(),
     COOKIE_EXPIRES_IN: z.string(),
     COOKIE_REFRESH_EXPIRES_IN: z.string(),
     MAIL_HOST: z.string(),
@@ -44,6 +47,11 @@ const schema = z
     MAIL_USER: z.string(),
     MAIL_PASS: z.string(),
     SEED_LANDING_PASSWORD: z.string(),
+    API_PERU_TOKEN: z.string(),
+    API_PERU_BASE_URL: z.string(),
+    BACKEND_URL: z.string().optional(),
+    BETTER_AUTH_DOMAIN: z.string().optional(),
+    FRONTEND_URL: z.string().optional(),
   })
   .passthrough() satisfies z.ZodType<Partial<GeneralEnvVars>>;
 
@@ -59,10 +67,7 @@ export const generalEnvs: GeneralEnvVars = {
   WEBSOCKET_PORT: envVars.WEBSOCKET_PORT,
   DATABASE_URL: envVars.DATABASE_URL,
   WEB_URL: envVars.WEB_URL,
-  JWT_SECRET: envVars.JWT_SECRET,
   JWT_EXPIRES_IN: envVars.JWT_EXPIRES_IN,
-  JWT_REFRESH_SECRET: envVars.JWT_REFRESH_SECRET,
-  JWT_REFRESH_EXPIRES_IN: envVars.JWT_REFRESH_EXPIRES_IN,
   COOKIE_EXPIRES_IN: envVars.COOKIE_EXPIRES_IN,
   COOKIE_REFRESH_EXPIRES_IN: envVars.COOKIE_REFRESH_EXPIRES_IN,
   MAIL_HOST: envVars.MAIL_HOST,
@@ -70,4 +75,9 @@ export const generalEnvs: GeneralEnvVars = {
   MAIL_USER: envVars.MAIL_USER,
   MAIL_PASS: envVars.MAIL_PASS,
   SEED_LANDING_PASSWORD: envVars.SEED_LANDING_PASSWORD,
+  API_PERU_TOKEN: envVars.API_PERU_TOKEN,
+  API_PERU_BASE_URL: envVars.API_PERU_BASE_URL,
+  BACKEND_URL: envVars.BACKEND_URL,
+  BETTER_AUTH_DOMAIN: envVars.BETTER_AUTH_DOMAIN,
+  FRONTEND_URL: envVars.FRONTEND_URL,
 };

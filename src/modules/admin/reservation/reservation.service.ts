@@ -47,6 +47,7 @@ import { ExtendStayUseCase } from './use-cases/extendStay.use.case';
 import { LateCheckoutDto } from './dto/late-checkout.dto';
 import { ExtendStayDto } from './dto/extend-stay.dto';
 import { RemoveLateCheckoutUseCase } from './use-cases/removeLateCheckout.use.case';
+import { ReasonResponseDto } from './dto/reasons-response.dto';
 
 @Injectable()
 export class ReservationService {
@@ -1120,6 +1121,24 @@ export class ReservationService {
         newCheckoutDate,
       });
       return this.errorHandler.handleError(error, 'updating');
+    }
+  }
+
+  /**
+   * Obtiene todas las razones únicas de las reservas
+   * @returns Lista de razones únicas ordenadas alfabéticamente
+   */
+  async getAllReasons(): Promise<ReasonResponseDto[]> {
+    try {
+      return await this.reservationRepository.getAllReasons();
+    } catch (error) {
+      this.logger.error(
+        `Error al obtener razones de reservas: ${error.message}`,
+        {
+          error,
+        },
+      );
+      throw error;
     }
   }
 }

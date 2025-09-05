@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import { ExpenseData } from '../interfaces/expense-fields';
+import { colors } from 'src/utils/colors/colors.utils';
 
 @Injectable()
 export class ExpenseReportUseCase {
@@ -31,7 +32,16 @@ export class ExpenseReportUseCase {
     sheet.mergeCells('A1:H1');
     const titleCell = sheet.getCell('A1');
     titleCell.value = title;
-    titleCell.font = { bold: true, size: 14 };
+    titleCell.font = {
+      bold: true,
+      size: 14,
+      color: { argb: colors.headerText },
+    };
+    titleCell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: colors.titleBg },
+    };
     titleCell.alignment = { horizontal: 'center' };
 
     // -- Encabezados de columnas (actualizados) --
@@ -52,17 +62,20 @@ export class ExpenseReportUseCase {
 
     // -- Estilo de encabezados --
     sheet.getRow(3).eachCell((cell) => {
-      cell.font = { bold: true };
+      cell.font = {
+        bold: true,
+        color: { argb: colors.headerText },
+      };
       cell.fill = {
         type: 'pattern',
         pattern: 'solid',
-        fgColor: { argb: 'FFD3D3D3' },
+        fgColor: { argb: colors.headerBg },
       };
       cell.border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' },
+        top: { style: 'thin', color: { argb: colors.borderColor } },
+        left: { style: 'thin', color: { argb: colors.borderColor } },
+        bottom: { style: 'thin', color: { argb: colors.borderColor } },
+        right: { style: 'thin', color: { argb: colors.borderColor } },
       };
     });
 
@@ -138,15 +151,36 @@ export class ExpenseReportUseCase {
       totalGastos, // Nueva columna
       totalGeneral,
     ]);
-    totalRow.font = { bold: true };
 
-    // Aplicar estilo a la celda del total general
+    // Aplicar estilo corporativo a toda la fila de totales
+    totalRow.eachCell((cell) => {
+      cell.font = {
+        bold: true,
+        color: { argb: colors.headerText },
+      };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: colors.totalsBg },
+      };
+      cell.border = {
+        top: { style: 'thin', color: { argb: colors.borderColor } },
+        left: { style: 'thin', color: { argb: colors.borderColor } },
+        bottom: { style: 'thin', color: { argb: colors.borderColor } },
+        right: { style: 'thin', color: { argb: colors.borderColor } },
+      };
+    });
+
+    // Aplicar estilo especial a la celda del total general
     const totalGeneralCell = sheet.getCell(`J${totalRow.number}`);
-    totalGeneralCell.font = { bold: true, color: { argb: 'FF0000FF' } };
+    totalGeneralCell.font = {
+      bold: true,
+      color: { argb: colors.headerText },
+    };
     totalGeneralCell.fill = {
       type: 'pattern',
       pattern: 'solid',
-      fgColor: { argb: 'FFEEEEEE' },
+      fgColor: { argb: `FF${colors.WARNING}` },
     };
 
     // -- Formato de moneda para todas las celdas numéricas --

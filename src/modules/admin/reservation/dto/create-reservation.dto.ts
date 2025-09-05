@@ -85,6 +85,7 @@ export class CreateReservationDto {
   })
   @IsNotEmpty()
   @IsString()
+  @Transform(({ value }) => value?.toLowerCase())
   reason: string;
 
   @ApiPropertyOptional({
