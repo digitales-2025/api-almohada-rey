@@ -1,0 +1,30 @@
+pipeline {
+	agent {
+		docker {
+			image 'node:22'
+			reuseNode true
+			args '-u 0:0 -v /home/jenkinsci/pnpm-store:/root/.pnpm-store'
+		}
+	}
+	stages {
+		stage('Install dependencies') {
+			steps {
+				sh "npm i -g pnpm"
+				sh 'pnpm config set store-dir /root/.pnpm-store'
+				sh 'pnpm i --frozen-lockfile'
+			}
+		}
+		stage('Build') {
+			steps {
+				sh 'pnpm prisma generate'
+				sh 'pnpm run build'
+			}
+		}
+	}
+	post {
+		always {
+			sh 'rm -rf node_modules'
+		}
+	}
+}
+
