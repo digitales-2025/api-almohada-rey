@@ -195,8 +195,8 @@ model Reservation {
   customerId             String? //Required for the admin, but optional for the landing page
   room                   Room              @relation(fields: [roomId], references: [id])
   roomId                 String
-  userProfile            User?             @relation(fields: [userProfileId], references: [id]) //Required for the admin, but optional for the landing page
-  userProfileId          String? //Required for the admin, but optional for the landing page
+  user                   User?             @relation(fields: [userId], references: [id]) //Required for the admin, but optional for the landing page
+  userId                 String? //Required for the admin, but optional for the landing page
   reservationDate        DateTime          @default(now()) @db.Timestamptz(6)
   checkInDate            DateTime          @db.Timestamptz(6)
   checkOutDate           DateTime          @db.Timestamptz(6)
