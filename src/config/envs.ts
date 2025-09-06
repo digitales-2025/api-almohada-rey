@@ -11,9 +11,6 @@ type GeneralEnvVars = {
   WEBSOCKET_PORT: string;
   DATABASE_URL: string;
   WEB_URL: string;
-  JWT_EXPIRES_IN: string;
-  COOKIE_EXPIRES_IN: string;
-  COOKIE_REFRESH_EXPIRES_IN: string;
   MAIL_HOST: string;
   MAIL_PORT: string;
   MAIL_USER: string;
@@ -39,9 +36,6 @@ const schema = z
     WEBSOCKET_PORT: z.string(),
     DATABASE_URL: z.string(),
     WEB_URL: z.string(),
-    JWT_EXPIRES_IN: z.string(),
-    COOKIE_EXPIRES_IN: z.string(),
-    COOKIE_REFRESH_EXPIRES_IN: z.string(),
     MAIL_HOST: z.string(),
     MAIL_PORT: z.string(),
     MAIL_USER: z.string(),
@@ -67,9 +61,6 @@ export const generalEnvs: GeneralEnvVars = {
   WEBSOCKET_PORT: envVars.WEBSOCKET_PORT,
   DATABASE_URL: envVars.DATABASE_URL,
   WEB_URL: envVars.WEB_URL,
-  JWT_EXPIRES_IN: envVars.JWT_EXPIRES_IN,
-  COOKIE_EXPIRES_IN: envVars.COOKIE_EXPIRES_IN,
-  COOKIE_REFRESH_EXPIRES_IN: envVars.COOKIE_REFRESH_EXPIRES_IN,
   MAIL_HOST: envVars.MAIL_HOST,
   MAIL_PORT: envVars.MAIL_PORT,
   MAIL_USER: envVars.MAIL_USER,
