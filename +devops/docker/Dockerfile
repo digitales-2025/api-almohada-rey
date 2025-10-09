@@ -22,7 +22,7 @@ RUN pnpm i --ignore-scripts
 
 # Build binary
 COPY . .
-RUN pnpx prisma generate
+RUN pnpm prisma generate
 RUN pnpm run build
 
 
