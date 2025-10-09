@@ -116,19 +116,8 @@ export class PaymentService {
   }
 
   validatePayment(validatePaymentDto): boolean {
-    console.log(
-      'validatePaymentDto recibido:',
-      JSON.stringify(validatePaymentDto, null, 2),
-    );
-
     // Verificar si los datos vienen anidados
     let hashKey, hash, rawClientAnswer;
-
-    console.log('Tipo de dato recibido:', typeof validatePaymentDto);
-    console.log(
-      '¿Es un objeto?',
-      validatePaymentDto !== null && typeof validatePaymentDto === 'object',
-    );
 
     if (
       validatePaymentDto.rawClientAnswer &&
@@ -136,43 +125,23 @@ export class PaymentService {
       validatePaymentDto.rawClientAnswer.hashKey
     ) {
       // Si los datos vienen anidados en rawClientAnswer y rawClientAnswer es un objeto
-      console.log(
-        'Estructura anidada detectada, extrayendo datos de rawClientAnswer',
-      );
       hashKey = validatePaymentDto.rawClientAnswer.hashKey;
       hash = validatePaymentDto.rawClientAnswer.hash;
       rawClientAnswer = validatePaymentDto.rawClientAnswer.rawClientAnswer;
-
-      console.log('Datos extraídos (anidados):');
-      console.log('- hashKey:', hashKey);
-      console.log('- hash:', hash);
-      console.log('- ¿rawClientAnswer existe?', !!rawClientAnswer);
     } else {
       // Extracción directa del objeto principal
       ({ hashKey, hash, rawClientAnswer } = validatePaymentDto);
-
-      console.log('Datos extraídos (directos):');
-      console.log('- hashKey:', hashKey);
-      console.log('- hash:', hash);
-      console.log('- ¿rawClientAnswer existe?', !!rawClientAnswer);
     }
 
     let generatedHash = '';
 
     if (!hashKey) {
-      console.log('Error: hashKey no proporcionado');
-      console.log('Intentando buscar hashKey en otras ubicaciones...');
-
       // Intenta buscar hashKey en otras posibles ubicaciones
       if (
         validatePaymentDto.rawClientAnswer &&
         validatePaymentDto.rawClientAnswer.hashAlgorithm
       ) {
         hashKey = validatePaymentDto.rawClientAnswer.hashAlgorithm;
-        console.log(
-          'hashKey encontrado en rawClientAnswer.hashAlgorithm:',
-          hashKey,
-        );
       }
 
       if (!hashKey) {
@@ -180,78 +149,39 @@ export class PaymentService {
       }
     }
 
-    console.log('Usando hashKey:', hashKey);
-    console.log('Hash a verificar:', hash);
-
     if (hashKey === 'sha256_hmac') {
-      console.log('Usando método sha256_hmac para validar');
-      console.log(
-        'HMAC Secret Key:',
-        this.hmacSecretKey
-          ? 'existe (longitud: ' + this.hmacSecretKey.length + ')'
-          : 'no existe',
-      );
-
       // Para sha256_hmac, verificamos si rawClientAnswer es string para procesarlo correctamente
       if (typeof rawClientAnswer === 'string') {
-        console.log('rawClientAnswer es una cadena, usando directamente');
         generatedHash = this.generateHmacSha256(
           rawClientAnswer,
           this.hmacSecretKey,
         );
       } else {
-        console.log('rawClientAnswer no es una cadena, convirtiendo a JSON');
         generatedHash = this.generateHmacSha256(
           rawClientAnswer,
           this.hmacSecretKey,
         );
       }
-      console.log('Hash generado con sha256_hmac:', generatedHash);
     } else if (hashKey === 'password') {
-      console.log('Usando método password para validar');
-      console.log(
-        'Password:',
-        this.password
-          ? 'existe (longitud: ' + this.password.length + ')'
-          : 'no existe',
-      );
-
       // Para password, usamos el string JSON del objeto rawClientAnswer
       const rawClientAnswerStr =
         typeof rawClientAnswer === 'string'
           ? rawClientAnswer
           : JSON.stringify(rawClientAnswer);
 
-      console.log(
-        'rawClientAnswer convertido a string (primeros 100 chars):',
-        rawClientAnswerStr.substring(0, 100) + '...',
-      );
-
       generatedHash = this.generateHmacSha256(
         rawClientAnswerStr,
         this.password,
       );
-      console.log('Hash generado con password:', generatedHash);
     } else {
-      console.log(`Tipo de hash no soportado: ${hashKey}`);
       this.logger.warn(`Tipo de hash no soportado: ${hashKey}`);
       return false;
     }
-
-    console.log(
-      `Comparando hashes - Recibido: ${hash}, Generado: ${generatedHash}`,
-    );
     const isValid = hash === generatedHash;
-    console.log('¿Los hashes coinciden?', isValid);
 
     if (isValid) {
-      console.log('Validación exitosa');
       return true;
     } else {
-      console.log('Validación fallida - Hash mismatch');
-      this.logger.error(
-        `Hash mismatch: esperado=${hash}, generado=${generatedHash}`,
-      );
       throw new BadRequestException('Payment hash mismatch');
     }
   }

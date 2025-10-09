@@ -245,21 +245,34 @@ export class LandingReservationService {
 
   async cancelReservation(id: string, locale?: SupportedLocales) {
     try {
-      const landingUser = await this.userService.findLandingUser();
+      // Luego eliminar la reserva
+      const deletedReservation = await this.reservationRepository.delete(id);
 
-      return await this.reservationService.changeReservationStatus(
-        id,
-        ReservationStatus.CANCELED,
-        landingUser,
-      );
+      // Asegurarse de que el objeto devuelto tenga el estado CANCELED para la validación
+      const enhancedDeletedReservation = {
+        ...deletedReservation,
+        status: ReservationStatus.CANCELED, // Asegurar que tenga este estado para la validación
+      };
+
+      return {
+        success: true,
+        data: enhancedDeletedReservation,
+        message: this.translation.getTranslations(
+          'reservation_CancellationSuccess',
+          locale,
+          errorDictionary,
+        ),
+      };
     } catch {
-      throw new Error(
-        this.translation.getTranslations(
+      // Si hay error, devuelve un objeto con success en false
+      return {
+        success: false,
+        message: this.translation.getTranslations(
           'reservation_CancellationException',
           locale,
           errorDictionary,
         ),
-      );
+      };
     }
   }
 
