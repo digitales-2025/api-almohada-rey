@@ -312,15 +312,15 @@ export class LandingReservationService {
         data: updatedReservation.data,
         message:
           locale === defaultLocale
-            ? 'Pago exitoso, reserva guardada'
-            : 'Successful payment, booking saved',
+            ? 'Datos de la reservación guardados exitosamente'
+            : 'Reservation data saved successfully',
         success: true,
       };
     } catch {
       throw new BadRequestException(
         locale === defaultLocale
-          ? 'Lo sentimos, no se pudo confirmar la reserva. Intente nuevamente.'
-          : 'Sorry, we could not confirm the reservation. Please try again.',
+          ? 'Lo sentimos, no se pudieron guardar los datos de la reserva. Intente nuevamente.'
+          : 'Sorry, we could not save the reservation data. Please try again.',
       );
     }
   }

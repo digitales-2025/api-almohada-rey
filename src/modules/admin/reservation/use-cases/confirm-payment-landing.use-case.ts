@@ -41,17 +41,17 @@ export class ConfirmPaymentLandingUseCase {
           }
 
           // 2. Get state handler for current status
-          const currentStatus = this.stateFactory.getStateHandler(
+          /*           const currentStatus = this.stateFactory.getStateHandler(
             existingReservation.status,
           );
+ */
+          // 3. Check if transition is valid - COMENTADO: Ya no se cambia el estado
+          // const transitionResult =
+          //   await currentStatus.canTransitionTo('CONFIRMED');
 
-          // 3. Check if transition is valid
-          const transitionResult =
-            await currentStatus.canTransitionTo('CONFIRMED');
-
-          if (!transitionResult.isValid) {
-            throw new BadRequestException(transitionResult.errorMessage);
-          }
+          // if (!transitionResult.isValid) {
+          //   throw new BadRequestException(transitionResult.errorMessage);
+          // }
 
           const newCustomer = await tx.customer.upsert({
             where: {
@@ -82,36 +82,36 @@ export class ConfirmPaymentLandingUseCase {
             );
           }
 
-          // 4. Update reservation status
+          // 4. Update reservation data - SIN CAMBIAR ESTADO
           const reservation = await this.reservationRepository.updateWithTx(
             id,
             {
-              status: 'CONFIRMED',
+              // status: 'CONFIRMED', // COMENTADO: Ya no se cambia el estado
               createdByLandingPage: true,
               customerId: newCustomer.id,
               didAcceptExtraServices: dto.didAcceptExtraServices,
               didAcceptTerms: dto.didAcceptTermsAndConditions,
               observations: dto.observations,
               requestedGuestNumber: dto.reservation.guestNumber,
-              isActive: transitionResult.isActive,
+              // isActive: transitionResult.isActive, // COMENTADO: Ya no se usa transitionResult
               updatedAt: new Date(),
             },
             tx,
           );
 
-          // 5. Handle state-specific actions, like changing room status
-          await currentStatus.handleTransition(
-            existingReservation,
-            'CONFIRMED',
-            tx,
-          );
+          // 5. Handle state-specific actions - COMENTADO: Ya no se maneja transición de estado
+          // await currentStatus.handleTransition(
+          //   existingReservation,
+          //   'CONFIRMED',
+          //   tx,
+          // );
 
-          // 6. Register audit
+          // 6. Register audit - ACTUALIZADO: Ya no es cambio de estado
           await this.auditRepository.createWithTx(
             {
               entityId: reservation.id,
               entityType: 'reservation',
-              action: AuditActionType.UPDATE_STATUS,
+              action: AuditActionType.UPDATE, // Cambiado de UPDATE_STATUS a UPDATE
               performedById: user.id,
             },
             tx,
@@ -123,12 +123,12 @@ export class ConfirmPaymentLandingUseCase {
 
       return {
         success: true,
-        message: `Estado de reservación cambiado a CONFIRMED exitosamente`,
+        message: `Datos de la reservación actualizados exitosamente`,
         data: updatedReservation,
       };
     } catch (error) {
       this.logger.error(
-        `Error al cambiar estado de reservación: ${error.message}`,
+        `Error al actualizar datos de reservación: ${error.message}`,
         {
           error,
         },
@@ -148,7 +148,7 @@ export class ConfirmPaymentLandingUseCase {
       }
 
       throw new InternalServerErrorException(
-        'Ocurrió un error al actualizar el estado de la reservación. Por favor, intente nuevamente.',
+        'Ocurrió un error al actualizar los datos de la reservación. Por favor, intente nuevamente.',
       );
     }
   }

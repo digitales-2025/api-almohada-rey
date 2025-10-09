@@ -159,7 +159,7 @@ export class ReservationGateway
   ) {
     try {
       const reservation = await this.executeBasicValidation(client, payload);
-      const timeLimit = 12000;
+      const timeLimit = 180;
 
       // Logger.log(reservation, 'ReservationGateway');
 
