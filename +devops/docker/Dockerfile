@@ -28,6 +28,8 @@ RUN pnpm run build
 
 FROM base
 
+RUN apk add curl
+
 COPY --from=prod /pnpm /pnpm
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
@@ -39,9 +41,9 @@ COPY --from=prod /app/dist ./dist
 COPY --from=prod /app/prisma ./prisma
 COPY --from=prod /app/package.json .
 COPY --from=prod /app/pnpm-lock.yaml .
-COPY deploy/start.sh .
+COPY +devops/docker/docker-entrypoint.sh .
 
 RUN pnpm i --prod
 USER node
 
-CMD ["sh", "start.sh"]
+CMD ["sh", "docker-entrypoint.sh"]

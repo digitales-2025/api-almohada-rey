@@ -5,14 +5,209 @@
   <meta name="color-scheme" content="light dark" />
   <meta name="supported-color-schemes" content="light dark" />
   <style>
+    /* Reset y configuración base */
+    body,
+    table,
+    td,
+    p,
+    a,
+    li,
+    blockquote {
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+    }
+
+    table,
+    td {
+      mso-table-lspace: 0pt;
+      mso-table-rspace: 0pt;
+    }
+
+    img {
+      -ms-interpolation-mode: bicubic;
+      border: 0;
+      height: auto;
+      line-height: 100%;
+      outline: none;
+      text-decoration: none;
+    }
+
+    /* Estilos principales */
     body {
-      font-family: 'Arial', sans-serif;
-      font-optical-sizing: auto;
-      background-color: #f9f9ff;
+      font-family:
+        -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+        Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      background-color: #fcfcfc;
       margin: 0;
       padding: 0;
       -webkit-font-smoothing: antialiased;
-      color: #0a0a0a;
+      -moz-osx-font-smoothing: grayscale;
+      color: #393939;
+      width: 100% !important;
+      min-width: 100%;
+      height: 100%;
+    }
+
+    /* Contenedor principal */
+    .email-container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border: 1px solid #e5e5e5;
+    }
+
+    /* Header */
+    .email-header {
+      background-color: #ad935c;
+      padding: 32px 24px;
+      text-align: center;
+    }
+
+    .email-header h1 {
+      color: #ffffff;
+      font-size: 28px;
+      font-weight: 600;
+      margin: 0;
+      letter-spacing: -0.5px;
+    }
+
+    /* Contenido */
+    .email-content {
+      padding: 40px 32px;
+    }
+
+    .email-content h2 {
+      color: #393939;
+      font-size: 24px;
+      font-weight: 600;
+      margin: 0 0 16px 0;
+      line-height: 1.3;
+    }
+
+    .email-content p {
+      color: #393939;
+      font-size: 16px;
+      line-height: 1.6;
+      margin: 0 0 20px 0;
+    }
+
+    .email-content p:last-child {
+      margin-bottom: 0;
+    }
+
+    /* Botones */
+    .btn {
+      display: inline-block;
+      background-color: #ad935c;
+      color: #ffffff !important;
+      text-decoration: none;
+      padding: 14px 28px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 16px;
+      text-align: center;
+      margin: 20px 0;
+      transition: background-color 0.2s ease;
+    }
+
+    .btn:hover {
+      background-color: #9a7f4f;
+    }
+
+    .btn-secondary {
+      background-color: #393939;
+    }
+
+    .btn-secondary:hover {
+      background-color: #2a2a2a;
+    }
+
+    /* Tablas de información */
+    .info-table {
+      background-color: #f8f8f8;
+      border: 1px solid #e5e5e5;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+
+    .info-table td {
+      padding: 8px 0;
+      border: none;
+    }
+
+    .info-table strong {
+      color: #393939;
+      font-weight: 600;
+    }
+
+    /* Alertas */
+    .alert {
+      background-color: #fff3cd;
+      border: 1px solid #ffeaa7;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 20px 0;
+    }
+
+    .alert-warning {
+      background-color: #fff3cd;
+      border-color: #ffeaa7;
+    }
+
+    .alert-warning span {
+      color: #ad935c;
+      font-weight: 600;
+    }
+
+    /* Footer */
+    .email-footer {
+      background-color: #f8f8f8;
+      padding: 24px 32px;
+      text-align: center;
+      border-top: 1px solid #e5e5e5;
+    }
+
+    .email-footer p {
+      color: #666666;
+      font-size: 14px;
+      margin: 4px 0;
+    }
+
+    /* Responsive */
+    @media only screen and (max-width: 600px) {
+      .email-container {
+        width: 100% !important;
+        border: none;
+      }
+
+      .email-content {
+        padding: 24px 20px;
+      }
+
+      .email-header {
+        padding: 24px 20px;
+      }
+
+      .email-header h1 {
+        font-size: 24px;
+      }
+
+      .email-content h2 {
+        font-size: 20px;
+      }
+
+      .email-content p {
+        font-size: 15px;
+      }
+
+      .btn {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+      }
     }
   </style>
 </head>

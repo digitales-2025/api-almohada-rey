@@ -1,7 +1,7 @@
 pipeline {
 	agent {
 		docker {
-			image 'guergeiro/pnpm:22-10-alpine'
+			image 'node:22'
 			reuseNode true
 			args '-u 0:0 -v /home/jenkinsci/pnpm-store:/root/.pnpm-store'
 		}
@@ -9,22 +9,14 @@ pipeline {
 	stages {
 		stage('Install dependencies') {
 			steps {
+				sh "npm i -g pnpm"
 				sh 'pnpm config set store-dir /root/.pnpm-store'
 				sh 'pnpm i --frozen-lockfile'
 			}
 		}
-		stage('Generate Prisma types') {
+		stage('Build') {
 			steps {
-				sh 'pnpx prisma generate'
-			}
-		}
-		stage('Validate lint rules') {
-			steps {
-				sh 'pnpm run lint'
-			}
-		}
-		stage('Build ') {
-			steps {
+				sh 'pnpm prisma generate'
 				sh 'pnpm run build'
 			}
 		}

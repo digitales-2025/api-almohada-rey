@@ -7,31 +7,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Usuario principal con todos los campos
 model User {
-  id                 String      @id @unique @default(uuid())
-  name               String
-  userRol            UserRolType
-  email              String
-  password           String
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  emailVerified Boolean?
+  image         String?
+
+  // Campos personalizados (opcionales para Better Auth)
   phone              String?
-  isSuperAdmin       Boolean     @default(false)
-  lastLogin          DateTime    @default(now()) @db.Timestamptz(6)
-  isActive           Boolean     @default(true)
-  mustChangePassword Boolean     @default(true)
-  isLandingUser      Boolean     @default(false) // Indicates if the user was created through the landing page and if that's the case, notify the admin to complete the missing data
+  userRol            UserRolType?
+  isSuperAdmin       Boolean      @default(false)
+  lastLogin          DateTime     @default(now()) @db.Timestamptz(6)
+  isActive           Boolean      @default(true)
+  mustChangePassword Boolean      @default(true)
+  isLandingUser      Boolean      @default(false)
 
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt
 
-  // Relación con auditorías (acciones realizadas por este usuario)
-  auditsPerformed Audit[] @relation("AuditPerformedBy")
+  // Relaciones de Better Auth
+  accounts Account[]
+  sessions Session[]
 
-  // Relación con checklists de limpieza (personal que supervisa la limpieza)
+  // Todas tus relaciones existentes
+  auditsPerformed    Audit[]             @relation("AuditPerformedBy")
   cleaningChecklists CleaningChecklist[] @relation("CleaningChecklistUser")
-
-  reservations Reservation[]
-
-  @@unique([email, isActive])
+  reservations       Reservation[]
 }
 
 enum UserRolType {
@@ -58,7 +61,7 @@ enum AuditActionType {
 }
 
 model Customer {
-  id             String                @id @default(uuid())
+  id             String                 @id @default(uuid())
   name           String
   address        String? //Admin is required, landing is not
   birthPlace     String? //Admin is required, landing is not
@@ -69,19 +72,20 @@ model Customer {
   phone          String
   occupation     String? //Admin is required, landing is not
   documentType   CustomerDocumentType
-  documentNumber String                @unique
-  email          String?               //@unique
+  documentNumber String                 @unique
+  email          String? //@unique
   maritalStatus  CustomerMaritalStatus? //Admin is required, landing is not
   companyName    String?
-  ruc            String?               @unique
+  ruc            String?
   companyAddress String?
-  isActive       Boolean               @default(true)
-  createdAt      DateTime              @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime              @updatedAt
+  isActive       Boolean                @default(true)
+  createdAt      DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime               @updatedAt
 
-  createdByLandingPage Boolean?        @default(false) // Indicates if the customer was created through the landing page and if that's the case, notify the admin to complete the missing data
-  mustCompleteData    Boolean?        @default(false) // Indicates if the admin was created by the landing page and if that's the case, notify the admin to complete the missing data
-  reservations Reservation[]
+  createdByLandingPage Boolean?                     @default(false) // Indicates if the customer was created through the landing page and if that's the case, notify the admin to complete the missing data
+  mustCompleteData     Boolean?                     @default(false) // Indicates if the admin was created by the landing page and if that's the case, notify the admin to complete the missing data
+  reservations         Reservation[]
+  reservationHistory   CustomerReservationHistory[]
 }
 
 enum CustomerDocumentType {
@@ -103,13 +107,13 @@ enum FloorTypes {
 }
 
 model RoomTypes {
-  id     String @id @default(uuid())
+  id     String  @id @default(uuid())
   name   String
   nameEn String? //Translation in English for the landing page
   guests Int
   price  Float
 
-  description String
+  description   String
   descriptionEn String //Translation in English, mandatory for the landing page always
 
   bed           String
@@ -186,25 +190,25 @@ enum ReservationStatus {
 }
 
 model Reservation {
-  id                  String            @id @default(uuid())
-  customer            Customer?        @relation(fields: [customerId], references: [id]) //Required for the admin, but optional for the landing page
-  customerId          String?           //Required for the admin, but optional for the landing page
-  room                Room              @relation(fields: [roomId], references: [id])
-  roomId              String
-  user                User?             @relation(fields: [userId], references: [id]) //Required for the admin, but optional for the landing page
-  userId              String?           //Required for the admin, but optional for the landing page
-  reservationDate     DateTime          @default(now()) @db.Timestamptz(6)
-  checkInDate         DateTime          @db.Timestamptz(6)
-  checkOutDate        DateTime          @db.Timestamptz(6)
-  status              ReservationStatus
-  origin              String? // Origin place from the customer //Required for the admin, but optional for the landing page 
-  reason              String? // Reason for reservation //Mandatory for the admin, but optional for the landing page
-  guests              Json? // List of companions
-  requestedGuestNumber Int? // Number of guests requested in the landing
-  observations        String? // Additional notes
-  appliedLateCheckOut Boolean           @default(false) // Flag to indicate if late check-out is applied
-  didAcceptExtraServices Boolean   @default(false) // Accept extra services
-  didAcceptTerms     Boolean   @default(false)  // Accept terms and conditions
+  id                     String            @id @default(uuid())
+  customer               Customer?         @relation(fields: [customerId], references: [id]) //Required for the admin, but optional for the landing page
+  customerId             String? //Required for the admin, but optional for the landing page
+  room                   Room              @relation(fields: [roomId], references: [id])
+  roomId                 String
+  user                   User?             @relation(fields: [userId], references: [id]) //Required for the admin, but optional for the landing page
+  userId                 String? //Required for the admin, but optional for the landing page
+  reservationDate        DateTime          @default(now()) @db.Timestamptz(6)
+  checkInDate            DateTime          @db.Timestamptz(6)
+  checkOutDate           DateTime          @db.Timestamptz(6)
+  status                 ReservationStatus
+  origin                 String? // Origin place from the customer //Required for the admin, but optional for the landing page 
+  reason                 String? // Reason for reservation //Mandatory for the admin, but optional for the landing page
+  guests                 Json? // List of companions
+  requestedGuestNumber   Int? // Number of guests requested in the landing
+  observations           String? // Additional notes
+  appliedLateCheckOut    Boolean           @default(false) // Flag to indicate if late check-out is applied
+  didAcceptExtraServices Boolean           @default(false) // Accept extra services
+  didAcceptTerms         Boolean           @default(false) // Accept terms and conditions
 
   payment Payment[] @relation("PaymentReservation")
 
@@ -215,7 +219,7 @@ model Reservation {
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt
 
-  createdByLandingPage Boolean?        @default(false) // Indicates if the reservation was created through the landing page and if that's the case, notify the admin to complete the missing data
+  createdByLandingPage Boolean? @default(false) // Indicates if the reservation was created through the landing page and if that's the case, notify the admin to complete the missing data
 }
 
 model Payment {
@@ -403,10 +407,16 @@ model MovementsDetail {
   updatedAt DateTime @updatedAt
 }
 
+enum WarehouseType {
+  COMMERCIAL
+  INTERNAL_USE
+  DEPOSIT
+}
+
 model Warehouse {
-  id   String      @id @unique @default(uuid())
-  code String      @unique
-  type ProductType
+  id   String        @id @unique @default(uuid())
+  code String        @unique
+  type WarehouseType
 
   stock Stock[] @relation("WarehouseStock")
 
@@ -430,4 +440,123 @@ model Stock {
 
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt
+}
+
+model ApiPeruCache {
+  id        String   @id @unique @default(uuid())
+  dni       String
+  name      String
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt
+
+  @@unique([dni])
+  @@map("api_peru_cache")
+}
+
+model RucCache {
+  id                        String   @id @unique @default(uuid())
+  ruc                       String   @unique
+  nombreORazonSocial        String
+  tipoContribuyente         String?
+  nombreComercial           String?
+  fechaInscripcion          String?
+  fechaInicioActividades    String?
+  estado                    String?
+  condicion                 String?
+  domicilioFiscal           String?
+  sistemaEmisionComprobante String?
+  actividadComercioExterior String?
+  sistemaContabilidad       String?
+  actividadPrincipal        String?
+  actividadSecundaria1      String?
+  actividadSecundaria2      String?
+  comprobantesAutorizados   String?
+  sistemaEmisionElectronica String?
+  emisorElectronicoDesde    String?
+  comprobantesElectronicos  String?
+  afiliadoPLEDesde          String?
+  padrones                  String?
+  createdAt                 DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt                 DateTime @updatedAt
+
+  representantes RepresentanteLegal[] @relation("RucRepresentantes")
+
+  @@map("ruc_cache")
+}
+
+model RepresentanteLegal {
+  id              String   @id @unique @default(uuid())
+  rucCacheId      String
+  tipoDocumento   String?
+  numeroDocumento String?
+  nombre          String
+  cargo           String?
+  fechaDesde      String?
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt
+
+  rucCache RucCache @relation("RucRepresentantes", fields: [rucCacheId], references: [id])
+
+  @@map("representante_legal")
+}
+
+model CustomerReservationHistory {
+  id         String   @id @unique @default(uuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  date       String
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt
+
+  @@map("customer_reservation_history")
+}
+
+// Tablas requeridas por Better Auth
+model Account {
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+
+  //boilerplate
+  id        String    @id @default(uuid())
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@map("accounts")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  updatedAt DateTime
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }

@@ -1,32 +1,32 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef, Global } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { UsersModule } from '../users/users.module';
-import { PassportModule } from '@nestjs/passport';
-import { JwtModule } from '@nestjs/jwt';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtStrategy } from './strategies/jwt.strategy';
-import { RefreshTokenStrategy } from './strategies/refresh-token.strategy';
+import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from 'src/prisma/prisma.module';
+import { BetterAuthAdapter } from './better-auth.adapter';
+import { RefreshAuthGuard } from './guards/refresh-auth.guard';
+import { BetterAuthGuard } from './guards/better-auth.guard';
+import { UserRolGuard } from './guards/user-rol.guard';
+import { MustChangePasswordGuard } from './guards/must-change-password-guards.guard';
 
+@Global()
 @Module({
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, RefreshTokenStrategy],
-  imports: [
-    ConfigModule,
-    UsersModule,
-
-    PrismaModule,
-    PassportModule.register({ defaultStrategy: 'jwt' }),
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get('JWT_SECRET'),
-        signOptions: { expiresIn: configService.get('JWT_EXPIRES_IN') },
-      }),
-    }),
+  providers: [
+    AuthService,
+    BetterAuthAdapter,
+    RefreshAuthGuard,
+    BetterAuthGuard,
+    UserRolGuard,
+    MustChangePasswordGuard,
   ],
-  exports: [JwtStrategy, RefreshTokenStrategy, PassportModule, JwtModule],
+  imports: [ConfigModule, forwardRef(() => UsersModule), PrismaModule],
+  exports: [
+    BetterAuthAdapter,
+    BetterAuthGuard,
+    UserRolGuard,
+    MustChangePasswordGuard,
+  ],
 })
 export class AuthModule {}

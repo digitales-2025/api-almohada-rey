@@ -281,4 +281,21 @@ export class CustomersController {
   ): Promise<Omit<HttpResponse, 'data'>> {
     return this.customersService.reactivateAll(user, customers);
   }
+
+  @Get('dni/:dni')
+  @ApiOkResponse({
+    description: 'Customer data obtained from Peru API successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', example: 'Juan Carlos Pérez García' },
+        dni: { type: 'string', example: '12345678' },
+      },
+    },
+  })
+  @ApiOperation({ summary: 'Get customer data by DNI from Peru API' })
+  @ApiBadRequestResponse({ description: 'Invalid DNI or API error' })
+  getDataByDni(@Param('dni') dni: string) {
+    return this.customersService.getDataByDni(dni);
+  }
 }

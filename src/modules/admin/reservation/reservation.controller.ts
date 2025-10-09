@@ -46,6 +46,7 @@ import { ReservationStatusAvailableActions } from './entities/reservation.status
 import { UpdateManyDto, UpdateManyResponseDto } from './dto/update-many.dto';
 import { LateCheckoutDto } from './dto/late-checkout.dto';
 import { ExtendStayDto } from './dto/extend-stay.dto';
+import { ReasonResponseDto } from './dto/reasons-response.dto';
 
 @ApiTags('Admin Reservations')
 @ApiBadRequestResponse({
@@ -552,5 +553,20 @@ export class ReservationController {
     @GetUser() user: UserPayload,
   ): Promise<BaseApiResponse<Reservation>> {
     return this.reservationService.extendStay(id, extendStayDto, user);
+  }
+
+  @Get('all/reasons')
+  @ApiOperation({
+    summary: 'Obtener todas las razones únicas de las reservas',
+    description:
+      'Retorna una lista de todas las razones únicas utilizadas en las reservas, ordenadas alfabéticamente',
+  })
+  @ApiOkResponse({
+    description: 'Lista de razones únicas de reservas',
+    type: [ReasonResponseDto],
+  })
+  async getAllReasons(): Promise<ReasonResponseDto[]> {
+    const reasons = await this.reservationService.getAllReasons();
+    return reasons;
   }
 }

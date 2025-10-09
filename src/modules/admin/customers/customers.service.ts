@@ -16,6 +16,7 @@ import {
   UserPayload,
 } from 'src/interfaces';
 import { handleException } from 'src/utils';
+import { HttpService } from '@nestjs/axios';
 import {
   AuditActionType,
   CustomerDocumentType,
@@ -30,10 +31,15 @@ import { DeleteCustomerDto } from './dto/delete-customer.dto';
 import { Customer } from './entity/customer.entity';
 import { CustomerRepository } from './repository/customer.repository';
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
-import { HistoryCustomerData } from 'src/interfaces/customer.interface';
+import {
+  HistoryCustomerData,
+  ResponseApiCustomer,
+} from 'src/interfaces/customer.interface';
 import * as excelJs from 'exceljs';
 import { PaginationService } from 'src/pagination/pagination.service';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
+import { lastValueFrom } from 'rxjs';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class CustomersService {
@@ -41,20 +47,12 @@ export class CustomersService {
   private readonly errorHandler: BaseErrorHandler;
   constructor(
     private readonly prisma: PrismaService,
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
     private readonly audit: AuditService,
     private readonly customerRepository: CustomerRepository,
     private readonly paginationService: PaginationService,
   ) {}
-
-  /**
-   * Validar la longitud del RUC
-   * @param ruc RUC a validar
-   */
-  private validateLengthRuc(ruc: string): void {
-    if (ruc.length !== 11) {
-      throw new BadRequestException('The length of the RUC is incorrect');
-    }
-  }
 
   /**
    * Buscar un cliente por su número de documento
@@ -104,60 +102,6 @@ export class CustomersService {
   }
 
   /**
-   * Buscar un cliente por su email
-   * @param email Email del cliente
-   * @param id Id del cliente
-   */
-  // async findByEmail(email: string, id?: string) {
-  //   const customerDB = await this.prisma.customer.findUnique({
-  //     where: { email },
-  //     select: {
-  //       id: true,
-  //       email: true,
-  //       isActive: true,
-  //     },
-  //   });
-  //   if (!!customerDB && customerDB.id !== id) {
-  //     if (!!customerDB && !customerDB.isActive) {
-  //       throw new BadRequestException(
-  //         'This email is already in use but the customer is inactive',
-  //       );
-  //     }
-  //     if (customerDB) {
-  //       throw new BadRequestException('This email is already in use');
-  //     }
-  //   }
-  // }
-
-  /**
-   * Buscar un cliente por su RUC
-   * @param ruc RUC del cliente
-   * @param id Id del cliente
-   */
-  async findByRuc(ruc: string, id?: string) {
-    await this.validateLengthRuc(ruc);
-    const customerDB = await this.prisma.customer.findUnique({
-      where: { ruc },
-      select: {
-        id: true,
-        ruc: true,
-        isActive: true,
-      },
-    });
-
-    if (!!customerDB && customerDB.id !== id) {
-      if (!customerDB.isActive) {
-        throw new BadRequestException(
-          'This RUC is already in use but the customer is inactive',
-        );
-      }
-      if (customerDB) {
-        throw new BadRequestException('This RUC is already in use');
-      }
-    }
-  }
-
-  /**
    * Crear un nuevo cliente
    * @param createCustomerDto Datos del cliente a crear
    * @param user Usuario que realiza la acción
@@ -190,8 +134,6 @@ export class CustomersService {
     try {
       // Crear el cliente y registrar la auditoría
       await this.findByDocumentNumber(documentNumber);
-      // if (email) await this.findByEmail(email);
-      if (ruc) await this.findByRuc(ruc);
 
       newCustomer = await this.prisma.$transaction(async () => {
         // Crear el nuevo cliente
@@ -294,6 +236,116 @@ export class CustomersService {
 
       handleException(error, 'Error creating a customer');
     }
+  }
+
+  /**
+   * Consultar datos de un cliente por su DNI usando la API de Perú
+   * @param dni Número de DNI a consultar
+   * @returns Datos del cliente obtenidos desde la API de Perú
+   */
+  async getDataByDni(dni: string): Promise<ResponseApiCustomer> {
+    // Primero consultar en la base de datos local
+    const cachedData = await this.prisma.apiPeruCache.findUnique({
+      where: { dni },
+    });
+
+    if (cachedData) {
+      this.logger.log(`DNI ${dni} encontrado en caché local`);
+      return {
+        name: cachedData.name,
+        dni: cachedData.dni,
+      };
+    }
+
+    // Si no está en caché, consultar la API de Perú
+    const token = this.configService.get<string>('API_PERU_TOKEN');
+    const baseUrl = this.configService.get<string>('API_PERU_BASE_URL');
+
+    if (!token) {
+      throw new Error('API Peru token is not configured');
+    }
+
+    const url = `${baseUrl}/api/dni`;
+
+    try {
+      const response$ = this.httpService.post(
+        url,
+        { dni },
+        {
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      const response = await lastValueFrom(response$);
+      const data = response.data?.data;
+
+      if (!data || !data.nombre_completo) {
+        throw new Error('DNI no encontrado o inválido.');
+      }
+
+      // Usar el nombre completo que viene de la API
+      const fullName = data.nombre_completo;
+
+      // Convertir a formato capitalizado (primera letra de cada palabra en mayúscula)
+      const capitalizedName = this.capitalizeWithAccents(fullName);
+
+      // Guardar en la base de datos para futuras consultas
+      await this.prisma.apiPeruCache.create({
+        data: {
+          dni: data.numero,
+          name: capitalizedName,
+        },
+      });
+
+      this.logger.log(`DNI ${dni} consultado en API Peru y guardado en caché`);
+
+      return {
+        name: capitalizedName,
+        dni: data.numero,
+      };
+    } catch (error) {
+      this.logger.error(
+        'Error consultando DNI en API Peru:',
+        error.response?.data || error.message,
+      );
+
+      if (error.response?.status === 401) {
+        throw new Error('Token de API Peru inválido o expirado');
+      }
+
+      if (error.response?.status === 404) {
+        throw new Error('DNI no encontrado en la base de datos de RENIEC');
+      }
+
+      throw new Error('No se pudo obtener los datos del DNI desde API Peru');
+    }
+  }
+
+  /**
+   * Convierte un texto a formato capitalizado preservando las tildes y caracteres especiales
+   * @param text Texto a convertir
+   * @returns Texto capitalizado
+   */
+  private capitalizeWithAccents(text: string): string {
+    if (!text) return '';
+
+    return text
+      .toLowerCase()
+      .split(' ')
+      .map((word) => {
+        if (word.length === 0) return word;
+
+        // Convertir la primera letra a mayúscula preservando tildes
+        const firstChar = word.charAt(0).toUpperCase();
+        const restOfWord = word.slice(1);
+
+        return firstChar + restOfWord;
+      })
+      .join(' ')
+      .trim();
   }
 
   /**
@@ -742,7 +794,6 @@ export class CustomersService {
     try {
       const customerDB = await this.findById(id);
 
-      if (updateData.ruc) await this.findByRuc(updateData.ruc, id);
       // if (updateData.email) await this.findByEmail(updateData.email, id);
       if (updateData.documentNumber)
         await this.findByDocumentNumber(updateData.documentNumber, id);
@@ -1123,6 +1174,30 @@ export class CustomersService {
             }
 
             rowData[fieldName] = value;
+          } else if (colIndex - 1 >= 16) {
+            // Para columnas a partir de la Q (índice 16), guardar como fechas de historial
+            let value: unknown = cell.value;
+
+            // Manejar diferentes tipos de valores de celda
+            if (value && typeof value === 'object') {
+              if ('result' in value) {
+                value = value.result;
+              } else if ('text' in value && value.text) {
+                value = value.text;
+              } else if ('richText' in value) {
+                value = String(cell.text);
+              }
+            }
+
+            // Si es una fecha, formatearla como string YYYY-MM-DD
+            if (value instanceof Date) {
+              value = value.toISOString().split('T')[0];
+            }
+
+            // Solo guardar si hay un valor
+            if (value && String(value).trim()) {
+              rowData[`history_date_${colIndex - 16}`] = value;
+            }
           }
         });
 
@@ -1164,8 +1239,6 @@ export class CustomersService {
           // Verificar duplicados sin lanzar excepciones
           const duplicateInfo = await this.checkForDuplicates(
             customerData.documentNumber,
-            customerData.email,
-            customerData.ruc,
           );
 
           if (duplicateInfo) {
@@ -1181,7 +1254,14 @@ export class CustomersService {
           }
 
           // Si no es duplicado, crear el cliente
-          await this.createCustomerWithoutValidation(customerData, user);
+          const newCustomer = await this.createCustomerWithoutValidation(
+            customerData,
+            user,
+          );
+
+          // Procesar fechas de reservas anteriores si existen
+          await this.processReservationHistoryDates(row, newCustomer.id);
+
           successful++;
         } catch (error) {
           failed++;
@@ -1410,6 +1490,52 @@ export class CustomersService {
     instructionsData.forEach((row) => {
       sheet.addRow(row);
     });
+
+    // Añadir espacio antes de la información de fechas de reservas
+    sheet.addRow([]);
+    sheet.addRow([]);
+
+    // INFORMACIÓN SOBRE FECHAS DE RESERVAS ANTERIORES
+    sheet.addRow(['FECHAS DE RESERVAS ANTERIORES', '', '', '']);
+    const historyHeaderRow = sheet.lastRow;
+    historyHeaderRow.getCell(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF70AD47' },
+    };
+    historyHeaderRow.getCell(1).font = {
+      bold: true,
+      color: { argb: 'FFFFFFFF' },
+    };
+    historyHeaderRow.getCell(1).alignment = { horizontal: 'center' };
+    sheet.mergeCells(`A${historyHeaderRow.number}:D${historyHeaderRow.number}`);
+
+    // Instrucciones para fechas de reservas anteriores
+    sheet.addRow(['COLUMNA', 'DESCRIPCIÓN', 'OBLIGATORIO', 'FORMATO']);
+    sheet.addRow([
+      'Q en adelante',
+      'Fechas de reservas anteriores del cliente',
+      'No',
+      'YYYY-MM-DD (ej: 2023-12-25)',
+    ]);
+    sheet.addRow([
+      '',
+      'Se pueden agregar múltiples fechas en columnas consecutivas',
+      'No',
+      'Una fecha por columna',
+    ]);
+    sheet.addRow([
+      '',
+      'Solo se procesarán fechas válidas (formato YYYY-MM-DD)',
+      'No',
+      'Las fechas inválidas serán ignoradas',
+    ]);
+    sheet.addRow([
+      '',
+      'Estas fechas se guardarán en el historial del cliente',
+      'No',
+      'Para consultas futuras',
+    ]);
 
     // Añadir espacio antes de la tabla de traducciones
     sheet.addRow([]);
@@ -1714,6 +1840,74 @@ export class CustomersService {
   }
 
   /**
+   * Procesar fechas de reservas anteriores desde las columnas del Excel
+   * @param row Fila del Excel con los datos
+   * @param customerId ID del cliente creado
+   */
+  private async processReservationHistoryDates(
+    row: Record<string, unknown>,
+    customerId: string,
+  ): Promise<void> {
+    try {
+      // Procesar columnas a partir de la M (índice 12) en busca de fechas válidas
+      const validDates: string[] = [];
+
+      // Iterar desde la columna Q (índice 16) hasta el final
+      for (let i = 0; i < 50; i++) {
+        // Límite de 50 columnas para evitar bucles infinitos
+        const columnKey = `history_date_${i}`;
+        const dateValue = row[columnKey];
+
+        if (dateValue && typeof dateValue === 'string' && dateValue.trim()) {
+          const trimmedDate = dateValue.trim();
+
+          // Validar formato de fecha YYYY-MM-DD
+          if (this.isValidDateFormat(trimmedDate)) {
+            validDates.push(trimmedDate);
+          }
+        }
+      }
+
+      // Crear registros de historial para cada fecha válida
+      if (validDates.length > 0) {
+        await this.prisma.customerReservationHistory.createMany({
+          data: validDates.map((date) => ({
+            customerId,
+            date,
+          })),
+        });
+
+        this.logger.log(
+          `Creado historial de reservas para cliente ${customerId}: ${validDates.length} fechas`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Error procesando fechas de historial para cliente ${customerId}: ${error.message}`,
+        error.stack,
+      );
+      // No lanzar error para no interrumpir la importación
+    }
+  }
+
+  /**
+   * Validar si una cadena tiene formato de fecha YYYY-MM-DD
+   * @param dateString Cadena a validar
+   * @returns true si es una fecha válida
+   */
+  private isValidDateFormat(dateString: string): boolean {
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(dateString)) {
+      return false;
+    }
+
+    const date = new Date(dateString);
+    return (
+      !isNaN(date.getTime()) && date.toISOString().split('T')[0] === dateString
+    );
+  }
+
+  /**
    * Convertir una fecha de Excel al formato ISO
    * @param excelDate Fecha en formato Excel
    * @returns Fecha en formato ISO
@@ -1751,8 +1945,6 @@ export class CustomersService {
    */
   private async checkForDuplicates(
     documentNumber: string,
-    email?: string,
-    ruc?: string,
   ): Promise<string | null> {
     // Verificar documento
     const existingByDocument = await this.prisma.customer.findUnique({
@@ -1762,40 +1954,6 @@ export class CustomersService {
 
     if (existingByDocument) {
       return `Número de documento ${documentNumber} ya existe${!existingByDocument.isActive ? ' (inactivo)' : ''}`;
-    }
-
-    // Verificar email si existe
-    // This is no longer necessary because of landing automatic creation reasosns
-    // if (email) {
-    //   const existingByEmail = await this.prisma.customer.findUnique({
-    //     where: { email },
-    //     select: { id: true, isActive: true },
-    //   });
-
-    //   if (existingByEmail) {
-    //     return `Email ${email} ya existe${!existingByEmail.isActive ? ' (inactivo)' : ''}`;
-    //   }
-    // }
-
-    // Verificar ruc si existe
-    if (ruc) {
-      try {
-        // Validar longitud de RUC primero
-        if (ruc.length !== 11) {
-          return `La longitud del RUC ${ruc} es incorrecta`;
-        }
-
-        const existingByRuc = await this.prisma.customer.findUnique({
-          where: { ruc },
-          select: { id: true, isActive: true },
-        });
-
-        if (existingByRuc) {
-          return `RUC ${ruc} ya existe${!existingByRuc.isActive ? ' (inactivo)' : ''}`;
-        }
-      } catch (error) {
-        return `Error al validar RUC: ${error.message}`;
-      }
     }
 
     return null;

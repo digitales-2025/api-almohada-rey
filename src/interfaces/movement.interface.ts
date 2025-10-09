@@ -1,10 +1,15 @@
-import { ExpenseDocumentType, Movements, ProductType } from '@prisma/client';
+import {
+  ExpenseDocumentType,
+  Movements,
+  ProductType,
+  WarehouseType,
+} from '@prisma/client';
 
 export type MovementsData = Pick<
   Movements,
   'id' | 'codeUnique' | 'dateMovement' | 'type' | 'description'
 > & {
-  warehouse: { id: string; type: ProductType };
+  warehouse: { id: string; type: WarehouseType };
   typePurchaseOrder?: ExpenseDocumentType;
   documentNumber?: string;
   movementsDetail: MovementsDetailData[];
@@ -26,7 +31,7 @@ export type SummaryMovementsData = Pick<
   'id' | 'codeUnique' | 'dateMovement' | 'type' | 'description'
 > & {
   typeProduct?: ProductType;
-  warehouse: { id: string; type: ProductType };
+  warehouse: { id: string; type: WarehouseType };
   typePurchaseOrder?: ExpenseDocumentType;
   documentNumber?: string;
   hasPaymentAssigned?: boolean;

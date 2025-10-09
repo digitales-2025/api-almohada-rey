@@ -6,14 +6,16 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import * as ExcelJS from 'exceljs';
 import { MovementsService } from '../movements/movements.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SummaryWarehouseData, WarehouseData } from 'src/interfaces';
 import { handleException } from 'src/utils';
 import { PaginationService } from 'src/pagination/pagination.service';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
-import { ProductType } from '@prisma/client';
+import { WarehouseType } from '@prisma/client';
 import { StockData } from 'src/interfaces/warehouse.interface';
+import { WarehouseExcelReport } from './warehouse.excel.report';
 
 @Injectable()
 export class WarehouseService {
@@ -23,6 +25,7 @@ export class WarehouseService {
     private readonly paginationService: PaginationService,
     @Inject(forwardRef(() => MovementsService))
     private readonly movementsService: MovementsService,
+    private readonly warehouseExcelReport: WarehouseExcelReport,
   ) {}
 
   /**
@@ -74,7 +77,9 @@ export class WarehouseService {
    * @param type Tipo de almacén a buscar
    * @returns Almacén encontrado o error si no existe
    */
-  async findWarehouseByType(type: ProductType): Promise<SummaryWarehouseData> {
+  async findWarehouseByType(
+    type: WarehouseType,
+  ): Promise<SummaryWarehouseData> {
     try {
       const warehouse = await this.prisma.warehouse.findFirst({
         where: { type },
@@ -282,7 +287,7 @@ export class WarehouseService {
    * @returns Lista de datos de stock filtrados por tipo de producto
    */
   async findProductsStockByType(
-    type: ProductType,
+    type: WarehouseType,
     paymentDetailId?: string,
   ): Promise<StockData[]> {
     let warehouse = await this.prisma.warehouse.findFirst({
@@ -349,5 +354,29 @@ export class WarehouseService {
 
     // Devuelve el array de StockData, potencialmente ajustado
     return warehouse.stock;
+  }
+
+  /**
+   * Genera un reporte Excel con los datos de stock de un almacén
+   * @param warehouseId ID del almacén para generar el reporte
+   * @returns Workbook de Excel con el reporte de stock
+   */
+  async getWarehouseStockExcel(warehouseId: string): Promise<ExcelJS.Workbook> {
+    try {
+      // Obtenemos los datos del almacén usando el método findById existente
+      const warehouseData = await this.findById(warehouseId);
+
+      // Generamos el reporte Excel usando el servicio WarehouseExcelReport
+      return this.warehouseExcelReport.generateStockReport(warehouseData);
+    } catch (error) {
+      this.logger.error(
+        `Error generating warehouse stock Excel report: ${error.message}`,
+        error.stack,
+      );
+      handleException(
+        error,
+        'Error al generar el reporte Excel de stock del almacén',
+      );
+    }
   }
 }

@@ -28,6 +28,7 @@ import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { Auth, GetUser } from '../../auth/decorators';
 import { StatusRoomDto } from '../dto/status.dto';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
+import { UpdateAmenitiesRoomDto } from '../dto/update-amenities-room.dto';
 
 /**
  * Controlador REST para gestionar habitaciones.
@@ -308,5 +309,32 @@ export class RoomController {
     @Param('id') id: string,
   ): Promise<BaseApiResponse<Room>> {
     return this.roomService.updateStatusCleaning(id);
+  }
+
+  /**
+   * Actualiza las amenities de una habitación
+   */
+  @Patch(':id/amenities')
+  @ApiOperation({
+    summary: 'Actualizar amenidades de una habitación',
+    description:
+      'Actualiza las amenidades de una habitación y ajusta automáticamente su estado según las amenidades',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la habitación' })
+  @ApiResponse({
+    status: 200,
+    description: 'Amenidades de la habitación actualizadas exitosamente',
+    type: BaseApiResponse,
+  })
+  @ApiBadRequestResponse({
+    description:
+      'ID inválido, habitación no encontrada o datos de amenidades inválidos',
+  })
+  updateAmenities(
+    @Param('id') id: string,
+    @Body() updateAmenitiesRoomDto: UpdateAmenitiesRoomDto,
+    @GetUser() user: UserData,
+  ): Promise<BaseApiResponse<Room>> {
+    return this.roomService.updateAmenities(id, updateAmenitiesRoomDto, user);
   }
 }
