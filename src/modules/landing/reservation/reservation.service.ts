@@ -17,6 +17,7 @@ import { ConfirmBookingDto } from './dto/confirm-reservation.dto';
 import { ConfirmPaymentLandingUseCase } from 'src/modules/admin/reservation/use-cases/confirm-payment-landing.use-case';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { Reservation } from 'src/modules/admin/reservation/entities/reservation.entity';
+import { TypedEventEmitter } from 'src/event-emitter/typed-event-emitter.class';
 
 @Injectable()
 export class LandingReservationService {
@@ -30,6 +31,7 @@ export class LandingReservationService {
     private readonly reservationService: ReservationService,
     private readonly userService: UsersService,
     private readonly confirmUseCase: ConfirmPaymentLandingUseCase,
+    private readonly eventEmitter: TypedEventEmitter,
   ) {
     this.errorHandler = new BaseErrorHandler(
       this.logger,
@@ -308,6 +310,59 @@ export class LandingReservationService {
         dto,
         landingUser,
       );
+
+      // Obtener datos detallados de la reserva para el email
+      const detailedReservation =
+        await this.reservationService.findOneDetailed(id);
+
+      if (detailedReservation) {
+        // Enviar email de confirmación
+        try {
+          const emailResponse = await this.eventEmitter.emitAsync(
+            'reservation.confirmation',
+            {
+              guestName: detailedReservation.customer.name,
+              guestEmail: detailedReservation.customer.email,
+              reservationId: detailedReservation.id,
+              roomName: `Habitación ${detailedReservation.room.number}`,
+              roomType:
+                detailedReservation.room.RoomTypes?.name || 'Habitación',
+              checkInDate: new Date(
+                detailedReservation.checkInDate,
+              ).toLocaleDateString('es-PE', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              }),
+              checkOutDate: new Date(
+                detailedReservation.checkOutDate,
+              ).toLocaleDateString('es-PE', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              }),
+              guestNumber: detailedReservation.requestedGuestNumber || 1,
+              specialRequests: detailedReservation.observations || '',
+            },
+          );
+
+          if (emailResponse.every((response) => response !== true)) {
+            this.logger.warn(
+              'Failed to send confirmation email for reservation:',
+              id,
+            );
+          } else {
+            this.logger.log(
+              'Confirmation email sent successfully for reservation:',
+              id,
+            );
+          }
+        } catch (emailError) {
+          this.logger.error('Error sending confirmation email:', emailError);
+          // No lanzamos error para no afectar el flujo principal
+        }
+      }
+
       return {
         data: updatedReservation.data,
         message:
