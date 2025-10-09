@@ -17,6 +17,7 @@ import { ConfirmBookingDto } from './dto/confirm-reservation.dto';
 import { ConfirmPaymentLandingUseCase } from 'src/modules/admin/reservation/use-cases/confirm-payment-landing.use-case';
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { Reservation } from 'src/modules/admin/reservation/entities/reservation.entity';
+import { TypedEventEmitter } from 'src/event-emitter/typed-event-emitter.class';
 
 @Injectable()
 export class LandingReservationService {
@@ -30,6 +31,7 @@ export class LandingReservationService {
     private readonly reservationService: ReservationService,
     private readonly userService: UsersService,
     private readonly confirmUseCase: ConfirmPaymentLandingUseCase,
+    private readonly eventEmitter: TypedEventEmitter,
   ) {
     this.errorHandler = new BaseErrorHandler(
       this.logger,
@@ -245,21 +247,34 @@ export class LandingReservationService {
 
   async cancelReservation(id: string, locale?: SupportedLocales) {
     try {
-      const landingUser = await this.userService.findLandingUser();
+      // Luego eliminar la reserva
+      const deletedReservation = await this.reservationRepository.delete(id);
 
-      return await this.reservationService.changeReservationStatus(
-        id,
-        ReservationStatus.CANCELED,
-        landingUser,
-      );
+      // Asegurarse de que el objeto devuelto tenga el estado CANCELED para la validación
+      const enhancedDeletedReservation = {
+        ...deletedReservation,
+        status: ReservationStatus.CANCELED, // Asegurar que tenga este estado para la validación
+      };
+
+      return {
+        success: true,
+        data: enhancedDeletedReservation,
+        message: this.translation.getTranslations(
+          'reservation_CancellationSuccess',
+          locale,
+          errorDictionary,
+        ),
+      };
     } catch {
-      throw new Error(
-        this.translation.getTranslations(
+      // Si hay error, devuelve un objeto con success en false
+      return {
+        success: false,
+        message: this.translation.getTranslations(
           'reservation_CancellationException',
           locale,
           errorDictionary,
         ),
-      );
+      };
     }
   }
 
@@ -295,19 +310,72 @@ export class LandingReservationService {
         dto,
         landingUser,
       );
+
+      // Obtener datos detallados de la reserva para el email
+      const detailedReservation =
+        await this.reservationService.findOneDetailed(id);
+
+      if (detailedReservation) {
+        // Enviar email de confirmación
+        try {
+          const emailResponse = await this.eventEmitter.emitAsync(
+            'reservation.confirmation',
+            {
+              guestName: detailedReservation.customer.name,
+              guestEmail: detailedReservation.customer.email,
+              reservationId: detailedReservation.id,
+              roomName: `Habitación ${detailedReservation.room.number}`,
+              roomType:
+                detailedReservation.room.RoomTypes?.name || 'Habitación',
+              checkInDate: new Date(
+                detailedReservation.checkInDate,
+              ).toLocaleDateString('es-PE', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              }),
+              checkOutDate: new Date(
+                detailedReservation.checkOutDate,
+              ).toLocaleDateString('es-PE', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              }),
+              guestNumber: detailedReservation.requestedGuestNumber || 1,
+              specialRequests: detailedReservation.observations || '',
+            },
+          );
+
+          if (emailResponse.every((response) => response !== true)) {
+            this.logger.warn(
+              'Failed to send confirmation email for reservation:',
+              id,
+            );
+          } else {
+            this.logger.log(
+              'Confirmation email sent successfully for reservation:',
+              id,
+            );
+          }
+        } catch (emailError) {
+          this.logger.error('Error sending confirmation email:', emailError);
+          // No lanzamos error para no afectar el flujo principal
+        }
+      }
+
       return {
         data: updatedReservation.data,
         message:
           locale === defaultLocale
-            ? 'Pago exitoso, reserva guardada'
-            : 'Successful payment, booking saved',
+            ? 'Datos de la reservación guardados exitosamente'
+            : 'Reservation data saved successfully',
         success: true,
       };
     } catch {
       throw new BadRequestException(
         locale === defaultLocale
-          ? 'Lo sentimos, no se pudo confirmar la reserva. Intente nuevamente.'
-          : 'Sorry, we could not confirm the reservation. Please try again.',
+          ? 'Lo sentimos, no se pudieron guardar los datos de la reserva. Intente nuevamente.'
+          : 'Sorry, we could not save the reservation data. Please try again.',
       );
     }
   }

@@ -88,4 +88,58 @@ export class EmailService {
       return false; // Retorna false indicando fallo
     }
   }
+
+  @OnEvent('reservation.confirmation')
+  async reservationConfirmation(
+    data: EventPayloads['reservation.confirmation'],
+  ): Promise<boolean> {
+    const {
+      guestName,
+      guestEmail,
+      reservationId,
+      roomName,
+      roomType,
+      checkInDate,
+      checkOutDate,
+      guestNumber,
+      specialRequests,
+    } = data;
+
+    const subject = `Confirmación de Reserva - ${infoBusiness.business}`;
+
+    try {
+      const sendingEmail = await this.mailerService.sendMail({
+        to: guestEmail,
+        subject,
+        template: 'reservation-confirmation',
+        context: {
+          guestName,
+          guestEmail,
+          reservationId,
+          roomName,
+          roomType,
+          checkInDate,
+          checkOutDate,
+          guestNumber,
+          specialRequests: specialRequests || '',
+          surveyLink:
+            'https://docs.google.com/forms/d/e/1FAIpQLSeFARPJ9C-vez172l9v6tJyoEjoODP_YeL3rfcc61OCt6u0mg/viewform?usp=sharing&ouid=110652417826153588409',
+          business: infoBusiness.business,
+          url: infoBusiness.url,
+          phone: infoBusiness.phone,
+          address: infoBusiness.address,
+          contact: infoBusiness.contact,
+        },
+      });
+
+      if (sendingEmail) {
+        return true; // Retorna true indicando éxito
+      } else {
+        return false; // Retorna false indicando fallo
+      }
+    } catch (error) {
+      this.logger.error(error);
+      return false; // Retorna false indicando fallo
+    }
+  }
 }
