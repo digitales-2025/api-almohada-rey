@@ -2268,10 +2268,22 @@ export class PaymentsService {
 
         // Recalculamos siempre el monto total sumando todos los detalles
         // sin importar si hay habitación o no
-        totalAmount = allDetails.reduce(
-          (sum, detail) => sum + detail.subtotal,
-          0,
-        );
+        totalAmount = allDetails.reduce((sum, detail) => {
+          // Si es un pago pendiente, calculamos su valor real
+          if (detail.method === 'PENDING_PAYMENT') {
+            const quantity = detail.quantity || 1;
+            const days = detail.days || 1;
+            return (
+              sum +
+              (detail.type === 'ROOM_RESERVATION'
+                ? detail.unitPrice * days
+                : detail.unitPrice * quantity)
+            );
+          } else {
+            // Para pagos normales, usamos el subtotal
+            return sum + detail.subtotal;
+          }
+        }, 0);
 
         const totalAmountPaid = allDetails
           .filter((detail) => detail.status === 'PAID')

@@ -1,0 +1,222 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <%- include("./shared/head.ejs") %>
+  <body>
+    <table
+      width="100%"
+      border="0"
+      cellspacing="0"
+      cellpadding="0"
+      style="background-color: #fcfcfc"
+    >
+      <tr>
+        <td align="center" style="padding: 40px 20px">
+          <div class="email-container">
+            <!-- Header -->
+            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+              <tr>
+                <td class="email-header">
+                  <h1>¡Reserva Confirmada!</h1>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Content -->
+            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+              <tr>
+                <td class="email-content">
+                  <h2>Estimado/a <strong><%= locals.guestName %></strong></h2>
+
+                  <p>
+                    ¡Nos complace confirmar su reserva en <strong><%= locals.business %></strong>! 
+                    Su estadía ha sido registrada exitosamente y estamos emocionados de recibirle.
+                  </p>
+
+                  <!-- Reservation Details Table -->
+                  <table
+                    class="info-table"
+                    width="100%"
+                    border="0"
+                    cellspacing="0"
+                    cellpadding="0"
+                  >
+                    <tr>
+                      <td style="padding: 16px 0; border-bottom: 1px solid #e5e5e5">
+                        <h3 style="color: #ad935c; font-size: 18px; font-weight: 600; margin: 0">
+                          Detalles de su Reserva
+                        </h3>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 12px 0">
+                        <strong>Habitación:</strong>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0">
+                        <div
+                          style="
+                            background-color: #ffffff;
+                            border: 1px solid #e5e5e5;
+                            border-radius: 6px;
+                            padding: 12px;
+                            font-size: 16px;
+                            color: #393939;
+                          "
+                        >
+                          <%= locals.roomName %> - <%= locals.roomType %>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 12px 0">
+                        <strong>Fechas de Estadía:</strong>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0">
+                        <div
+                          style="
+                            background-color: #ffffff;
+                            border: 1px solid #e5e5e5;
+                            border-radius: 6px;
+                            padding: 12px;
+                            font-size: 16px;
+                            color: #393939;
+                          "
+                        >
+                          <strong>Check-in:</strong> <%= locals.checkInDate %><br>
+                          <strong>Check-out:</strong> <%= locals.checkOutDate %>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 12px 0">
+                        <strong>Huéspedes:</strong>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0">
+                        <div
+                          style="
+                            background-color: #ffffff;
+                            border: 1px solid #e5e5e5;
+                            border-radius: 6px;
+                            padding: 12px;
+                            font-size: 16px;
+                            color: #393939;
+                          "
+                        >
+                          <%= locals.guestNumber %> <%= locals.guestNumber === 1 ? 'huésped' : 'huéspedes' %>
+                        </div>
+                      </td>
+                    </tr>
+                    <% if (locals.specialRequests && locals.specialRequests.trim() !== '') { %>
+                    <tr>
+                      <td style="padding: 12px 0">
+                        <strong>Solicitudes Especiales:</strong>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0">
+                        <div
+                          style="
+                            background-color: #ffffff;
+                            border: 1px solid #e5e5e5;
+                            border-radius: 6px;
+                            padding: 12px;
+                            font-size: 16px;
+                            color: #393939;
+                            font-style: italic;
+                          "
+                        >
+                          "<%= locals.specialRequests %>"
+                        </div>
+                      </td>
+                    </tr>
+                    <% } %>
+                  </table>
+
+                  <div class="alert alert-warning">
+                    <p style="margin: 0; font-size: 14px">
+                      <strong>Importante:</strong> Por favor, conserve este correo como comprobante de su reserva. 
+                      Si necesita realizar algún cambio, contáctenos con anticipación.
+                    </p>
+                  </div>
+
+                  <p>
+                    Estamos comprometidos a brindarle una experiencia excepcional durante su estadía. 
+                    Nuestro equipo estará disponible para asistirle en todo momento.
+                  </p>
+
+                  <!-- Survey Section -->
+                  <div style="background-color: #f8f8f8; border: 1px solid #e5e5e5; border-radius: 8px; padding: 24px; margin: 32px 0; text-align: center;">
+                    <h3 style="color: #ad935c; font-size: 20px; font-weight: 600; margin: 0 0 16px 0">
+                      Su Opinión es Importante
+                    </h3>
+                    <p style="color: #393939; font-size: 16px; margin: 0 0 20px 0; line-height: 1.5">
+                      Ayúdenos a mejorar nuestros servicios compartiendo su experiencia. 
+                      Esta encuesta toma menos de 1 minuto y nos ayudará a seguir brindando 
+                      el mejor servicio.
+                    </p>
+                    <div style="margin: 24px 0">
+                      <a
+                        href="<%= locals.surveyLink %>"
+                        target="_blank"
+                        class="btn btn-secondary"
+                        style="background-color: #393939; color: #ffffff !important; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 16px; text-align: center; display: inline-block; transition: background-color 0.2s ease;"
+                      >
+                        Completar Encuesta de Satisfacción
+                      </a>
+                    </div>
+                    <p style="color: #666666; font-size: 12px; margin: 16px 0 0 0; font-style: italic">
+                      * Esta encuesta es completamente opcional y confidencial
+                    </p>
+                  </div>
+
+                  <p
+                    style="
+                      margin-top: 32px;
+                      font-size: 18px;
+                      color: #ad935c;
+                      font-weight: 600;
+                    "
+                  >
+                    ¡Esperamos darle la bienvenida pronto a <%= locals.business %>!
+                  </p>
+
+                  <p style="margin-top: 24px">
+                    Saludos cordiales,<br />
+                    <strong>El equipo de <%= locals.business %></strong>
+                  </p>
+
+                  <!-- Contact Information -->
+                  <div style="background-color: #f8f8f8; border-radius: 8px; padding: 20px; margin: 32px 0 0 0;">
+                    <h4 style="color: #393939; font-size: 16px; font-weight: 600; margin: 0 0 12px 0">
+                      Información de Contacto
+                    </h4>
+                    <p style="color: #666666; font-size: 14px; margin: 4px 0">
+                      <strong>Teléfono:</strong> <%= locals.phone %>
+                    </p>
+                    <p style="color: #666666; font-size: 14px; margin: 4px 0">
+                      <strong>Email:</strong> <%= locals.contact %>
+                    </p>
+                    <p style="color: #666666; font-size: 14px; margin: 4px 0">
+                      <strong>Dirección:</strong> <%= locals.address %>
+                    </p>
+                  </div>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Footer -->
+            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+              <%- include("./shared/footer.ejs") %>
+            </table>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+

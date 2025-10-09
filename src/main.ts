@@ -87,6 +87,10 @@ async function bootstrap() {
       name: 'Admin Expenses',
       description: 'Todos los Gastos',
     },
+    {
+      name: 'Landing Payment',
+      description: 'Operaciones de pago en el landing',
+    },
   ];
 
   SwaggerModule.setup('api', app, document);
