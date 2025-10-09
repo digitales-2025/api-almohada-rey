@@ -1,3 +1,5 @@
+/*
+// PAYMENT MODULE - COMMENTED OUT (NO LONGER IN USE)
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsNumber,
@@ -38,3 +40,4 @@ export class CreatePaymentDto {
   @IsString()
   returnUrl?: string;
 }
+*/

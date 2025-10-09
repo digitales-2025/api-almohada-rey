@@ -1,3 +1,5 @@
+/*
+// PAYMENT MODULE - COMMENTED OUT (NO LONGER IN USE)
 import {
   BadRequestException,
   Injectable,
@@ -39,7 +41,7 @@ export class PaymentService {
    * @param createPaymentDto DTO para crear un pago
    * @returns formToken para redirigir al usuario al formulario de pago
    */
-  async createPayment(createPaymentDto: CreatePaymentDto): Promise<string> {
+/*  async createPayment(createPaymentDto: CreatePaymentDto): Promise<string> {
     return new Promise((resolve, reject) => {
       const url = new URL(
         `${this.endpoint}/api-payment/V4/Charge/CreatePayment`,
@@ -185,14 +187,14 @@ export class PaymentService {
       throw new BadRequestException('Payment hash mismatch');
     }
   }
-
-  /**
-   * Genera un hash HMAC-SHA256
-   * @param message Mensaje a hashear (string u objeto)
-   * @param secretKey Llave secreta
-   * @returns Hash en formato hexadecimal
-   */
-  generateHmacSha256(
+ */
+/**
+ * Genera un hash HMAC-SHA256
+ * @param message Mensaje a hashear (string u objeto)
+ * @param secretKey Llave secreta
+ * @returns Hash en formato hexadecimal
+ */
+/*  generateHmacSha256(
     message: string | Record<string, any>,
     secretKey: string,
   ): string {
@@ -210,3 +212,4 @@ export class PaymentService {
     }
   }
 }
+*/

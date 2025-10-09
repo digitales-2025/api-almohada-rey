@@ -1,4 +1,4 @@
-import {
+/* import {
   Controller,
   Post,
   Body,
@@ -12,7 +12,7 @@ import { Response } from 'express';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 
 import { ApiTags } from '@nestjs/swagger';
-import { PaymentService } from './payment.service';
+import { PaymentService } from './payment.service'; 
 
 @ApiTags('Landing Payment')
 @Controller({
@@ -21,11 +21,11 @@ import { PaymentService } from './payment.service';
 })
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
-
-  /**
-   * Crear un pago y obtener el formToken para renderizar en frontend
-   */
-  @Post()
+*/
+/**
+ * Crear un pago y obtener el formToken para renderizar en frontend
+ */
+/*   @Post()
   async createPayment(
     @Body() createPaymentDto: CreatePaymentDto,
     @Res() res: Response,
@@ -46,12 +46,12 @@ export class PaymentController {
           .send({ message: 'Internal server error' });
       }
     }
-  }
+  } */
 
-  /**
-   * Validar un pago recibido (usado en IPN o callbacks)
-   */
-  @Post('validate')
+/**
+ * Validar un pago recibido (usado en IPN o callbacks)
+ */
+/*  @Post('validate')
   async validatePayment(@Body() body, @Res() res: Response) {
     try {
       const isValid = this.paymentService.validatePayment(body);
@@ -72,3 +72,4 @@ export class PaymentController {
     }
   }
 }
+ */
