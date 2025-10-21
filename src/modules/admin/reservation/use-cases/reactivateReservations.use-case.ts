@@ -11,7 +11,7 @@ import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { AuditRepository } from 'src/modules/admin/audit/audit.repository';
 import { ReservationStateFactory } from '../states/reservation-state.factory';
 import { UpdateManyResponseDto } from '../dto/update-many.dto';
-import { getCurrentLimaDate } from 'src/utils/dates/peru-datetime';
+import { getCurrentLimaTime } from 'src/utils/dates/peru-datetime';
 
 @Injectable()
 export class ReactivateReservationsUseCase {
@@ -38,7 +38,7 @@ export class ReactivateReservationsUseCase {
   }
 
   async checkCheckInDateItsNotInThePast(checkInDate: string): Promise<boolean> {
-    const currentDateLima = getCurrentLimaDate();
+    const currentDateLima = getCurrentLimaTime();
     const checkInDateObj = new Date(checkInDate);
     return checkInDateObj.getDay() >= currentDateLima.getDay();
   }

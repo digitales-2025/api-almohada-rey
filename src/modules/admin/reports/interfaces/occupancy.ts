@@ -14,9 +14,9 @@ export interface RoomTypeOccupancyStats {
   arrivalsByDay: Record<string, number>; // Arribos por día
   overnightsByDay: Record<string, number>; // Pernoctaciones por día
   summary: {
-    month: number;
-    year: number;
-    daysInMonth: number;
+    startDate: string;
+    endDate: string;
+    daysInRange: number;
     roomType: string;
     totalRooms: number;
   };
@@ -55,8 +55,8 @@ export interface DailyStats {
 }
 
 export interface OccupancySummary {
-  month: number;
-  year: number;
+  startDate: string;
+  endDate: string;
   totalRoomTypes: number;
   totalCountries: number;
   totalPeruvianDepartments: number;

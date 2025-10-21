@@ -12,19 +12,13 @@ export class ReportsRepository {
 
   /**
    * Obtiene los datos de profit (ganancias) de todas las tablas configuradas,
-   * filtrando por mes y año.
-   * @param month Mes numérico (1-12)
-   * @param year Año (YYYY)
+   * filtrando por rango de fechas.
+   * @param startDate Fecha de inicio (YYYY-MM-DD)
+   * @param endDate Fecha de fin (YYYY-MM-DD)
    * @returns Arreglo de objetos ProfitSummary
    */
 
-  async getProfit(month: number, year: number): Promise<ProfitData[]> {
-    const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
-    const endDate =
-      month === 12
-        ? `${year + 1}-01-01`
-        : `${year}-${(month + 1).toString().padStart(2, '0')}-01`;
-
+  async getProfit(startDate: string, endDate: string): Promise<ProfitData[]> {
     // 1. Reservas CHECKED_IN en el rango
     const reservas = await this.prisma.reservation.findMany({
       where: {
@@ -109,29 +103,20 @@ export class ReportsRepository {
   /* Fin reporte ganancias  */
 
   /**
-   * Obtiene los gastos diarios agrupados por día para un mes y año específicos.
-   * @param month Mes numérico (1-12)
-   * @param year Año (YYYY)
+   * Obtiene los gastos diarios agrupados por día para un rango de fechas específico.
+   * @param startDate Fecha de inicio (YYYY-MM-DD)
+   * @param endDate Fecha de fin (YYYY-MM-DD)
    * @returns Objeto con los gastos diarios agrupados por día
    */
 
-  async getExpense(month: number, year: number): Promise<ExpenseData[]> {
-    const startDate = new Date(
-      `${year}-${month.toString().padStart(2, '0')}-01`,
-    );
-    const endDate = new Date(
-      month === 12
-        ? `${year + 1}-01-01`
-        : `${year}-${(month + 1).toString().padStart(2, '0')}-01`,
-    );
-
+  async getExpense(startDate: string, endDate: string): Promise<ExpenseData[]> {
     // Movements INPUT (gastos de inventario)
     const inputMovements = await this.prisma.movements.findMany({
       where: {
         type: 'INPUT',
         dateMovement: {
-          gte: startDate.toISOString().slice(0, 10),
-          lt: endDate.toISOString().slice(0, 10),
+          gte: startDate,
+          lt: endDate,
         },
       },
       select: {
@@ -150,8 +135,8 @@ export class ReportsRepository {
     const hotelExpenses = await this.prisma.hotelExpense.findMany({
       where: {
         date: {
-          gte: startDate.toISOString().slice(0, 10),
-          lt: endDate.toISOString().slice(0, 10),
+          gte: startDate,
+          lt: endDate,
         },
       },
       select: {
@@ -290,14 +275,14 @@ export class ReportsRepository {
   /**
    * Obtiene los datos de profit y expense para el balance,
    * retornando ambos arreglos en un solo objeto.
-   * @param month Mes numérico (1-12)
-   * @param year Año (YYYY)
+   * @param startDate Fecha de inicio (YYYY-MM-DD)
+   * @param endDate Fecha de fin (YYYY-MM-DD)
    * @returns Objeto con arreglos profit y expense
    */
-  async getBalance(month: number, year: number): Promise<BalanceData> {
+  async getBalance(startDate: string, endDate: string): Promise<BalanceData> {
     const [profit, expense] = await Promise.all([
-      this.getProfit(month, year),
-      this.getExpense(month, year),
+      this.getProfit(startDate, endDate),
+      this.getExpense(startDate, endDate),
     ]);
     return { profit, expense };
   }
@@ -305,23 +290,17 @@ export class ReportsRepository {
   /* Fin reporte balance */
 
   /**
-   * Genera y retorna un Excel con los datos de ganancia por habitación del mes y año indicados.
-   * @param month Mes numérico (1-12)
-   * @param year Año (YYYY)
+   * Genera y retorna un Excel con los datos de ganancia por habitación del rango de fechas indicado.
+   * @param startDate Fecha de inicio (YYYY-MM-DD)
+   * @param endDate Fecha de fin (YYYY-MM-DD)
    * @param typeRoomId ID del tipo de habitación
    * @returns ExcelJS.Workbook con los datos de balance
    */
   async getProfitTypeRoom(
-    month: number,
-    year: number,
+    startDate: string,
+    endDate: string,
     typeRoomId: string,
   ): Promise<ProfitRoomTypeData[]> {
-    const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
-    const endDate =
-      month === 12
-        ? `${year + 1}-01-01`
-        : `${year}-${(month + 1).toString().padStart(2, '0')}-01`;
-
     // Habitaciones
     const roomDetails = await this.prisma.paymentDetail.findMany({
       where: {
@@ -432,23 +411,16 @@ export class ReportsRepository {
   /* Fin reporte ganacias tipo de habitacion */
 
   /**
-   * Obtiene estadísticas de ocupación por tipo de habitación para un mes y año específico,
+   * Obtiene estadísticas de ocupación por tipo de habitación para un rango de fechas específico,
    * incluyendo estadísticas por nacionalidad y departamento
-   * @param month Mes numérico (1-12)
-   * @param year Año (YYYY)
+   * @param startDate Fecha de inicio (YYYY-MM-DD)
+   * @param endDate Fecha de fin (YYYY-MM-DD)
    * @returns Estadísticas detalladas de ocupación
    */
   async getOccupancyStatsByRoomType(
-    month: number,
-    year: number,
+    startDate: string,
+    endDate: string,
   ): Promise<OccupancyStatsResponse> {
-    // Definir rango de fechas para el mes y año
-    const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
-    const endDate =
-      month === 12
-        ? `${year + 1}-01-01`
-        : `${year}-${(month + 1).toString().padStart(2, '0')}-01`;
-
     // Primero vamos a obtener todas las habitaciones por tipo para tener el conteo total
     const roomsByType = await this.prisma.room.groupBy({
       by: ['roomTypeId'],
@@ -547,15 +519,19 @@ export class ReportsRepository {
     > = {};
 
     // Contadores diarios para arribos y pernoctaciones
-    const diasEnMes = new Date(year, month, 0).getDate();
     const dailyArrivalsCount: Record<string, number> = {};
     const dailyOvernightsCount: Record<string, number> = {};
 
-    // Inicializar contadores diarios
-    for (let day = 1; day <= diasEnMes; day++) {
-      const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    // Inicializar contadores diarios para el rango de fechas
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const current = new Date(start);
+
+    while (current <= end) {
+      const dateStr = current.toISOString().split('T')[0];
       dailyArrivalsCount[dateStr] = 0;
       dailyOvernightsCount[dateStr] = 0;
+      current.setDate(current.getDate() + 1);
     }
 
     // 3. Calcular estadísticas por cada reserva
@@ -638,11 +614,7 @@ export class ReportsRepository {
 
       // Contar arribo en la fecha de llegada
       const checkInDateStr = checkIn.toISOString().split('T')[0];
-      if (
-        checkInDateStr.startsWith(
-          `${year}-${month.toString().padStart(2, '0')}`,
-        )
-      ) {
+      if (checkInDateStr >= startDate && checkInDateStr < endDate) {
         dailyArrivalsCount[checkInDateStr] =
           (dailyArrivalsCount[checkInDateStr] || 0) + 1;
       }
@@ -651,9 +623,7 @@ export class ReportsRepository {
       const currentDate = new Date(checkIn);
       while (currentDate < checkOut) {
         const dateStr = currentDate.toISOString().split('T')[0];
-        if (
-          dateStr.startsWith(`${year}-${month.toString().padStart(2, '0')}`)
-        ) {
+        if (dateStr >= startDate && dateStr < endDate) {
           dailyOvernightsCount[dateStr] =
             (dailyOvernightsCount[dateStr] || 0) + guestCount;
         }
@@ -705,7 +675,11 @@ export class ReportsRepository {
 
       // También mantenemos el cálculo original para referencia
       const roomCount = stats.rooms.size;
-      const totalPossibleRoomDays = roomCount * diasEnMes;
+      const daysInRange = Math.ceil(
+        (new Date(endDate).getTime() - new Date(startDate).getTime()) /
+          (1000 * 60 * 60 * 24),
+      );
+      const totalPossibleRoomDays = roomCount * daysInRange;
       const occupancyRateByDays =
         totalPossibleRoomDays > 0
           ? (stats.occupiedRoomDays / totalPossibleRoomDays) * 100
@@ -735,18 +709,21 @@ export class ReportsRepository {
         ),
         arrivalsByDay: this.calculateDailyArrivals(
           stats.occupancyDetails,
-          year,
-          month,
+          startDate,
+          endDate,
         ),
         overnightsByDay: this.calculateDailyOvernights(
           stats.occupancyDetails,
-          year,
-          month,
+          startDate,
+          endDate,
         ),
         summary: {
-          month: month,
-          year: year,
-          daysInMonth: diasEnMes,
+          startDate: startDate,
+          endDate: endDate,
+          daysInRange: Math.ceil(
+            (new Date(endDate).getTime() - new Date(startDate).getTime()) /
+              (1000 * 60 * 60 * 24),
+          ),
           roomType: stats.roomTypeName,
           totalRooms: totalRoomsOfThisType, // Ahora usamos el total real
         },
@@ -796,8 +773,8 @@ export class ReportsRepository {
       peruvianDepartmentStats,
       dailyStats,
       summary: {
-        month,
-        year,
+        startDate,
+        endDate,
         totalRoomTypes: roomTypeStats.length,
         totalCountries: nationalityStats.length,
         totalPeruvianDepartments: peruvianDepartmentStats.length,
@@ -827,23 +804,27 @@ export class ReportsRepository {
       country: string;
       department: string | null;
     }>,
-    year: number,
-    month: number,
+    startDate: string,
+    endDate: string,
   ): Record<string, number> {
     const result: Record<string, number> = {};
-    const diasEnMes = new Date(year, month, 0).getDate();
 
-    // Inicializar todos los días del mes con 0
-    for (let day = 1; day <= diasEnMes; day++) {
-      const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    // Inicializar todos los días del rango con 0
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const current = new Date(start);
+
+    while (current <= end) {
+      const dateStr = current.toISOString().split('T')[0];
       result[dateStr] = 0;
+      current.setDate(current.getDate() + 1);
     }
 
     // Contar arribos por día
     occupancyDetails.forEach((detail) => {
       const dateStr = detail.checkInDate.toISOString().split('T')[0];
-      // Solo contar si está dentro del mes solicitado
-      if (dateStr.startsWith(`${year}-${month.toString().padStart(2, '0')}`)) {
+      // Solo contar si está dentro del rango solicitado
+      if (dateStr >= startDate && dateStr < endDate) {
         result[dateStr] = (result[dateStr] || 0) + 1;
       }
     });
@@ -863,16 +844,20 @@ export class ReportsRepository {
       country: string;
       department: string | null;
     }>,
-    year: number,
-    month: number,
+    startDate: string,
+    endDate: string,
   ): Record<string, number> {
     const result: Record<string, number> = {};
-    const diasEnMes = new Date(year, month, 0).getDate();
 
-    // Inicializar todos los días del mes con 0
-    for (let day = 1; day <= diasEnMes; day++) {
-      const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    // Inicializar todos los días del rango con 0
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const current = new Date(start);
+
+    while (current <= end) {
+      const dateStr = current.toISOString().split('T')[0];
       result[dateStr] = 0;
+      current.setDate(current.getDate() + 1);
     }
 
     // Contar pernoctaciones por día
@@ -884,10 +869,8 @@ export class ReportsRepository {
       const currentDate = new Date(checkIn);
       while (currentDate < checkOut) {
         const dateStr = currentDate.toISOString().split('T')[0];
-        // Solo contar si está dentro del mes solicitado
-        if (
-          dateStr.startsWith(`${year}-${month.toString().padStart(2, '0')}`)
-        ) {
+        // Solo contar si está dentro del rango solicitado
+        if (dateStr >= startDate && dateStr < endDate) {
           result[dateStr] = (result[dateStr] || 0) + detail.guestCount;
         }
         // Avanzar al siguiente día
@@ -905,8 +888,8 @@ export class ReportsRepository {
    * @returns Estadísticas de razones de reserva
    */
   async getReservationReasonsStats(
-    month: number,
-    year: number,
+    startDate: string,
+    endDate: string,
   ): Promise<{
     reasons: Array<{
       reason: string;
@@ -920,12 +903,6 @@ export class ReportsRepository {
     totalOvernights: number;
     totalGuests: number;
   }> {
-    const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
-    const endDate =
-      month === 12
-        ? `${year + 1}-01-01`
-        : `${year}-${(month + 1).toString().padStart(2, '0')}-01`;
-
     // Obtener reservas con razones en el rango especificado
     const reservations = await this.prisma.reservation.findMany({
       where: {

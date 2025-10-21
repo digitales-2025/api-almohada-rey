@@ -10,7 +10,7 @@ export class OccupancyReportUseCase {
 
   async execute(
     data: OccupancyStatsResponse | null | undefined,
-    { month, year }: { month: number; year: number },
+    { startDate, endDate }: { startDate: string; endDate: string },
   ): Promise<ExcelJS.Workbook> {
     // Validación de datos...
     const safeData: Partial<OccupancyStatsResponse> = data || {};
@@ -30,8 +30,8 @@ export class OccupancyReportUseCase {
     // Crear un objeto summary completo con los valores calculados
     const safeSummary = {
       ...safeData.summary,
-      month: month,
-      year: year,
+      startDate: startDate,
+      endDate: endDate,
       totalRoomTypes: safeData.summary?.totalRoomTypes || 0,
       totalCountries: safeData.summary?.totalCountries || 0,
       totalPeruvianDepartments: safeData.summary?.totalPeruvianDepartments || 0,
@@ -45,25 +45,8 @@ export class OccupancyReportUseCase {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Reporte de Pernoctaciones');
 
-    // Nombres de los meses en español
-    const monthNames = [
-      '',
-      'Enero',
-      'Febrero',
-      'Marzo',
-      'Abril',
-      'Mayo',
-      'Junio',
-      'Julio',
-      'Agosto',
-      'Septiembre',
-      'Octubre',
-      'Noviembre',
-      'Diciembre',
-    ];
-
     // -- Título principal --
-    const title = `INFORME DE PERNOCTACIONES - ${monthNames[month].toUpperCase()} ${year}`;
+    const title = `INFORME DE PERNOCTACIONES - ${startDate} a ${endDate}`;
     sheet.mergeCells('A1:H1');
     const titleCell = sheet.getCell('A1');
     titleCell.value = title;
@@ -222,8 +205,8 @@ export class OccupancyReportUseCase {
     // Preparar los datos diarios
     const dailyData = this.prepareDailyData(
       safeData.dailyStats || [],
-      month,
-      year,
+      startDate,
+      endDate,
     );
 
     // Encabezados para la tabla de días
@@ -248,8 +231,58 @@ export class OccupancyReportUseCase {
     });
     sheet.getRow(sheet.rowCount).height = 24;
 
-    // Insertar datos por día
+    // Insertar datos por día con separadores de mes
+    let currentMonth = null;
+    const monthNames = [
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre',
+    ];
+
     dailyData.forEach((day, index) => {
+      // Extraer mes de la fecha
+      const date = new Date(day.date + 'T00:00:00');
+      const month = date.getMonth();
+      const year = date.getFullYear();
+
+      // Verificar si cambió el mes
+      if (currentMonth !== month) {
+        // Si no es el primer mes, agregar totales del mes anterior
+        if (currentMonth !== null) {
+          this.addMonthTotals(sheet, monthNames[currentMonth]);
+        }
+
+        // Agregar separador de mes
+        const monthRow = sheet.addRow([]);
+        const monthCell = sheet.getCell(`A${monthRow.number}`);
+        monthCell.value = monthNames[month] + ' ' + year;
+        monthCell.font = {
+          bold: true,
+          size: 12,
+          color: { argb: colors.PRIMARY },
+        };
+        monthCell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF0F0F0' },
+        };
+        monthCell.alignment = { horizontal: 'center' };
+
+        // Mergear celdas para el separador de mes
+        sheet.mergeCells(`A${monthRow.number}:C${monthRow.number}`);
+
+        currentMonth = month;
+      }
+
       const dayRow = sheet.addRow([day.dayLabel, day.arrivals, day.overnights]);
 
       // Estilo para filas alternadas
@@ -284,6 +317,11 @@ export class OccupancyReportUseCase {
         }
       });
     });
+
+    // Agregar totales del último mes
+    if (currentMonth !== null) {
+      this.addMonthTotals(sheet, monthNames[currentMonth]);
+    }
 
     // Añadir totales de días
     const totalArrivals = dailyData.reduce((sum, day) => sum + day.arrivals, 0);
@@ -530,7 +568,7 @@ export class OccupancyReportUseCase {
     sheet.getRow(sheet.rowCount).height = 24;
 
     // Obtener datos de razones reales del repositorio
-    const reasonsData = await this.getReasonsData(month, year);
+    const reasonsData = await this.getReasonsData(startDate, endDate);
 
     // Insertar datos de razones
     reasonsData.forEach((reason, index) => {
@@ -674,10 +712,11 @@ export class OccupancyReportUseCase {
     return workbook;
   }
 
-  private prepareDailyData(dailyStats: any[], month: number, year: number) {
-    // Obtener el número de días en el mes
-    const daysInMonth = new Date(year, month, 0).getDate();
-
+  private prepareDailyData(
+    dailyStats: any[],
+    startDate: string,
+    endDate: string,
+  ) {
     // Crear un mapa para acceso rápido
     const dailyStatsMap: Record<
       string,
@@ -687,13 +726,17 @@ export class OccupancyReportUseCase {
       dailyStatsMap[day.date] = day;
     });
 
-    // Crear un array con todos los días del mes
+    // Crear un array con todos los días del rango
     const result = [];
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dayStr = day.toString().padStart(2, '0');
-      const dateStr = `${year}-${month.toString().padStart(2, '0')}-${dayStr}`;
-      const dayOfWeek = new Date(dateStr).getDay();
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const current = new Date(start);
+
+    while (current <= end) {
+      const dateStr = current.toISOString().split('T')[0];
+      const dayOfWeek = current.getDay();
       const weekDays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+      const dayStr = current.getDate().toString().padStart(2, '0');
 
       // Crear etiqueta para el día: "01 (Lun)"
       const dayLabel = `${dayStr} (${weekDays[dayOfWeek]})`;
@@ -711,6 +754,9 @@ export class OccupancyReportUseCase {
         overnights: dayData.overnights,
         date: dateStr,
       });
+
+      // Avanzar al siguiente día
+      current.setDate(current.getDate() + 1);
     }
 
     return result;
@@ -721,8 +767,8 @@ export class OccupancyReportUseCase {
    * @private
    */
   private async getReasonsData(
-    month: number,
-    year: number,
+    startDate: string,
+    endDate: string,
   ): Promise<
     Array<{
       reason: string;
@@ -735,7 +781,10 @@ export class OccupancyReportUseCase {
   > {
     try {
       const reasonsStats =
-        await this.reportsRepository.getReservationReasonsStats(month, year);
+        await this.reportsRepository.getReservationReasonsStats(
+          startDate,
+          endDate,
+        );
       return reasonsStats.reasons;
     } catch (error) {
       console.error('Error obteniendo estadísticas de razones:', error);
@@ -755,5 +804,341 @@ export class OccupancyReportUseCase {
     } else {
       return 'Baja';
     }
+  }
+
+  /**
+   * Genera un reporte comparativo de ocupación entre dos años
+   * @param data1 Datos del primer año
+   * @param data2 Datos del segundo año
+   * @param years Años a comparar
+   * @returns Workbook con 3 hojas: Resumen Comparativo, Detalle Año 1, Detalle Año 2
+   */
+  async executeCompare(
+    data1: OccupancyStatsResponse,
+    data2: OccupancyStatsResponse,
+    { year1, year2 }: { year1: number; year2: number },
+  ): Promise<ExcelJS.Workbook> {
+    const workbook = new ExcelJS.Workbook();
+
+    // Hoja 1: Resumen Comparativo
+    const summarySheet = workbook.addWorksheet('Resumen Comparativo');
+    this.createOccupancyComparisonSummary(
+      summarySheet,
+      data1,
+      data2,
+      year1,
+      year2,
+    );
+
+    // Hoja 2: Detalle Año 1
+    const detailSheet1 = workbook.addWorksheet(`Detalle ${year1}`);
+    this.createOccupancyDetailSheet(detailSheet1, data1, year1);
+
+    // Hoja 3: Detalle Año 2
+    const detailSheet2 = workbook.addWorksheet(`Detalle ${year2}`);
+    this.createOccupancyDetailSheet(detailSheet2, data2, year2);
+
+    return workbook;
+  }
+
+  private createOccupancyComparisonSummary(
+    sheet: ExcelJS.Worksheet,
+    data1: OccupancyStatsResponse,
+    data2: OccupancyStatsResponse,
+    year1: number,
+    year2: number,
+  ) {
+    // Título principal
+    sheet.mergeCells('A1:G1');
+    const titleCell = sheet.getCell('A1');
+    titleCell.value = `Reporte Comparativo de Ocupación - ${year1} vs ${year2}`;
+    titleCell.font = { size: 16, bold: true, color: { argb: colors.PRIMARY } };
+    titleCell.alignment = { horizontal: 'center' };
+
+    // Subtítulo
+    sheet.mergeCells('A2:G2');
+    const subtitleCell = sheet.getCell('A2');
+    subtitleCell.value =
+      'Análisis comparativo de ocupación por tipo de habitación';
+    subtitleCell.font = { size: 12, italic: true };
+    subtitleCell.alignment = { horizontal: 'center' };
+
+    // Espacio
+    sheet.getRow(3).height = 20;
+
+    // Encabezados de la tabla comparativa
+    const headers = [
+      'Tipo de Habitación',
+      `${year1} Ocupación (%)`,
+      `${year2} Ocupación (%)`,
+      'Diferencia (%)',
+      'Variación (%)',
+      'Tendencia',
+      'Estado',
+    ];
+
+    const headerRow = sheet.getRow(4);
+    headers.forEach((header, index) => {
+      const cell = headerRow.getCell(index + 1);
+      cell.value = header;
+      cell.font = { bold: true, color: { argb: 'FFFFFF' } };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: colors.PRIMARY },
+      };
+      cell.alignment = { horizontal: 'center' };
+    });
+
+    // Calcular comparaciones por tipo de habitación
+    const roomTypes = this.getUniqueRoomTypes(data1, data2);
+    let currentRow = 5;
+
+    roomTypes.forEach((roomType) => {
+      const occupancy1 = this.getOccupancyByRoomType(data1, roomType);
+      const occupancy2 = this.getOccupancyByRoomType(data2, roomType);
+      const difference = occupancy1 - occupancy2;
+      const variation = occupancy2 !== 0 ? (difference / occupancy2) * 100 : 0;
+      const trend = this.getTrendIcon(variation);
+      const status = this.getOccupancyStatus(occupancy1);
+
+      const row = sheet.getRow(currentRow);
+      row.getCell(1).value = roomType;
+      row.getCell(2).value = occupancy1;
+      row.getCell(3).value = occupancy2;
+      row.getCell(4).value = difference;
+      row.getCell(5).value = variation;
+      row.getCell(6).value = trend;
+      row.getCell(7).value = status;
+
+      // Formatear números
+      row.getCell(2).numFmt = '0.00"%"';
+      row.getCell(3).numFmt = '0.00"%"';
+      row.getCell(4).numFmt = '0.00"%"';
+      row.getCell(5).numFmt = '0.00"%"';
+
+      // Colorear según tendencia
+      if (variation > 5) {
+        row.getCell(4).font = { color: { argb: '00AA00' } }; // Verde para aumento
+        row.getCell(5).font = { color: { argb: '00AA00' } };
+      } else if (variation < -5) {
+        row.getCell(4).font = { color: { argb: 'AA0000' } }; // Rojo para disminución
+        row.getCell(5).font = { color: { argb: 'AA0000' } };
+      }
+
+      // Colorear estado
+      if (status === 'Excelente') {
+        row.getCell(7).font = { color: { argb: '00AA00' } };
+      } else if (status === 'Buena') {
+        row.getCell(7).font = { color: { argb: 'FFA500' } };
+      } else {
+        row.getCell(7).font = { color: { argb: 'AA0000' } };
+      }
+
+      currentRow++;
+    });
+
+    // Fila de totales
+    const totalRow = sheet.getRow(currentRow);
+    const totalOccupancy1 = this.getTotalOccupancy(data1);
+    const totalOccupancy2 = this.getTotalOccupancy(data2);
+    const totalDiff = totalOccupancy1 - totalOccupancy2;
+    const totalVariation =
+      totalOccupancy2 !== 0 ? (totalDiff / totalOccupancy2) * 100 : 0;
+
+    totalRow.getCell(1).value = 'PROMEDIO GENERAL';
+    totalRow.getCell(1).font = { bold: true };
+    totalRow.getCell(2).value = totalOccupancy1;
+    totalRow.getCell(3).value = totalOccupancy2;
+    totalRow.getCell(4).value = totalDiff;
+    totalRow.getCell(5).value = totalVariation;
+    totalRow.getCell(6).value = this.getTrendIcon(totalVariation);
+    totalRow.getCell(7).value = this.getOccupancyStatus(totalOccupancy1);
+
+    // Formatear totales
+    totalRow.getCell(2).numFmt = '0.00"%"';
+    totalRow.getCell(3).numFmt = '0.00"%"';
+    totalRow.getCell(4).numFmt = '0.00"%"';
+    totalRow.getCell(5).numFmt = '0.00"%"';
+
+    // Estilo de la fila de totales
+    totalRow.eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'F0F0F0' },
+      };
+    });
+
+    // Ajustar ancho de columnas
+    sheet.columns = [
+      { width: 30 }, // Tipo de Habitación
+      { width: 18 }, // Año 1
+      { width: 18 }, // Año 2
+      { width: 15 }, // Diferencia
+      { width: 12 }, // Variación
+      { width: 10 }, // Tendencia
+      { width: 12 }, // Estado
+    ];
+  }
+
+  private createOccupancyDetailSheet(
+    sheet: ExcelJS.Worksheet,
+    data: OccupancyStatsResponse,
+    year: number,
+  ) {
+    // Título
+    sheet.mergeCells('A1:G1');
+    const titleCell = sheet.getCell('A1');
+    titleCell.value = `Reporte de Ocupación - ${year}`;
+    titleCell.font = { size: 16, bold: true, color: { argb: colors.PRIMARY } };
+    titleCell.alignment = { horizontal: 'center' };
+
+    // Espacio
+    sheet.getRow(2).height = 20;
+
+    // Encabezados
+    const headers = [
+      'Tipo de Habitación',
+      'Habitaciones',
+      'Días Ocupados',
+      'Días Totales',
+      'Ocupación (%)',
+      'Estado',
+      'Prioridad',
+    ];
+    const headerRow = sheet.getRow(3);
+    headers.forEach((header, index) => {
+      const cell = headerRow.getCell(index + 1);
+      cell.value = header;
+      cell.font = { bold: true, color: { argb: 'FFFFFF' } };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: colors.PRIMARY },
+      };
+      cell.alignment = { horizontal: 'center' };
+    });
+
+    // Datos
+    let currentRow = 4;
+    data.roomTypeStats.forEach((roomType) => {
+      const row = sheet.getRow(currentRow);
+      row.getCell(1).value = roomType.roomTypeName;
+      row.getCell(2).value = roomType.totalRoomsOfThisType;
+      row.getCell(3).value = roomType.occupiedRoomDays;
+      row.getCell(4).value = roomType.summary.totalRooms;
+      row.getCell(5).value = roomType.occupancyRatePercent;
+      row.getCell(6).value = this.getOccupancyStatus(
+        roomType.occupancyRatePercent,
+      );
+      row.getCell(7).value = this.getPriorityLevel(
+        roomType.occupancyRatePercent,
+      );
+
+      // Formatear números
+      row.getCell(2).numFmt = '#,##0';
+      row.getCell(3).numFmt = '#,##0';
+      row.getCell(4).numFmt = '#,##0';
+      row.getCell(5).numFmt = '0.00"%"';
+
+      // Colorear estado
+      if (row.getCell(6).value === 'Excelente') {
+        row.getCell(6).font = { color: { argb: '00AA00' } };
+      } else if (row.getCell(6).value === 'Buena') {
+        row.getCell(6).font = { color: { argb: 'FFA500' } };
+      } else {
+        row.getCell(6).font = { color: { argb: 'AA0000' } };
+      }
+
+      // Colorear prioridad
+      if (row.getCell(7).value === 'Alta') {
+        row.getCell(7).font = { color: { argb: 'AA0000' } };
+      } else if (row.getCell(7).value === 'Media') {
+        row.getCell(7).font = { color: { argb: 'FFA500' } };
+      } else {
+        row.getCell(7).font = { color: { argb: '00AA00' } };
+      }
+
+      currentRow++;
+    });
+
+    // Ajustar ancho de columnas
+    sheet.columns = [
+      { width: 30 }, // Tipo de Habitación
+      { width: 15 }, // Habitaciones
+      { width: 15 }, // Días Ocupados
+      { width: 15 }, // Días Totales
+      { width: 15 }, // Ocupación (%)
+      { width: 12 }, // Estado
+      { width: 12 }, // Prioridad
+    ];
+  }
+
+  private getUniqueRoomTypes(
+    data1: OccupancyStatsResponse,
+    data2: OccupancyStatsResponse,
+  ): string[] {
+    const roomTypes = new Set<string>();
+    data1.roomTypeStats.forEach((item) => roomTypes.add(item.roomTypeName));
+    data2.roomTypeStats.forEach((item) => roomTypes.add(item.roomTypeName));
+    return Array.from(roomTypes).sort();
+  }
+
+  private getOccupancyByRoomType(
+    data: OccupancyStatsResponse,
+    roomType: string,
+  ): number {
+    const roomTypeData = data.roomTypeStats.find(
+      (item) => item.roomTypeName === roomType,
+    );
+    return roomTypeData ? roomTypeData.occupancyRatePercent : 0;
+  }
+
+  private getTotalOccupancy(data: OccupancyStatsResponse): number {
+    if (data.roomTypeStats.length === 0) return 0;
+    const totalOccupancy = data.roomTypeStats.reduce(
+      (sum, item) => sum + item.occupancyRatePercent,
+      0,
+    );
+    return totalOccupancy / data.roomTypeStats.length;
+  }
+
+  private getOccupancyStatus(percentage: number): string {
+    if (percentage >= 80) {
+      return 'Excelente';
+    } else if (percentage >= 60) {
+      return 'Buena';
+    } else {
+      return 'Baja';
+    }
+  }
+
+  private getTrendIcon(variation: number): string {
+    if (variation > 5) return '📈';
+    if (variation < -5) return '📉';
+    return '➡️';
+  }
+
+  private addMonthTotals(sheet: ExcelJS.Worksheet, monthName: string) {
+    // Agregar fila de totales del mes
+    const totalRow = sheet.addRow(['TOTAL ' + monthName.toUpperCase()]);
+
+    // Mergear celdas para el total del mes
+    sheet.mergeCells(`A${totalRow.number}:C${totalRow.number}`);
+
+    // Estilo para el total del mes
+    const totalCell = sheet.getCell(`A${totalRow.number}`);
+    totalCell.font = { bold: true, size: 11, color: { argb: colors.PRIMARY } };
+    totalCell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE8E8E8' },
+    };
+    totalCell.alignment = { horizontal: 'center' };
+
+    // Agregar fila vacía para separación
+    sheet.addRow([]);
   }
 }
