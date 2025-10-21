@@ -32,9 +32,10 @@ model User {
   sessions Session[]
 
   // Todas tus relaciones existentes
-  auditsPerformed    Audit[]             @relation("AuditPerformedBy")
-  cleaningChecklists CleaningChecklist[] @relation("CleaningChecklistUser")
-  reservations       Reservation[]
+  auditsPerformed      Audit[]             @relation("AuditPerformedBy")
+  cleaningChecklists   CleaningChecklist[] @relation("CleaningChecklistUser")
+  reservations         Reservation[]
+  blacklistedCustomers Customer[]          @relation("CustomerBlacklist")
 }
 
 enum UserRolType {
@@ -81,6 +82,12 @@ model Customer {
   isActive       Boolean                @default(true)
   createdAt      DateTime               @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime               @updatedAt
+
+  isBlacklist     Boolean?  @default(false) // Indicates if the customer is blacklisted
+  blacklistReason String? // Razón del blacklist
+  blacklistDate   DateTime? // Fecha de blacklist
+  blacklistedBy   User?     @relation("CustomerBlacklist", fields: [blacklistedById], references: [id])
+  blacklistedById String? // ID del usuario que blacklistó al cliente
 
   createdByLandingPage Boolean?                     @default(false) // Indicates if the customer was created through the landing page and if that's the case, notify the admin to complete the missing data
   mustCompleteData     Boolean?                     @default(false) // Indicates if the admin was created by the landing page and if that's the case, notify the admin to complete the missing data
@@ -294,6 +301,9 @@ model PaymentDetail {
 
   payment   Payment @relation("PaymentDetailPayment", fields: [paymentId], references: [id])
   paymentId String
+
+  typePaymentDetail ExpenseDocumentType?
+  documentNumberPaymentDetail    String?
 
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt
