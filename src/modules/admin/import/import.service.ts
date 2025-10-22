@@ -1,0 +1,1527 @@
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { ImportExcelDto } from './dto/import-excel.dto';
+import { UserData } from 'src/interfaces';
+import * as ExcelJS from 'exceljs';
+import {
+  PaymentDetailMethod,
+  PaymentDetailStatus,
+  ReservationStatus,
+} from '@prisma/client';
+import { NormalizationUtils } from './utils/normalization.utils';
+import { AuditService } from '../audit/audit.service';
+
+@Injectable()
+export class ImportService {
+  private readonly logger = new Logger(ImportService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
+
+  // Función auxiliar para dividir array en lotes
+  private chunkArray<T>(array: T[], chunkSize: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+      chunks.push(array.slice(i, i + chunkSize));
+    }
+    return chunks;
+  }
+
+  async importExcelData(importExcelDto: ImportExcelDto, user: UserData) {
+    const { data, batchNumber = 1, totalBatches = 1 } = importExcelDto;
+
+    // Validar límite de 1000 registros
+    if (data.length > 1000) {
+      throw new BadRequestException('Máximo 1000 registros por request');
+    }
+
+    const results = {
+      processed: 0,
+      successful: 0,
+      failed: 0,
+      errors: [],
+      batchNumber,
+      totalBatches,
+      processingTime: 0,
+      internalBatches: [] as any[],
+      unnormalizedNationalities: [] as string[],
+    };
+
+    const startTime = Date.now();
+    const startTimeISO = new Date().toISOString();
+
+    // OPTIMIZACIÓN: Procesar en lotes internos de 100 registros
+    const internalBatchSize = 100;
+    const internalBatches = this.chunkArray(data, internalBatchSize);
+
+    this.logger.log(
+      `🚀 INICIANDO IMPORTACIÓN - Batch ${batchNumber}/${totalBatches}`,
+      {
+        totalRecords: data.length,
+        internalBatches: internalBatches.length,
+        batchSize: internalBatchSize,
+        startTime: startTimeISO,
+        batchNumber,
+        totalBatches,
+      },
+    );
+
+    // Procesar cada lote interno
+    for (
+      let internalBatchIndex = 0;
+      internalBatchIndex < internalBatches.length;
+      internalBatchIndex++
+    ) {
+      const internalBatch = internalBatches[internalBatchIndex];
+      const batchStartTime = Date.now();
+
+      const batchStartTimeISO = new Date().toISOString();
+      this.logger.log(
+        `📦 PROCESANDO LOTE INTERNO ${internalBatchIndex + 1}/${internalBatches.length}`,
+        {
+          records: internalBatch.length,
+          startTime: batchStartTimeISO,
+          progress: `${((internalBatchIndex / internalBatches.length) * 100).toFixed(1)}%`,
+        },
+      );
+
+      const internalBatchResults = {
+        internalBatchNumber: internalBatchIndex + 1,
+        totalRecords: internalBatch.length,
+        successful: 0,
+        failed: 0,
+        errors: [] as any[],
+        processingTime: 0,
+      };
+
+      // Procesar cada registro del lote interno (MANTENIENDO LA LÓGICA INDIVIDUAL)
+      for (const [recordIndex, record] of internalBatch.entries()) {
+        const globalRecordIndex =
+          internalBatchIndex * internalBatchSize + recordIndex;
+
+        try {
+          // MANTENER TODA LA LÓGICA COMPLEJA INTACTA
+          await this.processSingleRecord(record, user, results);
+          internalBatchResults.successful++;
+          results.successful++;
+        } catch (error) {
+          internalBatchResults.failed++;
+          results.failed++;
+
+          const errorInfo = {
+            recordIndex: globalRecordIndex,
+            internalBatchIndex: internalBatchIndex + 1,
+            error: error.message,
+            data: record,
+          };
+
+          internalBatchResults.errors.push(errorInfo);
+          results.errors.push(errorInfo);
+
+          this.logger.error(
+            `Error procesando registro ${globalRecordIndex + 1} (lote interno ${internalBatchIndex + 1}): ${error.message}`,
+            error.stack,
+          );
+        }
+        results.processed++;
+      }
+
+      internalBatchResults.processingTime = Date.now() - batchStartTime;
+      results.internalBatches.push(internalBatchResults);
+
+      const batchEndTimeISO = new Date().toISOString();
+      const avgTimePerRecord =
+        internalBatchResults.processingTime / internalBatch.length;
+
+      this.logger.log(`✅ LOTE INTERNO ${internalBatchIndex + 1} COMPLETADO`, {
+        successful: internalBatchResults.successful,
+        failed: internalBatchResults.failed,
+        totalRecords: internalBatch.length,
+        processingTime: `${internalBatchResults.processingTime}ms`,
+        avgTimePerRecord: `${avgTimePerRecord.toFixed(2)}ms`,
+        endTime: batchEndTimeISO,
+        successRate: `${((internalBatchResults.successful / internalBatch.length) * 100).toFixed(1)}%`,
+      });
+    }
+
+    results.processingTime = Date.now() - startTime;
+    const endTimeISO = new Date().toISOString();
+    const avgTimePerRecord = results.processingTime / data.length;
+    const avgTimePerBatch = results.processingTime / internalBatches.length;
+
+    this.logger.log(`🎉 BATCH ${batchNumber}/${totalBatches} COMPLETADO`, {
+      totalRecords: data.length,
+      successful: results.successful,
+      failed: results.failed,
+      successRate: `${((results.successful / data.length) * 100).toFixed(1)}%`,
+      totalProcessingTime: `${results.processingTime}ms (${(results.processingTime / 1000).toFixed(2)}s)`,
+      avgTimePerRecord: `${avgTimePerRecord.toFixed(2)}ms`,
+      avgTimePerBatch: `${avgTimePerBatch.toFixed(2)}ms`,
+      internalBatches: internalBatches.length,
+      startTime: startTimeISO,
+      endTime: endTimeISO,
+      duration: `${(results.processingTime / 1000 / 60).toFixed(2)} minutos`,
+    });
+
+    // Crear reporte completo de nacionalidades
+    const normalizationReport = {
+      totalRecords: data.length,
+      nationalitiesProcessed: results.processed,
+      unnormalizedCount: results.unnormalizedNationalities.length,
+      unnormalizedList: results.unnormalizedNationalities,
+      normalizationRate:
+        results.processed > 0
+          ? `${(((results.processed - results.unnormalizedNationalities.length) / results.processed) * 100).toFixed(1)}%`
+          : '0%',
+    };
+
+    return {
+      success: true,
+      ...results,
+      normalizationReport,
+    };
+  }
+
+  private async processSingleRecord(
+    record: any,
+    user: UserData,
+    results?: any,
+  ) {
+    // Validar que no sea un registro corrupto (headers como datos)
+    if (this.isCorruptRecord(record)) {
+      this.logger.warn(
+        'Registro corrupto detectado (headers como datos) - Procesando de todas formas',
+      );
+      // No lanzar error, continuar con el procesamiento
+    }
+
+    return await this.prisma.$transaction(async (prisma) => {
+      // 1. Calcular fechas primero (necesario para createdAt del cliente)
+      const { checkInDate, checkOutDate } =
+        await this.calculateDatesWithStrategy(record, prisma);
+
+      // 2. Normalizar y crear/buscar cliente (con fecha de check-in como createdAt)
+      const customer = await this.findOrCreateCustomer(
+        record,
+        prisma,
+        results,
+        checkInDate,
+      );
+
+      // 3. Buscar habitación
+      const room = await this.findRoomByNumberOrPrice(record, prisma);
+
+      // 4. Buscar usuario
+      const receptionist = await this.findUserByNameOrRandom(record, prisma);
+
+      // 5. Crear reserva
+      const reservation = await this.createReservation(
+        record,
+        customer,
+        room,
+        receptionist,
+        prisma,
+        checkInDate,
+        checkOutDate,
+      );
+
+      // 5. Crear pago con detalles inteligentes
+      const { payment, paymentDetails } = await this.createPaymentWithDetails(
+        record,
+        reservation,
+        room,
+        prisma,
+      );
+
+      // 6. Registrar auditoría
+      await this.audit.create({
+        entityId: reservation.id,
+        entityType: 'reservation',
+        action: 'CREATE',
+        performedById: user.id,
+        createdAt: new Date(),
+      });
+
+      return { customer, reservation, payment, paymentDetails };
+    });
+  }
+
+  private async findOrCreateCustomer(
+    record: any,
+    prisma: any,
+    results?: any,
+    checkInDate?: Date,
+  ) {
+    // Debug: Log del record para ver qué datos llegan
+    this.logger.debug(
+      'Processing customer record:',
+      JSON.stringify(record, null, 2),
+    );
+
+    // Normalizar datos del cliente
+    let documentType = NormalizationUtils.normalizeDocumentType(
+      record['TIPO DOCUMENTO'],
+    );
+    let documentNumber = NormalizationUtils.normalizeDocumentNumber(
+      record['Nº DOCUMENTO'],
+      documentType,
+    );
+
+    // Si se generó un documento temporal, forzar tipo DNI y verificar unicidad
+    if (documentNumber.startsWith('TEMP_')) {
+      documentType = 'DNI';
+      // Verificar que el documento temporal no exista ya
+      documentNumber = await this.ensureUniqueDocumentNumber(
+        documentNumber,
+        prisma,
+      );
+    }
+
+    // Validar que tenemos datos mínimos requeridos
+    if (!record['APELLIDOS Y NOMBRES'] || !documentNumber) {
+      throw new Error(
+        `Datos insuficientes para crear cliente: nombre=${record['APELLIDOS Y NOMBRES']}, documento=${documentNumber}`,
+      );
+    }
+
+    // Buscar cliente existente
+    let customer = await prisma.customer.findUnique({
+      where: { documentNumber },
+    });
+
+    if (!customer) {
+      // Verificar si es un departamento/provincia/ciudad del Perú
+      const peruvianDepartment = NormalizationUtils.detectPeruvianDepartment(
+        record['NACIONALIDAD'],
+      );
+
+      let normalizedCountry: string | null;
+      let normalizedDepartment: string | null = null;
+
+      if (peruvianDepartment) {
+        // Si es un departamento peruano, asignar Perú como país y el departamento correspondiente
+        normalizedCountry = 'Perú';
+        normalizedDepartment = peruvianDepartment;
+      } else {
+        // Normalizar como nacionalidad regular
+        normalizedCountry = NormalizationUtils.normalizeNationality(
+          record['NACIONALIDAD'],
+          documentType,
+        );
+      }
+
+      // Log nacionalidades que no pudieron normalizarse completamente
+      // Solo si NO es un departamento peruano reconocido
+      if (
+        record['NACIONALIDAD'] &&
+        record['NACIONALIDAD'].trim() &&
+        !peruvianDepartment
+      ) {
+        const isStandardized = this.isStandardizedCountry(normalizedCountry);
+        if (!isStandardized) {
+          NormalizationUtils.logUnnormalizedNationality(
+            record['NACIONALIDAD'],
+            this.logger,
+          );
+          // Agregar a la lista de nacionalidades no normalizadas si results está disponible
+          if (results && results.unnormalizedNationalities) {
+            const nationality = record['NACIONALIDAD'].trim();
+            if (!results.unnormalizedNationalities.includes(nationality)) {
+              results.unnormalizedNationalities.push(nationality);
+            }
+          }
+        }
+      }
+
+      // Crear nuevo cliente
+      customer = await prisma.customer.create({
+        data: {
+          name: record['APELLIDOS Y NOMBRES'],
+          documentType,
+          documentNumber,
+          address: record['DOMICILIO'] || null,
+          phone: NormalizationUtils.normalizePhone(record['TELEFONO']),
+          occupation: record['OCUPACIÓN'] || null,
+          email: record['EMAIL'] || null,
+          maritalStatus: NormalizationUtils.normalizeMaritalStatus(
+            record['ESTADO CIVIL'],
+          ),
+          companyName: record['EMPRESA'] || null,
+          ruc: NormalizationUtils.validateRUC(record['RUC']),
+          companyAddress: record['DIRECCION'] || null,
+          isBlacklist: NormalizationUtils.normalizeBlacklist(
+            record['LISTA NEGRA'],
+          ),
+          country: normalizedCountry,
+          department: normalizedDepartment,
+          isActive: true,
+          mustCompleteData: true,
+          createdByLandingPage: false,
+          createdAt:
+            checkInDate && !isNaN(checkInDate.getTime())
+              ? checkInDate
+              : new Date(), // Validar que checkInDate sea válido
+        },
+      });
+    }
+
+    return customer;
+  }
+
+  private async findRoomByNumberOrPrice(record: any, prisma: any) {
+    const roomNumber = record['HABITACION'];
+    const roomType = record['TIPO HABITACION'];
+    const price = parseFloat(record['PRECIO']) || 0;
+    const days = parseInt(record['DIAS DE ALOJAMIENTO']) || 1;
+
+    // 1. Buscar por número de habitación exacto
+    if (roomNumber && !isNaN(parseInt(roomNumber))) {
+      const room = await prisma.room.findFirst({
+        where: {
+          number: parseInt(roomNumber),
+          isActive: true,
+        },
+        include: { RoomTypes: true },
+      });
+
+      if (room) {
+        return room;
+      }
+    }
+
+    // 2. Buscar por tipo de habitación
+    let roomTypes = [];
+    if (roomType) {
+      roomTypes = await prisma.roomTypes.findMany({
+        where: {
+          isActive: true,
+          name: {
+            contains: roomType,
+            mode: 'insensitive',
+          },
+        },
+      });
+    }
+
+    // 3. Si no encontró por tipo, buscar por precio
+    if (roomTypes.length === 0) {
+      const allRoomTypes = await prisma.roomTypes.findMany({
+        where: { isActive: true },
+      });
+
+      if (allRoomTypes.length > 0) {
+        // Calcular precio por noche
+        const pricePerNight = price / days;
+
+        // Encontrar el tipo con precio más cercano
+        const closestType = allRoomTypes.reduce((closest, current) => {
+          const currentDiff = Math.abs(current.price - pricePerNight);
+          const closestDiff = Math.abs(closest.price - pricePerNight);
+          return currentDiff < closestDiff ? current : closest;
+        });
+
+        roomTypes = [closestType];
+      }
+    }
+
+    // 4. Buscar habitación del tipo encontrado
+    if (roomTypes.length > 0) {
+      const closestRoomType = roomTypes[0];
+
+      const room = await prisma.room.findFirst({
+        where: {
+          roomTypeId: closestRoomType.id,
+          isActive: true,
+        },
+        include: { RoomTypes: true },
+      });
+
+      if (room) {
+        return room;
+      }
+    }
+
+    // 5. Como último recurso, buscar cualquier habitación disponible (aleatoria)
+    const allRooms = await prisma.room.findMany({
+      where: {
+        isActive: true,
+      },
+      include: { RoomTypes: true },
+    });
+
+    if (allRooms.length > 0) {
+      // Seleccionar habitación aleatoria
+      const randomIndex = Math.floor(Math.random() * allRooms.length);
+      const randomRoom = allRooms[randomIndex];
+      this.logger.warn(
+        `No se encontró habitación específica, asignando habitación aleatoria: ${randomRoom.number}`,
+      );
+      return randomRoom;
+    }
+
+    // 6. Si no hay habitaciones en la BD, lanzar error
+    throw new BadRequestException(
+      'No hay habitaciones disponibles en la base de datos',
+    );
+  }
+
+  private async findUserByNameOrRandom(record: any, prisma: any) {
+    const receptionistName = record['RECEPCIONISTA CHECK IN'];
+
+    if (receptionistName) {
+      // Buscar usuario por nombre
+      const user = await prisma.user.findFirst({
+        where: {
+          userRol: 'RECEPCIONIST',
+          name: {
+            contains: receptionistName,
+            mode: 'insensitive',
+          },
+        },
+      });
+
+      if (user) {
+        return user;
+      }
+    }
+
+    // Si no se encuentra, asignar aleatoriamente
+    const receptionists = await prisma.user.findMany({
+      where: { userRol: 'RECEPCIONIST' },
+    });
+
+    if (receptionists.length === 0) {
+      throw new BadRequestException('No hay recepcionistas disponibles');
+    }
+
+    const randomIndex = Math.floor(Math.random() * receptionists.length);
+    return receptionists[randomIndex];
+  }
+
+  private async createReservation(
+    record: any,
+    customer: any,
+    room: any,
+    user: any,
+    prisma: any,
+    checkInDate: Date,
+    checkOutDate: Date,
+  ) {
+    // Fechas ya calculadas desde processSingleRecord
+
+    // ✅ CORRECCIÓN: Convertir fechas Date a ISO string para Prisma
+    const reservation = await prisma.reservation.create({
+      data: {
+        customerId: customer.id,
+        roomId: room.id,
+        userId: user.id,
+        reservationDate: checkInDate.toISOString(), // ✅ Convertir a ISO
+        checkInDate: checkInDate.toISOString(), // ✅ Convertir a ISO
+        checkOutDate: checkOutDate.toISOString(), // ✅ Convertir a ISO
+        status: ReservationStatus.CHECKED_OUT,
+        origin: record['PROCEDENCIA'] || null,
+        reason: record['MOTIVO DE VIAJE'] || null,
+        guests: NormalizationUtils.createGuestsJSON(
+          record['ACOMPAÑANTE'],
+          record['DOCUMENTO ACOMPAÑANTE'],
+        ),
+        observations: record['OBSERVACIONES'] || null,
+        isActive: false, // ✅ CORRECCIÓN: CHECKED_OUT debe tener isActive: false
+        createdByLandingPage: false,
+      },
+    });
+
+    return reservation;
+  }
+
+  private async createPaymentWithDetails(
+    record: any,
+    reservation: any,
+    room: any,
+    prisma: any,
+  ) {
+    const priceStr = record['PRECIO']?.toString().trim() || '';
+
+    // Limpiar formato de precio (S/ 25,84 → 25.84)
+    const cleanPriceStr = priceStr
+      .replace(/S\/\s*/g, '') // Quitar "S/ "
+      .replace(/,/g, '.') // Cambiar comas por puntos
+      .replace(/\s+/g, '') // Quitar espacios
+      .trim();
+
+    let excelAmount = parseFloat(cleanPriceStr);
+
+    // Si no hay precio válido, usar el precio de la habitación
+    if (isNaN(excelAmount) || excelAmount <= 0) {
+      excelAmount = room.RoomTypes.price;
+      this.logger.warn(
+        `Precio inválido "${priceStr}", usando precio de habitación: ${excelAmount}`,
+      );
+    }
+
+    const roomPrice = room.RoomTypes.price;
+
+    // ✅ Convertir fechas ISO string a Date para calcular noches
+    const checkInDateObj = new Date(reservation.checkInDate);
+    const checkOutDateObj = new Date(reservation.checkOutDate);
+    const nights = NormalizationUtils.calculateNights(
+      checkInDateObj,
+      checkOutDateObj,
+    );
+    const roomTotal = roomPrice * nights;
+
+    // Generar código de pago basado en la fecha del pago
+    const paymentCode = await this.generatePaymentCode(checkInDateObj);
+
+    // ✅ CORRECCIÓN: Usar el utils para generar fecha random entre check-in y check-out
+    const paymentDateISO = NormalizationUtils.generateRandomDateInRange(
+      checkInDateObj,
+      checkOutDateObj,
+    );
+
+    // Crear pago principal
+    const payment = await prisma.payment.create({
+      data: {
+        code: paymentCode,
+        amount: excelAmount,
+        amountPaid: excelAmount, // 100% pagado
+        status: PaymentDetailStatus.PAID,
+        date: paymentDateISO, // ✅ Ya es string ISO
+        reservationId: reservation.id,
+      },
+    });
+
+    const paymentDetails = [];
+
+    // 1. Siempre crear detalle de habitación
+    const roomDetail = await prisma.paymentDetail.create({
+      data: {
+        paymentId: payment.id,
+        paymentDate: paymentDateISO, // ✅ Usar fecha ISO
+        description: `Habitación ${room.number} - ${nights} noche(s)`,
+        type: 'ROOM_RESERVATION',
+        method: NormalizationUtils.normalizePaymentMethod(
+          record['FORMA DE PAGO'],
+        ),
+        status: PaymentDetailStatus.PAID,
+        roomId: room.id,
+        unitPrice: roomPrice,
+        subtotal: roomTotal,
+        days: nights,
+      },
+    });
+    paymentDetails.push(roomDetail);
+
+    // 2. Calcular sobrante y distribuirlo
+    const remainingAmount = excelAmount - roomTotal;
+
+    if (remainingAmount > 0) {
+      const additionalDetails = await this.distributeRemainingAmount(
+        remainingAmount,
+        nights,
+        payment.id,
+        NormalizationUtils.normalizePaymentMethod(record['FORMA DE PAGO']),
+        checkInDateObj, // ✅ Pasar Date object
+        checkOutDateObj, // ✅ Pasar Date object
+        prisma,
+      );
+      paymentDetails.push(...additionalDetails);
+    }
+
+    // 3. Si hay tipo de documento, crear detalle adicional
+    const documentType = NormalizationUtils.normalizePaymentDocumentType(
+      record['TIPO DE DOCUMENTO'],
+    );
+    if (documentType) {
+      const documentDetail = await prisma.paymentDetail.create({
+        data: {
+          paymentId: payment.id,
+          paymentDate: paymentDateISO, // ✅ Usar fecha ISO
+          description: `Documento: ${documentType}`,
+          type: 'EXTRA_SERVICE',
+          method: NormalizationUtils.normalizePaymentMethod(
+            record['FORMA DE PAGO'],
+          ),
+          status: PaymentDetailStatus.PAID,
+          unitPrice: 0,
+          subtotal: 0,
+          typePaymentDetail: documentType,
+        },
+      });
+      paymentDetails.push(documentDetail);
+    }
+
+    return { payment, paymentDetails };
+  }
+
+  private async distributeRemainingAmount(
+    remainingAmount: number,
+    nights: number,
+    paymentId: string,
+    paymentMethod: PaymentDetailMethod,
+    checkIn: Date,
+    checkOut: Date,
+    prisma: any,
+  ) {
+    const paymentDetails = [];
+
+    // 1. Buscar servicio de desayuno
+    const breakfastService = await prisma.service.findFirst({
+      where: {
+        name: {
+          contains: 'desayuno',
+          mode: 'insensitive',
+        },
+      },
+    });
+
+    let remainingForProducts = remainingAmount;
+
+    // 2. Si hay servicio de desayuno, calcular cuántos podemos pagar
+    if (breakfastService) {
+      const breakfastPrice = breakfastService.price;
+      const maxBreakfasts = Math.floor(remainingAmount / breakfastPrice);
+      const breakfastsToAdd = Math.min(maxBreakfasts, nights);
+
+      if (breakfastsToAdd > 0) {
+        const breakfastDetail = await prisma.paymentDetail.create({
+          data: {
+            paymentId,
+            paymentDate: NormalizationUtils.generateRandomDateInRange(
+              checkIn,
+              checkOut,
+            ), // ✅ Usar tu utilidad que ahora retorna ISO completo
+            description: `Desayuno - ${breakfastsToAdd} día(s)`,
+            type: 'EXTRA_SERVICE',
+            method: paymentMethod,
+            status: PaymentDetailStatus.PAID,
+            serviceId: breakfastService.id,
+            unitPrice: breakfastPrice,
+            subtotal: breakfastPrice * breakfastsToAdd,
+            quantity: breakfastsToAdd,
+          },
+        });
+        paymentDetails.push(breakfastDetail);
+        remainingForProducts -= breakfastPrice * breakfastsToAdd;
+      }
+    }
+
+    // 3. Distribuir el resto en productos
+    if (remainingForProducts > 0) {
+      const productDetails = await this.distributeInProducts(
+        remainingForProducts,
+        paymentId,
+        paymentMethod,
+        checkIn,
+        checkOut,
+        prisma,
+      );
+      paymentDetails.push(...productDetails);
+    }
+
+    return paymentDetails;
+  }
+
+  private async distributeInProducts(
+    amount: number,
+    paymentId: string,
+    paymentMethod: PaymentDetailMethod,
+    checkIn: Date,
+    checkOut: Date,
+    prisma: any,
+  ) {
+    const paymentDetails = [];
+
+    // Buscar productos disponibles (ordenados por precio)
+    const products = await prisma.product.findMany({
+      where: {
+        isActive: true,
+        type: 'COMMERCIAL',
+      },
+      orderBy: { unitCost: 'asc' },
+    });
+
+    let remainingAmount = amount;
+
+    // Distribuir en productos de menor a mayor precio
+    for (const product of products) {
+      if (remainingAmount <= 0) break;
+
+      // Calcular cuántas unidades de este producto podemos comprar
+      const maxQuantity = Math.floor(remainingAmount / product.unitCost);
+
+      if (maxQuantity > 0) {
+        const quantity = Math.min(maxQuantity, 5); // Máximo 5 unidades por producto
+        const subtotal = product.unitCost * quantity;
+
+        const productDetail = await prisma.paymentDetail.create({
+          data: {
+            paymentId,
+            paymentDate: NormalizationUtils.generateRandomDateInRange(
+              checkIn,
+              checkOut,
+            ), // ✅ Usar tu utilidad que ahora retorna ISO completo
+            description: `${product.name} - ${quantity} unidad(es)`,
+            type: 'EXTRA_SERVICE',
+            method: paymentMethod,
+            status: PaymentDetailStatus.PAID,
+            productId: product.id,
+            unitPrice: product.unitCost,
+            subtotal: subtotal,
+            quantity: quantity,
+          },
+        });
+
+        paymentDetails.push(productDetail);
+        remainingAmount -= subtotal;
+      }
+    }
+
+    // Si queda sobrante muy pequeño, agregarlo al último producto
+    if (remainingAmount > 0 && paymentDetails.length > 0) {
+      const lastDetail = paymentDetails[paymentDetails.length - 1];
+      await prisma.paymentDetail.update({
+        where: { id: lastDetail.id },
+        data: {
+          subtotal: lastDetail.subtotal + remainingAmount,
+          description: `${lastDetail.description} + ajuste`,
+        },
+      });
+    }
+
+    return paymentDetails;
+  }
+
+  private async generatePaymentCode(paymentDate: Date): Promise<string> {
+    const paymentYear = paymentDate.getFullYear();
+    const prefix = `PAG-${paymentYear}-`;
+
+    let lastIncrement = 0;
+    let paymentCode = '';
+    let isUnique = false;
+
+    while (!isUnique) {
+      const lastPayment = await this.prisma.payment.findFirst({
+        where: { code: { startsWith: prefix } },
+        orderBy: { code: 'desc' },
+      });
+
+      if (lastPayment && lastPayment.code.split('.').length === 3) {
+        lastIncrement = parseInt(lastPayment.code.split('.')[2], 10);
+      }
+
+      paymentCode = `${prefix}${String(lastIncrement + 1).padStart(3, '0')}`;
+
+      const existingPayment = await this.prisma.payment.findUnique({
+        where: { code: paymentCode },
+      });
+
+      if (!existingPayment) {
+        isUnique = true;
+      } else {
+        lastIncrement++;
+      }
+    }
+
+    return paymentCode;
+  }
+
+  async importExcelFile(file: Express.Multer.File, user: UserData) {
+    if (!file) {
+      throw new BadRequestException('Archivo Excel requerido');
+    }
+
+    // Validar tipo de archivo
+    const allowedMimeTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel', // .xls
+    ];
+
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException(
+        'Solo se permiten archivos Excel (.xlsx, .xls)',
+      );
+    }
+
+    try {
+      // Leer el archivo Excel
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(file.buffer as any);
+
+      const worksheet = workbook.worksheets[0];
+      if (!worksheet) {
+        throw new BadRequestException(
+          'El archivo Excel no contiene hojas de trabajo',
+        );
+      }
+
+      // Obtener los headers (primera fila) - forzar como texto
+      const headerRow = worksheet.getRow(1);
+      const headers: string[] = [];
+      headerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        // Forzar lectura como texto, colNumber empieza en 1
+        headers[colNumber - 1] = cell.text || cell.value?.toString() || '';
+      });
+
+      // Convertir datos a formato esperado
+      const data = [];
+      const rowCount = worksheet.rowCount;
+
+      for (let rowNumber = 2; rowNumber <= rowCount; rowNumber++) {
+        const row = worksheet.getRow(rowNumber);
+        const record: any = {};
+
+        // Iterar sobre cada header y obtener el valor de la celda correspondiente
+        for (let colIndex = 0; colIndex < headers.length; colIndex++) {
+          const header = headers[colIndex];
+          if (header) {
+            // colIndex es 0-based, pero getCell usa 1-based
+            const cell = row.getCell(colIndex + 1);
+            // Usar cell.text para obtener el valor original como texto
+            let cellValue = cell.text;
+
+            // Si cell.text está vacío, intentar con cell.value
+            if (!cellValue && cell.value !== null && cell.value !== undefined) {
+              if (cell.value instanceof Date) {
+                // Para fechas, usar formato específico
+                cellValue = this.formatDateForExcel(cell.value);
+              } else {
+                cellValue = cell.value.toString();
+              }
+            }
+
+            record[header] = cellValue || '';
+          }
+        }
+
+        // Solo agregar filas que tengan al menos un campo con valor
+        if (
+          Object.values(record).some(
+            (value) =>
+              value && typeof value === 'string' && value.trim() !== '',
+          )
+        ) {
+          data.push(record);
+        }
+      }
+
+      if (data.length === 0) {
+        throw new BadRequestException(
+          'No se encontraron datos válidos en el archivo Excel',
+        );
+      }
+
+      // Procesar en lotes de 1000
+      const BATCH_SIZE = 1000;
+      const totalBatches = Math.ceil(data.length / BATCH_SIZE);
+      const results = {
+        totalRecords: data.length,
+        totalBatches,
+        processed: 0,
+        successful: 0,
+        failed: 0,
+        errors: [],
+        batches: [],
+      };
+
+      for (let i = 0; i < data.length; i += BATCH_SIZE) {
+        const batch = data.slice(i, i + BATCH_SIZE);
+        const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+
+        try {
+          const batchResult = await this.importExcelData(
+            {
+              data: batch,
+              batchNumber,
+              totalBatches,
+            },
+            user,
+          );
+
+          results.processed += batchResult.processed;
+          results.successful += batchResult.successful;
+          results.failed += batchResult.failed;
+          results.errors.push(...batchResult.errors);
+          results.batches.push({
+            batchNumber,
+            ...batchResult,
+          });
+        } catch (error) {
+          results.failed += batch.length;
+          results.errors.push({
+            batchNumber,
+            error: error.message,
+            records: batch.length,
+          });
+          results.batches.push({
+            batchNumber,
+            processed: batch.length,
+            successful: 0,
+            failed: batch.length,
+            error: error.message,
+          });
+        }
+      }
+
+      // Generar resumen de errores
+      const errorSummary = this.generateErrorSummary(results.errors);
+
+      return {
+        success: true,
+        message: `Importación completada: ${results.successful} exitosos, ${results.failed} fallidos`,
+        errorSummary,
+        ...results,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error processing Excel file: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Error al procesar el archivo Excel: ${error.message}`,
+      );
+    }
+  }
+
+  private generateErrorSummary(errors: any[]) {
+    const errorCounts: { [key: string]: number } = {};
+    const sampleErrors: { [key: string]: any[] } = {};
+
+    errors.forEach((error) => {
+      const errorMessage = error.error || 'Error desconocido';
+      const errorType = this.categorizeError(errorMessage);
+
+      errorCounts[errorType] = (errorCounts[errorType] || 0) + 1;
+
+      if (!sampleErrors[errorType]) {
+        sampleErrors[errorType] = [];
+      }
+
+      if (sampleErrors[errorType].length < 3) {
+        sampleErrors[errorType].push({
+          recordIndex: error.recordIndex,
+          error: errorMessage,
+          sampleData: error.data
+            ? {
+                nombre: error.data['APELLIDOS Y NOMBRES'],
+                documento: error.data['Nº DOCUMENTO'],
+                habitacion: error.data['HABITACION'],
+              }
+            : null,
+        });
+      }
+    });
+
+    return {
+      totalErrors: errors.length,
+      errorTypes: Object.keys(errorCounts).map((errorType) => ({
+        type: errorType,
+        count: errorCounts[errorType],
+        percentage: ((errorCounts[errorType] / errors.length) * 100).toFixed(1),
+        samples: sampleErrors[errorType],
+      })),
+    };
+  }
+
+  private categorizeError(errorMessage: string): string {
+    if (errorMessage.includes('Datos insuficientes para crear cliente')) {
+      return 'Datos de cliente incompletos';
+    }
+    if (errorMessage.includes('Habitación no encontrada')) {
+      return 'Habitación no encontrada';
+    }
+    if (errorMessage.includes('Usuario no encontrado')) {
+      return 'Usuario no encontrado';
+    }
+    if (errorMessage.includes('Error al crear reserva')) {
+      return 'Error al crear reserva';
+    }
+    if (errorMessage.includes('Error al crear pago')) {
+      return 'Error al crear pago';
+    }
+    if (errorMessage.includes('Fecha inválida')) {
+      return 'Fecha inválida';
+    }
+    if (errorMessage.includes('Precio inválido')) {
+      return 'Precio inválido';
+    }
+    return 'Otros errores';
+  }
+
+  private formatDateForExcel(date: Date): string {
+    // Formatear fecha como dd/mm/yyyy para mantener consistencia con Excel
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+
+  private async ensureUniqueDocumentNumber(
+    documentNumber: string,
+    prisma: any,
+  ): Promise<string> {
+    let currentDocument = documentNumber;
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    while (attempts < maxAttempts) {
+      const existingCustomer = await prisma.customer.findUnique({
+        where: { documentNumber: currentDocument },
+      });
+
+      if (!existingCustomer) {
+        return currentDocument;
+      }
+
+      // Si existe, generar uno nuevo
+      currentDocument = NormalizationUtils.generateTemporaryDocumentNumber();
+      attempts++;
+    }
+
+    // Si después de 10 intentos no encontramos uno único, usar timestamp
+    const timestamp = Date.now().toString().slice(-8);
+    return `TEMP_${timestamp}`;
+  }
+
+  private async calculateDaysFromPrice(
+    record: any,
+    prisma: any,
+  ): Promise<number> {
+    // PRIMERO: Intentar usar DIAS DE ALOJAMIENTO si está disponible
+    const daysStr = record['DIAS DE ALOJAMIENTO']?.toString().trim();
+    const days = parseInt(daysStr);
+    if (!isNaN(days) && days > 0) {
+      return Math.min(days, 30); // Máximo 30 días
+    }
+
+    // SEGUNDO: Calcular basado en precio
+    const priceStr = record['PRECIO']?.toString().trim() || '';
+    const cleanPriceStr = priceStr
+      .replace(/S\/\s*/g, '')
+      .replace(/,/g, '.')
+      .replace(/\s+/g, '')
+      .trim();
+
+    const totalPrice = parseFloat(cleanPriceStr);
+
+    if (isNaN(totalPrice) || totalPrice <= 0) {
+      return 1; // Por defecto 1 día si no hay precio válido
+    }
+
+    const roomType = record['TIPO HABITACION'];
+
+    // Buscar el tipo de habitación más cercano al precio
+    let roomTypes = [];
+    if (roomType) {
+      roomTypes = await prisma.roomTypes.findMany({
+        where: {
+          isActive: true,
+          name: { contains: roomType, mode: 'insensitive' },
+        },
+      });
+    }
+
+    // Si no encontró por tipo, buscar todos los tipos activos
+    if (roomTypes.length === 0) {
+      roomTypes = await prisma.roomTypes.findMany({
+        where: { isActive: true },
+      });
+    }
+
+    if (roomTypes.length === 0) {
+      return 1; // Por defecto 1 día si no hay tipos de habitación
+    }
+
+    // Encontrar el tipo de habitación con precio más cercano
+    const closestRoomType = roomTypes.reduce((closest, current) => {
+      const currentDiff = Math.abs(current.price - totalPrice);
+      const closestDiff = Math.abs(closest.price - totalPrice);
+      return currentDiff < closestDiff ? current : closest;
+    });
+
+    // Calcular días basado en el precio total y precio por noche
+    const calculatedDays = Math.floor(totalPrice / closestRoomType.price);
+
+    // Asegurar que sea al menos 1 día y máximo 30 días
+    return Math.max(1, Math.min(calculatedDays, 30));
+  }
+
+  private isCorruptRecord(record: any): boolean {
+    // Detectar si el registro contiene headers como datos
+    const headerValues = [
+      'COMPROBANTE',
+      'Nº',
+      'TIPO DE CLIENTE',
+      'TIPO HABITACION',
+      'DIAS DE ALOJAMIENTO',
+      'PRECIO',
+      'FORMA DE PAGO',
+      'PAGO',
+      'OBSERVACIONES',
+    ];
+
+    // Si más de 3 campos contienen valores que son headers, es corrupto
+    let headerCount = 0;
+    for (const header of headerValues) {
+      if (record[header] && headerValues.includes(record[header])) {
+        headerCount++;
+      }
+    }
+
+    return headerCount >= 3;
+  }
+
+  /**
+   * Verifica si un país está en la lista de países estandarizados
+   * @param country País a verificar
+   * @returns true si está estandarizado, false si es un valor no reconocido
+   */
+  private isStandardizedCountry(country: string | null): boolean {
+    if (!country) return true; // null está permitido
+
+    const standardizedCountries = [
+      'Perú',
+      'Argentina',
+      'Bolivia',
+      'Brasil',
+      'Chile',
+      'Colombia',
+      'Ecuador',
+      'Paraguay',
+      'Uruguay',
+      'Venezuela',
+      'México',
+      'Panamá',
+      'Costa Rica',
+      'Nicaragua',
+      'Honduras',
+      'El Salvador',
+      'Guatemala',
+      'Belice',
+      'Cuba',
+      'República Dominicana',
+      'Puerto Rico',
+      'Estados Unidos',
+      'Canadá',
+      'España',
+      'Francia',
+      'Italia',
+      'Alemania',
+      'Reino Unido',
+      'Portugal',
+      'Países Bajos',
+      'Bélgica',
+      'Suecia',
+      'Noruega',
+      'Dinamarca',
+      'Finlandia',
+      'Irlanda',
+      'Austria',
+      'Suiza',
+      'Polonia',
+      'República Checa',
+      'Rusia',
+      'Ucrania',
+      'China',
+      'Japón',
+      'Corea del Sur',
+      'Corea del Norte',
+      'India',
+      'Tailandia',
+      'Filipinas',
+      'Vietnam',
+      'Indonesia',
+      'Australia',
+      'Nueva Zelanda',
+      'Líbano',
+      'Siria',
+      'Irak',
+      'Irán',
+      'Israel',
+      'Otro',
+    ];
+
+    return standardizedCountries.includes(country);
+  }
+
+  private async calculateDatesWithStrategy(
+    record: any,
+    prisma: any,
+  ): Promise<{ checkInDate: Date; checkOutDate: Date }> {
+    // PRIORIDAD 1: DIAS DE ALOJAMIENTO
+    const daysStr = record['DIAS DE ALOJAMIENTO']?.toString().trim();
+    const days = parseInt(daysStr);
+    const hasValidDays = !isNaN(days) && days > 0;
+
+    // PRIORIDAD 2: FECHAS DIRECTAS
+    let checkInDate: Date | null = null;
+    let checkOutDate: Date | null = null;
+
+    // Intentar parsear fecha de entrada
+    try {
+      if (
+        record['FECHA'] &&
+        record['FECHA'].trim() !== '' &&
+        record['FECHA'].trim() !== ' '
+      ) {
+        checkInDate = NormalizationUtils.parseDateTime(
+          record['FECHA'],
+          record['HORA'],
+        );
+      }
+    } catch (error) {
+      this.logger.warn(`Error parseando fecha de entrada: ${error.message}`);
+    }
+
+    // Intentar parsear fecha de salida
+    try {
+      if (
+        record['FECHA DE SALIDA'] &&
+        record['FECHA DE SALIDA'].trim() !== ''
+      ) {
+        checkOutDate = NormalizationUtils.parseDateTime(
+          record['FECHA DE SALIDA'],
+          record['HORA DE SALIDA'],
+        );
+      }
+    } catch (error) {
+      this.logger.warn(`Error parseando fecha de salida: ${error.message}`);
+    }
+
+    // ESTRATEGIA DE CÁLCULO
+    if (hasValidDays) {
+      // CASO 1: Tenemos días válidos
+
+      if (checkInDate && checkOutDate) {
+        // Verificar si la fecha de salida es razonable (no más de 1 año de diferencia)
+        const daysDifference = Math.abs(
+          (checkOutDate.getTime() - checkInDate.getTime()) /
+            (1000 * 60 * 60 * 24),
+        );
+
+        if (daysDifference > 365) {
+          // Fecha de salida muy lejana, recalcular usando días
+          checkOutDate = new Date(checkInDate);
+          checkOutDate.setDate(checkOutDate.getDate() + days);
+          checkOutDate.setHours(12, 0, 0, 0);
+        }
+        // Si la diferencia es razonable, usar las fechas tal como están
+      } else if (checkInDate && !checkOutDate) {
+        // Solo tenemos check-in, calcular check-out
+        checkOutDate = new Date(checkInDate);
+        checkOutDate.setDate(checkOutDate.getDate() + days);
+        checkOutDate.setHours(12, 0, 0, 0);
+      } else if (!checkInDate && checkOutDate) {
+        // Solo tenemos check-out, calcular check-in
+        checkInDate = new Date(checkOutDate);
+        checkInDate.setDate(checkInDate.getDate() - days);
+        checkInDate.setHours(12, 0, 0, 0);
+      } else {
+        // No tenemos fechas, usar fecha por defecto y calcular
+        checkInDate = new Date('2022-01-01T12:00:00');
+        checkOutDate = new Date(checkInDate);
+        checkOutDate.setDate(checkOutDate.getDate() + days);
+        checkOutDate.setHours(12, 0, 0, 0);
+      }
+    } else {
+      // CASO 2: No tenemos días válidos
+
+      if (checkInDate && checkOutDate) {
+        // Usar las fechas tal como están
+      } else if (checkInDate && !checkOutDate) {
+        // Calcular días basado en DIAS DE ALOJAMIENTO o precio
+        const calculatedDays = await this.calculateDaysFromPrice(
+          record,
+          prisma,
+        );
+        checkOutDate = new Date(checkInDate);
+        checkOutDate.setDate(checkOutDate.getDate() + calculatedDays);
+        checkOutDate.setHours(12, 0, 0, 0);
+      } else if (!checkInDate && checkOutDate) {
+        // Calcular días basado en DIAS DE ALOJAMIENTO o precio
+        const calculatedDays = await this.calculateDaysFromPrice(
+          record,
+          prisma,
+        );
+        checkInDate = new Date(checkOutDate);
+        checkInDate.setDate(checkInDate.getDate() - calculatedDays);
+        checkInDate.setHours(12, 0, 0, 0);
+      } else {
+        // No tenemos nada, usar valores por defecto
+        checkInDate = new Date('2022-01-01T12:00:00');
+        checkOutDate = new Date(checkInDate);
+        checkOutDate.setDate(checkOutDate.getDate() + 1);
+        checkOutDate.setHours(12, 0, 0, 0);
+      }
+    }
+
+    // VALIDACIÓN FINAL: Asegurar que las fechas sean diferentes
+    if (checkInDate && checkOutDate) {
+      const timeDiff = checkOutDate.getTime() - checkInDate.getTime();
+      if (timeDiff <= 0) {
+        // Si check-out es igual o anterior a check-in, agregar 1 día
+        checkOutDate = new Date(checkInDate);
+        checkOutDate.setDate(checkOutDate.getDate() + 1);
+        checkOutDate.setHours(12, 0, 0, 0);
+      }
+    }
+
+    return { checkInDate, checkOutDate };
+  }
+
+  async cleanupImportedData(user: UserData) {
+    this.logger.log('Iniciando limpieza de datos importados...', {
+      userId: user.id,
+    });
+
+    // Verificaciones de seguridad
+    if (!user || !user.id) {
+      throw new BadRequestException(
+        'Usuario no válido para realizar la limpieza',
+      );
+    }
+
+    // Verificar que el usuario tenga permisos de administrador
+    if (user.userRol !== 'ADMIN') {
+      throw new BadRequestException(
+        'Solo los administradores pueden realizar la limpieza',
+      );
+    }
+
+    return await this.prisma.$transaction(async (prisma) => {
+      const deletedCounts = {
+        payments: 0,
+        reservations: 0,
+        customers: 0,
+        auditLogs: 0,
+      };
+
+      try {
+        // 1. Primero obtener las Reservations que vamos a eliminar
+        const reservationsToDelete = await prisma.reservation.findMany({
+          where: {
+            createdByLandingPage: false, // Solo reservas creadas por importación
+            status: 'CHECKED_OUT', // Solo las que están en estado importado
+            // Verificar que tengan fecha de creación reciente (últimos 7 días)
+            createdAt: {
+              gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Últimos 7 días
+            },
+          },
+          select: { id: true },
+        });
+
+        const reservationIds = reservationsToDelete.map((r) => r.id);
+        this.logger.log(
+          `Encontradas ${reservationIds.length} reservas para eliminar`,
+        );
+
+        // 2. Obtener los Payments que referencian estas Reservations
+        const paymentsToDelete = await prisma.payment.findMany({
+          where: {
+            reservationId: {
+              in: reservationIds,
+            },
+          },
+          select: { id: true },
+        });
+
+        const paymentIds = paymentsToDelete.map((p) => p.id);
+        this.logger.log(`Encontrados ${paymentIds.length} pagos para eliminar`);
+
+        // 3. Eliminar PaymentDetails que referencian estos Payments
+        const deletedPaymentDetails = await prisma.paymentDetail.deleteMany({
+          where: {
+            paymentId: {
+              in: paymentIds,
+            },
+          },
+        });
+        this.logger.log(
+          `Eliminados ${deletedPaymentDetails.count} PaymentDetails`,
+        );
+
+        // 4. Eliminar Payments que referencian estas Reservations
+        const deletedPayments = await prisma.payment.deleteMany({
+          where: {
+            id: {
+              in: paymentIds,
+            },
+          },
+        });
+        deletedCounts.payments = deletedPayments.count;
+        this.logger.log(`Eliminados ${deletedPayments.count} Payments`);
+
+        // 5. Ahora eliminar las Reservations
+        const deletedReservations = await prisma.reservation.deleteMany({
+          where: {
+            id: {
+              in: reservationIds,
+            },
+          },
+        });
+        deletedCounts.reservations = deletedReservations.count;
+        this.logger.log(`Eliminadas ${deletedReservations.count} Reservations`);
+
+        // 6. Eliminar TODOS los Customers (para pruebas)
+        const deletedCustomers = await prisma.customer.deleteMany({});
+        deletedCounts.customers = deletedCustomers.count;
+        this.logger.log(
+          `Eliminados ${deletedCustomers.count} Customers (TODOS para pruebas)`,
+        );
+
+        // 8. Eliminar AuditLogs relacionados con la importación
+        const deletedAuditLogs = await prisma.audit.deleteMany({
+          where: {
+            OR: [
+              {
+                entityType: 'reservation',
+                action: 'CREATE',
+                performedById: user.id,
+              },
+              {
+                entityType: 'customer',
+                action: 'CREATE',
+                performedById: user.id,
+              },
+              {
+                entityType: 'payment',
+                action: 'CREATE',
+                performedById: user.id,
+              },
+            ],
+          },
+        });
+        deletedCounts.auditLogs = deletedAuditLogs.count;
+        this.logger.log(`Eliminados ${deletedAuditLogs.count} AuditLogs`);
+
+        // 9. Registrar auditoría de la limpieza
+        await prisma.audit.create({
+          data: {
+            entityId: 'CLEANUP_IMPORT',
+            entityType: 'import',
+            action: 'DELETE',
+            performedById: user.id,
+          },
+        });
+
+        this.logger.log('Limpieza completada exitosamente', { deletedCounts });
+
+        return {
+          success: true,
+          message: 'Limpieza de datos importados completada exitosamente',
+          deletedCounts,
+        };
+      } catch (error) {
+        this.logger.error(
+          `Error durante la limpieza: ${error.message}`,
+          error.stack,
+        );
+        throw new BadRequestException(
+          `Error durante la limpieza: ${error.message}`,
+        );
+      }
+    });
+  }
+}
