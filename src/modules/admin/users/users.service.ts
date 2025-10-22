@@ -19,6 +19,10 @@ import { HttpResponse, UserData, UserPayload } from 'src/interfaces';
 import { handleException } from 'src/utils';
 import { PaginationService } from 'src/pagination/pagination.service';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
+import {
+  FilterOptions,
+  SortOptions,
+} from 'src/prisma/src/interfaces/base.repository.interfaces';
 import { BetterAuthAdapter } from '../auth/better-auth.adapter';
 
 @Injectable()
@@ -645,32 +649,55 @@ export class UsersService {
   }
 
   /**
-   * Obtiene todos los usuarios paginados
+   * Obtiene todos los usuarios paginados con filtros avanzados
    * @param user Usuario que realiza la consulta
-   * @param options Opciones de paginación (página y tamaño de página)
+   * @param pagination Opciones de paginación
+   * @param filterOptions Filtros avanzados
+   * @param sortOptions Opciones de ordenamiento
    * @returns Lista paginada de usuarios
    */
   async findAllPaginated(
     user: UserPayload,
-    options: { page: number; pageSize: number },
+    pagination: { page: number; pageSize: number },
+    filterOptions?: FilterOptions<any>,
+    sortOptions?: SortOptions<any>,
   ): Promise<PaginatedResponse<Omit<UserPayload, 'claims'>>> {
     try {
-      const { page, pageSize } = options;
+      const { page, pageSize } = pagination;
 
-      // Definir el filtro según el rol del usuario
-      const filter =
-        user.userRol === UserRolType.ADMIN
-          ? {} // Admin puede ver todos los usuarios
-          : { isActive: true }; // Otros solo ven usuarios activos
+      // Definir campos enum y fecha para el modelo User
+      const enumFields = ['userRol']; // UserRolType enum
+      const dateFields = ['lastLogin', 'createdAt', 'updatedAt'];
 
-      return await this.paginationService.paginate<
+      // Construir filtros base según el rol del usuario
+      const baseFilters: any = {};
+      if (user.userRol !== UserRolType.ADMIN) {
+        baseFilters.searchByField = { isActive: true };
+      }
+
+      // Combinar filtros base con filtros avanzados
+      const combinedFilterOptions = {
+        ...baseFilters,
+        ...filterOptions,
+        // Combinar searchByField si existen ambos
+        searchByField: {
+          ...baseFilters.searchByField,
+          ...filterOptions?.searchByField,
+        },
+      };
+
+      // Usar el servicio de paginación avanzada
+      return await this.paginationService.paginateAdvanced<
         any,
         Omit<UserPayload, 'claims'>
       >({
         model: 'user',
         page,
         pageSize,
-        where: filter,
+        filterOptions: combinedFilterOptions,
+        sortOptions,
+        enumFields,
+        dateFields,
         select: {
           id: true,
           name: true,
@@ -699,6 +726,12 @@ export class UsersService {
       });
     } catch (error) {
       this.logger.error('Error getting paginated users', error.stack);
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
       handleException(error, 'Error getting paginated users');
     }
   }
@@ -896,16 +929,9 @@ export class UsersService {
       (acc) => acc.providerId === 'email',
     );
 
-    console.log('🔍 [DEBUG] findByEmail - All accounts:', clientDB.accounts);
-    console.log('🔍 [DEBUG] findByEmail - Email account found:', emailAccount);
-
     // Si no hay cuenta de email, retornar datos del usuario sin password
     // El password se creará cuando se llame a updateUserPassword
     if (!emailAccount) {
-      console.log(
-        '🔍 [DEBUG] findByEmail - No email account found, will be created on password update',
-      );
-
       return {
         id: clientDB.id,
         name: clientDB.name,
@@ -1112,11 +1138,6 @@ export class UsersService {
     hashedPassword: string,
   ): Promise<boolean> {
     try {
-      console.log(
-        '🔍 [DEBUG] updateUserPassword - Updating password for user:',
-        userId,
-      );
-
       // Obtener email normalizado del usuario
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
@@ -1138,10 +1159,6 @@ export class UsersService {
       });
 
       if (!emailAccount && !credentialAccount) {
-        console.log(
-          '🔍 [DEBUG] updateUserPassword - No account found, creating one',
-        );
-
         // Crear la cuenta si no existe
         await this.prisma.account.create({
           data: {
@@ -1160,9 +1177,6 @@ export class UsersService {
         });
       }
 
-      console.log(
-        '🔍 [DEBUG] updateUserPassword - Password updated successfully',
-      );
       return true;
     } catch (error) {
       console.error('🔍 [DEBUG] updateUserPassword - Error:', error);

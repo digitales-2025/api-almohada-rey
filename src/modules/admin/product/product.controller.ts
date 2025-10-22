@@ -63,7 +63,11 @@ export class ProductController {
   }
 
   @Get('paginated')
-  @ApiOperation({ summary: 'Get paginated products' })
+  @ApiOperation({
+    summary: 'Get paginated products with advanced filters',
+    description:
+      'Get products with advanced filtering by type, isActive status, and search in product fields',
+  })
   @ApiQuery({
     name: 'page',
     description: 'Page number',
@@ -79,26 +83,97 @@ export class ProductController {
     required: false,
   })
   @ApiQuery({
-    name: 'type',
-    description: 'Product type filter',
-    enum: ProductType,
+    name: 'search',
+    description: 'Search term for product name, code, or description',
+    type: String,
     required: false,
   })
-  @ApiOperation({ summary: 'Get all paginated products' })
+  @ApiQuery({
+    name: 'type',
+    description: 'Filter by product type (array)',
+    type: String,
+    example: 'COMMERCIAL,INTERNAL_USE',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'isActive',
+    description: 'Filter by active status (array)',
+    type: String,
+    example: 'true,false',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    description: 'Field to sort by',
+    type: String,
+    example: 'name',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    description: 'Sort order',
+    type: String,
+    enum: ['asc', 'desc'],
+    example: 'asc',
+    required: false,
+  })
+  @ApiOkResponse({ description: 'Products paginated retrieved successfully' })
   findAllPaginated(
     @GetUser() user: UserPayload,
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
-    @Query('type') type?: ProductType,
+    @Query('search') search?: string,
+    @Query('type') type?: string,
+    @Query('isActive') isActive?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ): Promise<PaginatedResponse<ProductData>> {
     const pageNumber = parseInt(page, 10) || 1;
     const pageSizeNumber = parseInt(pageSize, 10) || 10;
 
-    return this.productService.findAllPaginated(user, {
-      page: pageNumber,
-      pageSize: pageSizeNumber,
-      type,
-    });
+    // Construir filtros
+    const filterOptions: any = {};
+
+    // Filtro por tipo (array)
+    if (type) {
+      const typeArray = type.split(',').map((t) => t.trim());
+      filterOptions.arrayByField = {
+        ...filterOptions.arrayByField,
+        type: typeArray,
+      };
+    }
+
+    // Filtro por isActive (array booleano)
+    if (isActive) {
+      const isActiveArray = isActive.split(',').map((a) => a.trim() === 'true');
+      filterOptions.arrayByField = {
+        ...filterOptions.arrayByField,
+        isActive: isActiveArray,
+      };
+    }
+
+    // Búsqueda simple en campos del producto
+    if (search) {
+      filterOptions.searchByField = {
+        ...filterOptions.searchByField,
+        name: search,
+        code: search,
+      };
+    }
+
+    // Construir opciones de ordenamiento
+    const sortOptions: any = {};
+    if (sortBy) {
+      sortOptions.field = sortBy;
+      sortOptions.order = sortOrder || 'asc';
+    }
+
+    return this.productService.findAllPaginated(
+      user,
+      { page: pageNumber, pageSize: pageSizeNumber },
+      filterOptions,
+      sortOptions,
+    );
   }
 
   @ApiOkResponse({ description: 'Products found successfully' })

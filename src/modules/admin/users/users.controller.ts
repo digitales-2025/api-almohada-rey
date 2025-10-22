@@ -101,7 +101,11 @@ export class UsersController {
   }
 
   @Get('paginated')
-  @ApiOperation({ summary: 'Get paginated users' })
+  @ApiOperation({
+    summary: 'Get paginated users with advanced filters',
+    description:
+      'Get users with advanced filtering by role, isActive status, and search in user fields',
+  })
   @ApiQuery({
     name: 'page',
     description: 'Page number',
@@ -114,6 +118,41 @@ export class UsersController {
     description: 'Number of items per page',
     type: Number,
     example: 10,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'search',
+    description: 'Search term for user name, email, or phone',
+    type: String,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'userRol',
+    description: 'Filter by user role (array)',
+    type: String,
+    example: 'ADMIN,RECEPCIONIST',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'isActive',
+    description: 'Filter by active status (array)',
+    type: String,
+    example: 'true,false',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    description: 'Field to sort by',
+    type: String,
+    example: 'name',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    description: 'Sort order',
+    type: String,
+    enum: ['asc', 'desc'],
+    example: 'desc',
     required: false,
   })
   @ApiOkResponse({
@@ -160,14 +199,59 @@ export class UsersController {
     @GetUser() user: UserPayload,
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
+    @Query('search') search?: string,
+    @Query('userRol') userRol?: string,
+    @Query('isActive') isActive?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ): Promise<PaginatedResponse<Omit<UserPayload, 'claims'>>> {
     const pageNumber = parseInt(page, 10) || 1;
     const pageSizeNumber = parseInt(pageSize, 10) || 10;
 
-    return this.usersService.findAllPaginated(user, {
-      page: pageNumber,
-      pageSize: pageSizeNumber,
-    });
+    // Construir filtros
+    const filterOptions: any = {};
+
+    // Filtro por rol (array)
+    if (userRol) {
+      const userRolArray = userRol.split(',').map((r) => r.trim());
+      filterOptions.arrayByField = {
+        ...filterOptions.arrayByField,
+        userRol: userRolArray,
+      };
+    }
+
+    // Filtro por isActive (array booleano)
+    if (isActive) {
+      const isActiveArray = isActive.split(',').map((a) => a.trim() === 'true');
+      filterOptions.arrayByField = {
+        ...filterOptions.arrayByField,
+        isActive: isActiveArray,
+      };
+    }
+
+    // Búsqueda simple en campos del usuario
+    if (search) {
+      filterOptions.searchByField = {
+        ...filterOptions.searchByField,
+        name: search,
+        email: search,
+        phone: search,
+      };
+    }
+
+    // Construir opciones de ordenamiento
+    const sortOptions: any = {};
+    if (sortBy) {
+      sortOptions.field = sortBy;
+      sortOptions.order = sortOrder || 'desc';
+    }
+
+    return this.usersService.findAllPaginated(
+      user,
+      { page: pageNumber, pageSize: pageSizeNumber },
+      filterOptions,
+      sortOptions,
+    );
   }
 
   @ApiOkResponse({ description: 'Get user by id' })

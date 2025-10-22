@@ -84,6 +84,12 @@ export class CustomersService {
         department: true,
         province: true,
         isActive: true,
+        isBlacklist: true,
+        blacklistReason: true,
+        blacklistDate: true,
+        blacklistedById: true,
+        createdByLandingPage: true,
+        mustCompleteData: true,
       },
     });
 
@@ -173,6 +179,12 @@ export class CustomersService {
             department: true,
             province: true,
             isActive: true,
+            isBlacklist: true,
+            blacklistReason: true,
+            blacklistDate: true,
+            blacklistedById: true,
+            createdByLandingPage: true,
+            mustCompleteData: true,
           },
         });
 
@@ -212,6 +224,18 @@ export class CustomersService {
           ...(newCustomer.department && { department: newCustomer.department }),
           ...(newCustomer.province && { province: newCustomer.province }),
           isActive: newCustomer.isActive,
+          isBlacklist: newCustomer.isBlacklist,
+          ...(newCustomer.blacklistReason && {
+            blacklistReason: newCustomer.blacklistReason,
+          }),
+          ...(newCustomer.blacklistDate && {
+            blacklistDate: newCustomer.blacklistDate,
+          }),
+          ...(newCustomer.blacklistedById && {
+            blacklistedById: newCustomer.blacklistedById,
+          }),
+          createdByLandingPage: newCustomer.createdByLandingPage,
+          mustCompleteData: newCustomer.mustCompleteData,
         },
       };
     } catch (error) {
@@ -417,22 +441,45 @@ export class CustomersService {
    * Obtiene todos los clientes de forma paginada.
    * @param user Usuario que realiza la consulta
    * @param options Opciones de paginación (página y tamaño de página)
+   * @param filterOptions Opciones de filtrado avanzado
+   * @param sortOptions Opciones de ordenamiento
    * @returns Lista paginada de clientes
    */
   async findAllPaginated(
     user: UserPayload,
     options: { page: number; pageSize: number },
+    filterOptions?: any,
+    sortOptions?: any,
   ): Promise<PaginatedResponse<CustomerData>> {
     try {
       const { page, pageSize } = options;
 
-      return await this.paginationService.paginate<any, CustomerData>({
+      // Definir campos que son enums y fechas
+      const enumFields = ['documentType', 'maritalStatus'];
+      const dateFields = ['birthDate', 'createdAt', 'updatedAt'];
+
+      // Filtros base para usuarios no super admin
+      const baseFilters: any = {};
+      if (!user.isSuperAdmin) {
+        baseFilters.searchByField = { isActive: true };
+      }
+
+      // Combinar filtros base con los proporcionados
+      const combinedFilterOptions = {
+        ...baseFilters,
+        ...filterOptions,
+      };
+
+      return await this.paginationService.paginateAdvanced<any, CustomerData>({
         model: 'customer',
         page,
         pageSize,
         where: {
           // Filtrar por isActive solo si no es super admin
           ...(user.isSuperAdmin ? {} : { isActive: true }),
+        },
+        orderBy: {
+          createdAt: 'asc',
         },
         select: {
           id: true,
@@ -453,9 +500,12 @@ export class CustomersService {
           department: true,
           province: true,
           isActive: true,
-        },
-        orderBy: {
-          createdAt: 'asc',
+          isBlacklist: true,
+          blacklistReason: true,
+          blacklistDate: true,
+          blacklistedById: true,
+          createdByLandingPage: true,
+          mustCompleteData: true,
         },
         transformer: (customer) => ({
           id: customer.id,
@@ -478,7 +528,23 @@ export class CustomersService {
           ...(customer.department && { department: customer.department }),
           ...(customer.province && { province: customer.province }),
           isActive: customer.isActive,
+          isBlacklist: customer.isBlacklist,
+          ...(customer.blacklistReason && {
+            blacklistReason: customer.blacklistReason,
+          }),
+          ...(customer.blacklistDate && {
+            blacklistDate: customer.blacklistDate,
+          }),
+          ...(customer.blacklistedById && {
+            blacklistedById: customer.blacklistedById,
+          }),
+          createdByLandingPage: customer.createdByLandingPage,
+          mustCompleteData: customer.mustCompleteData,
         }),
+        filterOptions: combinedFilterOptions,
+        sortOptions,
+        enumFields,
+        dateFields,
       });
     } catch (error) {
       this.logger.error('Error getting paginated customers', error.stack);
@@ -530,6 +596,12 @@ export class CustomersService {
           department: true,
           province: true,
           isActive: true,
+          isBlacklist: true,
+          blacklistReason: true,
+          blacklistDate: true,
+          blacklistedById: true,
+          createdByLandingPage: true,
+          mustCompleteData: true,
         },
       });
       if (!customerDb) {
@@ -542,7 +614,20 @@ export class CustomersService {
         );
       }
 
-      return customerDb;
+      return {
+        ...customerDb,
+        ...(customerDb.blacklistReason && {
+          blacklistReason: customerDb.blacklistReason,
+        }),
+        ...(customerDb.blacklistDate && {
+          blacklistDate: customerDb.blacklistDate,
+        }),
+        ...(customerDb.blacklistedById && {
+          blacklistedById: customerDb.blacklistedById,
+        }),
+        createdByLandingPage: customerDb.createdByLandingPage,
+        mustCompleteData: customerDb.mustCompleteData,
+      };
     } catch (error) {
       this.logger.error('Error get customer by document number');
       if (error instanceof BadRequestException) {
@@ -578,6 +663,12 @@ export class CustomersService {
         department: true,
         province: true,
         isActive: true,
+        isBlacklist: true,
+        blacklistReason: true,
+        blacklistDate: true,
+        blacklistedById: true,
+        createdByLandingPage: true,
+        mustCompleteData: true,
       },
     });
     if (!customerDb) {
@@ -830,7 +921,19 @@ export class CustomersService {
       }
 
       // Construir el objeto de actualización dinámicamente solo con los campos presentes
-      const finalUpdateData = createDynamicUpdateObject(updateData, customerDB);
+      const dynamicUpdateData = createDynamicUpdateObject(
+        updateData,
+        customerDB,
+      );
+
+      // Filtrar campos de blacklist que no deben estar en la actualización
+      const finalUpdateData: any = { ...dynamicUpdateData };
+      delete finalUpdateData.isBlacklist;
+      delete finalUpdateData.blacklistReason;
+      delete finalUpdateData.blacklistDate;
+      delete finalUpdateData.blacklistedById;
+      delete finalUpdateData.createdByLandingPage;
+      delete finalUpdateData.mustCompleteData;
 
       // Transacción para realizar la actualización
       const updatedCustomer = await this.prisma.$transaction(async (prisma) => {
@@ -855,6 +958,12 @@ export class CustomersService {
             department: true,
             province: true,
             isActive: true,
+            isBlacklist: true,
+            blacklistReason: true,
+            blacklistDate: true,
+            blacklistedById: true,
+            createdByLandingPage: true,
+            mustCompleteData: true,
           },
         });
         // Crear un registro de auditoría
@@ -887,6 +996,19 @@ export class CustomersService {
           ...(updatedCustomer.province && {
             province: updatedCustomer.province,
           }),
+          isActive: updatedCustomer.isActive,
+          isBlacklist: updatedCustomer.isBlacklist,
+          ...(updatedCustomer.blacklistReason && {
+            blacklistReason: updatedCustomer.blacklistReason,
+          }),
+          ...(updatedCustomer.blacklistDate && {
+            blacklistDate: updatedCustomer.blacklistDate,
+          }),
+          ...(updatedCustomer.blacklistedById && {
+            blacklistedById: updatedCustomer.blacklistedById,
+          }),
+          createdByLandingPage: updatedCustomer.createdByLandingPage,
+          mustCompleteData: updatedCustomer.mustCompleteData,
         },
       };
     } catch (error) {
@@ -926,6 +1048,12 @@ export class CustomersService {
           select: {
             id: true,
             isActive: true,
+            isBlacklist: true,
+            blacklistReason: true,
+            blacklistDate: true,
+            blacklistedById: true,
+            createdByLandingPage: true,
+            mustCompleteData: true,
           },
         });
 
@@ -1005,6 +1133,12 @@ export class CustomersService {
           select: {
             id: true,
             isActive: true,
+            isBlacklist: true,
+            blacklistReason: true,
+            blacklistDate: true,
+            blacklistedById: true,
+            createdByLandingPage: true,
+            mustCompleteData: true,
           },
         });
 
@@ -2028,6 +2162,12 @@ export class CustomersService {
             department: true,
             province: true,
             isActive: true,
+            isBlacklist: true,
+            blacklistReason: true,
+            blacklistDate: true,
+            blacklistedById: true,
+            createdByLandingPage: true,
+            mustCompleteData: true,
           },
         });
 
@@ -2064,6 +2204,18 @@ export class CustomersService {
         ...(newCustomer.department && { department: newCustomer.department }),
         ...(newCustomer.province && { province: newCustomer.province }),
         isActive: newCustomer.isActive,
+        isBlacklist: newCustomer.isBlacklist,
+        ...(newCustomer.blacklistReason && {
+          blacklistReason: newCustomer.blacklistReason,
+        }),
+        ...(newCustomer.blacklistDate && {
+          blacklistDate: newCustomer.blacklistDate,
+        }),
+        ...(newCustomer.blacklistedById && {
+          blacklistedById: newCustomer.blacklistedById,
+        }),
+        createdByLandingPage: newCustomer.createdByLandingPage,
+        mustCompleteData: newCustomer.mustCompleteData,
       };
     } catch (error) {
       this.logger.error(

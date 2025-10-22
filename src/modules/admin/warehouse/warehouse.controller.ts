@@ -2,7 +2,12 @@ import { Controller, Get, Param, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { WarehouseService } from './warehouse.service';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
-import { StockData, SummaryWarehouseData, WarehouseData } from 'src/interfaces';
+import {
+  StockData,
+  SummaryWarehouseData,
+  WarehouseData,
+  UserPayload,
+} from 'src/interfaces';
 import {
   ApiBadRequestResponse,
   ApiOkResponse,
@@ -12,7 +17,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { Auth } from '../auth/decorators';
+import { Auth, GetUser } from '../auth/decorators';
 import { WarehouseType } from '@prisma/client';
 
 @ApiTags('Admin Warehouse')
@@ -31,7 +36,11 @@ export class WarehouseController {
   }
 
   @Get('paginated')
-  @ApiOperation({ summary: 'Get paginated warehouses' })
+  @ApiOperation({
+    summary: 'Get paginated warehouses with advanced filters',
+    description:
+      'Get warehouses with advanced filtering by type and search in stock products. Only super admin can see DEPOSIT warehouses.',
+  })
   @ApiQuery({
     name: 'page',
     description: 'Page number',
@@ -46,6 +55,34 @@ export class WarehouseController {
     example: 10,
     required: false,
   })
+  @ApiQuery({
+    name: 'search',
+    description: 'Search term for stock products (name, code)',
+    type: String,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'type',
+    description: 'Filter by warehouse type (array)',
+    type: String,
+    example: 'COMMERCIAL,INTERNAL_USE,DEPOSIT',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    description: 'Field to sort by',
+    type: String,
+    example: 'type',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    description: 'Sort order',
+    type: String,
+    enum: ['asc', 'desc'],
+    example: 'asc',
+    required: false,
+  })
   @ApiOkResponse({
     description: 'Paginated list of warehouses',
     schema: {
@@ -58,7 +95,11 @@ export class WarehouseController {
             type: 'object',
             properties: {
               id: { type: 'string' },
-              type: { type: 'string', enum: ['CENTRAL', 'LOCAL'] },
+              type: {
+                type: 'string',
+                enum: ['COMMERCIAL', 'INTERNAL_USE', 'DEPOSIT'],
+              },
+              code: { type: 'string' },
               quantityProducts: { type: 'number' },
               totalCost: { type: 'number' },
             },
@@ -79,16 +120,56 @@ export class WarehouseController {
     },
   })
   findAllPaginated(
+    @GetUser() user: UserPayload,
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
+    @Query('search') search?: string,
+    @Query('type') type?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ): Promise<PaginatedResponse<SummaryWarehouseData>> {
     const pageNumber = parseInt(page, 10) || 1;
     const pageSizeNumber = parseInt(pageSize, 10) || 10;
 
-    return this.warehouseService.findAllPaginated({
-      page: pageNumber,
-      pageSize: pageSizeNumber,
-    });
+    // Construir filtros
+    const filterOptions: any = {};
+
+    // Filtro por tipo (array)
+    if (type) {
+      const typeArray = type.split(',').map((t) => t.trim());
+      filterOptions.arrayByField = {
+        ...filterOptions.arrayByField,
+        type: typeArray,
+      };
+    }
+
+    // Búsqueda en productos del stock
+    if (search) {
+      filterOptions.searchByFieldsRelational = [
+        {
+          stock: {
+            product: {
+              name: search,
+              code: search,
+            },
+          },
+        },
+      ];
+    }
+
+    // Construir opciones de ordenamiento
+    const sortOptions: any = {};
+    if (sortBy) {
+      sortOptions.field = sortBy;
+      sortOptions.order = sortOrder || 'asc';
+    }
+
+    return this.warehouseService.findAllPaginated(
+      { page: pageNumber, pageSize: pageSizeNumber },
+      filterOptions,
+      sortOptions,
+      { isSuperAdmin: user.isSuperAdmin },
+    );
   }
 
   @ApiOperation({ summary: 'Get warehouse by id' })

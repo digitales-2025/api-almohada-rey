@@ -1185,8 +1185,9 @@ export class DashboardService {
         }
       }
 
-      // Convertir a array y ordenar por cantidad de clientes (descendente)
+      // Convertir a array, filtrar países con "-" y ordenar por cantidad de clientes (descendente)
       const sortedCountries = Object.entries(countryCounts)
+        .filter(([countryProvince]) => !countryProvince.includes('-')) // Excluir países con "-"
         .map(([countryProvince, totalCustomers]) => ({
           countryProvince,
           totalCustomers,
@@ -1202,9 +1203,9 @@ export class DashboardService {
   }
 
   /**
-   * Obtiene las top 10 provincias de Perú con más clientes para un año específico.
+   * Obtiene los top 10 departamentos de Perú con más clientes para un año específico.
    * @param year Año para el que se desean obtener las estadísticas
-   * @returns Top 10 provincias de Perú con más clientes
+   * @returns Top 10 departamentos de Perú con más clientes
    */
   async findTop10ProvincesCustomers(
     year: number,
@@ -1224,31 +1225,31 @@ export class DashboardService {
           isActive: true,
           // Solo incluir clientes de Perú
           country: 'Perú',
-          // Solo incluir clientes con provincia definida
-          province: {
+          // Solo incluir clientes con departamento definido
+          department: {
             not: null,
           },
         },
         select: {
-          province: true,
+          department: true,
         },
       });
 
-      // Contar clientes por provincia
-      const provinceCounts: { [key: string]: number } = {};
+      // Contar clientes por departamento
+      const departmentCounts: { [key: string]: number } = {};
 
       for (const customer of customers) {
-        if (customer.province) {
-          if (provinceCounts[customer.province]) {
-            provinceCounts[customer.province]++;
+        if (customer.department) {
+          if (departmentCounts[customer.department]) {
+            departmentCounts[customer.department]++;
           } else {
-            provinceCounts[customer.province] = 1;
+            departmentCounts[customer.department] = 1;
           }
         }
       }
 
       // Convertir a array y ordenar por cantidad de clientes (descendente)
-      const sortedProvinces = Object.entries(provinceCounts)
+      const sortedDepartments = Object.entries(departmentCounts)
         .map(([countryProvince, totalCustomers]) => ({
           countryProvince,
           totalCustomers,
@@ -1256,14 +1257,14 @@ export class DashboardService {
         .sort((a, b) => b.totalCustomers - a.totalCustomers)
         .slice(0, 10); // Tomar solo los 10 primeros
 
-      return sortedProvinces;
+      return sortedDepartments;
     } catch (error) {
       this.logger.error(
-        'Error obteniendo top 10 provincias de Perú con más clientes',
+        'Error obteniendo top 10 departamentos de Perú con más clientes',
       );
       handleException(
         error,
-        'Error obteniendo top 10 provincias de Perú con más clientes',
+        'Error obteniendo top 10 departamentos de Perú con más clientes',
       );
     }
   }

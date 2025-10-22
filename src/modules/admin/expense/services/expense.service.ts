@@ -19,6 +19,10 @@ import {
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { PaginationParams } from 'src/utils/paginated-response/pagination.types';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
+import {
+  FilterOptions,
+  SortOptions,
+} from 'src/prisma/src/interfaces/base.repository.interfaces';
 
 import { AuditService } from '../../audit/audit.service';
 import { Prisma } from '@prisma/client';
@@ -113,29 +117,85 @@ export class ExpenseService {
 
   async findByDatePaginated(
     pagination: PaginationParams,
-    filters: { month?: string; year?: string },
+    filters: {
+      month?: string;
+      year?: string;
+      search?: string;
+      category?: string;
+      paymentMethod?: string;
+      documentType?: string;
+    },
+    sortOptions?: SortOptions<any>,
   ): Promise<PaginatedResponse<HotelExpenseEntity>> {
     try {
-      const where: Prisma.HotelExpenseWhereInput = {};
+      // Construir filtros base para fechas
+      const baseWhere: Prisma.HotelExpenseWhereInput = {};
 
-      // Manejo de filtros separados por mes y año
+      // Manejo de filtros separados por mes y año (mantener lógica existente)
       if (filters.year && filters.month) {
         // Si tenemos ambos, año y mes
-        where.date = { startsWith: `${filters.year}-${filters.month}` };
+        baseWhere.date = { startsWith: `${filters.year}-${filters.month}` };
       } else if (filters.year && !filters.month) {
         // Solo año
-        where.date = { startsWith: `${filters.year}-` };
+        baseWhere.date = { startsWith: `${filters.year}-` };
       } else if (!filters.year && filters.month) {
         // Solo mes
         // Busca fechas que tengan -MM- en la posición correcta (YYYY-MM-DD)
-        where.date = { contains: `-${filters.month}-` };
+        baseWhere.date = { contains: `-${filters.month}-` };
       }
-      // Si no hay ningún filtro, se muestran todos los registros
 
+      // Construir filtros avanzados
+      const filterOptions: FilterOptions<any> = {};
+
+      // Filtro por categoría (array)
+      if (filters.category) {
+        const categoryArray = filters.category.split(',').map((c) => c.trim());
+        filterOptions.arrayByField = {
+          ...filterOptions.arrayByField,
+          category: categoryArray,
+        };
+      }
+
+      // Filtro por método de pago (array)
+      if (filters.paymentMethod) {
+        const paymentMethodArray = filters.paymentMethod
+          .split(',')
+          .map((p) => p.trim());
+        filterOptions.arrayByField = {
+          ...filterOptions.arrayByField,
+          paymentMethod: paymentMethodArray,
+        };
+      }
+
+      // Filtro por tipo de documento (array)
+      if (filters.documentType) {
+        const documentTypeArray = filters.documentType
+          .split(',')
+          .map((d) => d.trim());
+        filterOptions.arrayByField = {
+          ...filterOptions.arrayByField,
+          documentType: documentTypeArray,
+        };
+      }
+
+      // Búsqueda simple en campos del gasto
+      if (filters.search) {
+        filterOptions.searchByField = {
+          ...filterOptions.searchByField,
+          description: filters.search,
+          documentNumber: filters.search,
+        };
+      }
+
+      // Usar el BaseRepository con filtros avanzados
       return await this.expenseRepository.findManyPaginated<HotelExpenseEntity>(
         pagination,
         {
-          where,
+          where: baseWhere, // Filtros de fecha existentes
+          filterOptions, // Nuevos filtros avanzados
+          sortOptions, // Opciones de ordenamiento
+          enumFields: ['category', 'paymentMethod', 'documentType'],
+          dateFields: ['date', 'createdAt', 'updatedAt'],
           orderBy: { createdAt: 'desc' },
         },
       );

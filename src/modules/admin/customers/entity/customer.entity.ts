@@ -63,6 +63,48 @@ export class Customer extends BaseEntity {
   })
   createdByLandingPage?: boolean;
 
+  @ApiProperty({
+    description: 'Indicates if the customer is blacklisted',
+    required: false,
+    default: false,
+  })
+  isBlacklist?: boolean;
+
+  @ApiProperty({
+    description: 'Reason for blacklisting the customer',
+    required: false,
+  })
+  blacklistReason?: string;
+
+  @ApiProperty({
+    description: 'Date when the customer was blacklisted',
+    required: false,
+  })
+  blacklistDate?: Date;
+
+  @ApiProperty({
+    description: 'ID of the user who blacklisted the customer',
+    required: false,
+  })
+  blacklistedById?: string;
+
+  @ApiProperty({
+    description: 'User who blacklisted the customer',
+    required: false,
+  })
+  blacklistedBy?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+
+  @ApiProperty({
+    description: 'Indicates if the admin needs to complete missing data',
+    required: false,
+    default: false,
+  })
+  mustCompleteData?: boolean;
+
   constructor(partial: Partial<Customer>) {
     super(partial);
     Object.assign(this, partial);

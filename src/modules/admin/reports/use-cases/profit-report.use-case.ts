@@ -106,11 +106,6 @@ export class ProfitReportUseCase {
       const month = current.getMonth();
       const year = current.getFullYear();
 
-      // Debug: verificar valores
-      console.log(
-        `🔍 DEBUG - Fecha: ${fechaStr}, Month: ${month}, Year: ${year}, MonthName: ${monthNames[month]}, CurrentMonth: ${currentMonth}`,
-      );
-
       if (currentMonth !== month) {
         // Si no es el primer mes, agregar totales del mes anterior
         if (currentMonth !== null) {

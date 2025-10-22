@@ -105,21 +105,67 @@ export class ExpenseController {
   }
 
   /**
-   * Obtiene gastos por fecha
+   * Obtiene gastos por fecha con filtros avanzados
    */
   @Get('filter/date')
-  @ApiOperation({ summary: 'Obtener gastos por fecha (paginado y filtrado)' })
+  @ApiOperation({
+    summary: 'Obtener gastos por fecha con filtros avanzados',
+    description:
+      'Obtiene gastos paginados con filtros por fecha, categoría, método de pago, tipo de documento y búsqueda',
+  })
   @ApiQuery({
     name: 'month',
     required: false,
     type: String,
-    description: 'Mes para filtrar (ejemplo: enero, febrero, etc.)',
+    description: 'Mes para filtrar (ejemplo: 01, 02, etc.)',
   })
   @ApiQuery({
     name: 'year',
     required: false,
     type: String,
     description: 'Año para filtrar (ejemplo: 2023, 2024, etc.)',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Término de búsqueda en descripción y número de documento',
+  })
+  @ApiQuery({
+    name: 'category',
+    required: false,
+    type: String,
+    description: 'Filtro por categoría (array)',
+    example: 'FIXED,VARIABLE,OTHER',
+  })
+  @ApiQuery({
+    name: 'paymentMethod',
+    required: false,
+    type: String,
+    description: 'Filtro por método de pago (array)',
+    example: 'CASH,TRANSFER,CARD',
+  })
+  @ApiQuery({
+    name: 'documentType',
+    required: false,
+    type: String,
+    description: 'Filtro por tipo de documento (array)',
+    example: 'RECEIPT,INVOICE,OTHER',
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    type: String,
+    description: 'Campo para ordenar',
+    example: 'date',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    type: String,
+    enum: ['asc', 'desc'],
+    description: 'Orden de clasificación',
+    example: 'desc',
   })
   @ApiQuery({
     name: 'page',
@@ -152,14 +198,36 @@ export class ExpenseController {
   findByDate(
     @Query('month') month?: string,
     @Query('year') year?: string,
+    @Query('search') search?: string,
+    @Query('category') category?: string,
+    @Query('paymentMethod') paymentMethod?: string,
+    @Query('documentType') documentType?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
   ): Promise<PaginatedResponse<HotelExpenseEntity>> {
     const pageNumber = parseInt(page, 10) || 1;
     const pageSizeNumber = parseInt(pageSize, 10) || 10;
+
+    // Construir opciones de ordenamiento
+    const sortOptions: any = {};
+    if (sortBy) {
+      sortOptions.field = sortBy;
+      sortOptions.order = sortOrder || 'desc';
+    }
+
     return this.expenseService.findByDatePaginated(
       { page: pageNumber, pageSize: pageSizeNumber },
-      { month, year },
+      {
+        month,
+        year,
+        search,
+        category,
+        paymentMethod,
+        documentType,
+      },
+      sortOptions,
     );
   }
 
