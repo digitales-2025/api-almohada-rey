@@ -4,6 +4,12 @@ import { PrismaTransaction, QueryParams, CreateDto, UpdateDto } from '../types';
 import { BaseEntity } from './base.entity';
 import { PaginationParams } from 'src/utils/paginated-response/pagination.types';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
+import {
+  FilterOptions,
+  SortOptions,
+  FieldNumberOptions,
+  FieldDateOptions,
+} from '../interfaces/base.repository.interfaces';
 
 // export type filterByFieldOptions<T> = {
 //   field: keyof T;
@@ -94,7 +100,14 @@ export abstract class BaseRepository<T extends BaseEntity> {
    */
   async findManyPaginated<V = T>(
     pagination?: PaginationParams,
-    params?: QueryParams,
+    params?: QueryParams & {
+      filterOptions?: FilterOptions<T>;
+      sortOptions?: SortOptions<T>;
+      enumFields?: string[];
+      dateFields?: string[];
+      cursor?: any;
+      distinct?: any;
+    },
   ): Promise<PaginatedResponse<V>> {
     // Valores por defecto para paginación
     const DEFAULT_PAGE_SIZE = 10;
@@ -108,25 +121,56 @@ export abstract class BaseRepository<T extends BaseEntity> {
     // Asegura que params tenga una estructura adecuada
     const queryParams = params || {};
 
-    // Configura ordenamiento por createdAt descendente por defecto
-    // pero permite que sea sobrescrito si ya está definido
-    const orderBy = queryParams?.orderBy ?? { createdAt: 'desc' };
+    // Construye filtros avanzados y ordenamiento
 
-    // Realiza dos consultas: una para obtener los datos paginados y otra para el conteo total
+    const advancedWhere = this.buildWhereClause(
+      queryParams.filterOptions,
+      queryParams.enumFields,
+      queryParams.dateFields,
+    );
+
+    const orderBy = this.buildOrderByClause(
+      queryParams.sortOptions,
+      true,
+      true,
+    ) ??
+      queryParams?.orderBy ?? { createdAt: 'desc' };
+
+    // Combina filtros existentes con avanzados
+    const combinedWhere = { ...queryParams.where, ...advancedWhere };
+
+    // Extraer solo los argumentos válidos de Prisma del queryParams
+    const { include, select, cursor, distinct } = queryParams;
+
+    // Crear objeto con solo argumentos válidos de Prisma
+    const otherValidPrismaArgs = { ...queryParams };
+    delete otherValidPrismaArgs.filterOptions;
+    delete otherValidPrismaArgs.sortOptions;
+    delete otherValidPrismaArgs.enumFields;
+    delete otherValidPrismaArgs.dateFields;
+
+    const prismaQuery = {
+      ...otherValidPrismaArgs, // Solo argumentos válidos de Prisma
+      where: combinedWhere,
+      orderBy,
+      skip,
+      take: pageSize,
+      include,
+      select,
+      cursor,
+      distinct,
+    };
+
+    // Realiza dos consultas optimizadas: una para obtener los datos paginados y otra para el conteo total
+
     const [data, total] = await Promise.all([
       this.prisma.measureQuery(
         `findMany${String(this.modelName)}Paginated`,
-        () =>
-          (this.prisma[this.modelName] as any).findMany({
-            ...queryParams,
-            orderBy,
-            skip,
-            take: pageSize,
-          }),
+        () => (this.prisma[this.modelName] as any).findMany(prismaQuery),
       ),
       this.prisma.measureQuery(`count${String(this.modelName)}`, () =>
         (this.prisma[this.modelName] as any).count({
-          where: queryParams.where,
+          where: combinedWhere,
         }),
       ),
     ]);
@@ -876,5 +920,365 @@ export abstract class BaseRepository<T extends BaseEntity> {
       }),
     );
     return result as unknown as V[];
+  }
+
+  // Métodos avanzados para filtros y ordenamiento optimizados
+  protected buildWhereClause<T>(
+    filterOptions?: FilterOptions<T>,
+    enumFields?: string[],
+    dateFields?: string[],
+  ): Record<string, any> {
+    if (!filterOptions) {
+      return {};
+    }
+
+    const whereClause: Record<string, any> = {};
+    const {
+      searchByField,
+      searchByFieldsRelational,
+      OR,
+      fieldNumber,
+      fieldNumbers,
+      fieldDate,
+      fieldDates,
+      arrayByField,
+      ...rest
+    } = filterOptions;
+
+    // Filtros AND normales
+    if (searchByField) {
+      Object.entries(searchByField).forEach(([key, value]) => {
+        whereClause[key] =
+          typeof value === 'string' && !this.isEnumField(key, enumFields)
+            ? this.buildFlexibleSearchCondition(value)
+            : value;
+      });
+    }
+
+    if (searchByFieldsRelational) {
+      // OPTIMIZADO: Crear condiciones OR para múltiples relaciones
+      const orConditions: any[] = [];
+
+      searchByFieldsRelational.forEach((relation) => {
+        Object.entries(relation).forEach(([relationName, fields]) => {
+          // Para búsquedas relacionales, crear condición OR inteligente
+          const relationCondition = this.buildSearchConditionsForRelation(
+            fields,
+            enumFields,
+            dateFields,
+            relationName,
+          );
+
+          if (Object.keys(relationCondition).length > 0) {
+            orConditions.push({
+              [relationName]: relationCondition,
+            });
+          }
+        });
+      });
+
+      // Si hay condiciones OR relacionales, combinarlas con filtros directos
+      if (orConditions.length > 0) {
+        if (Object.keys(whereClause).length > 0) {
+          // Combinar filtros directos con relacionales usando OR
+          whereClause.OR = [
+            // Filtros directos como una condición
+            { ...whereClause },
+            // Condiciones relacionales
+            ...orConditions,
+          ];
+          // Limpiar filtros directos del nivel principal
+          Object.keys(whereClause).forEach((key) => {
+            if (key !== 'OR') delete whereClause[key];
+          });
+        } else {
+          // Solo condiciones relacionales
+          whereClause.OR = orConditions;
+        }
+      }
+    }
+
+    // Soporte para números y fechas
+    if (fieldNumber) this.applyFieldNumberCondition(whereClause, fieldNumber);
+    if (fieldNumbers)
+      fieldNumbers.forEach((fn) =>
+        this.applyFieldNumberCondition(whereClause, fn),
+      );
+    if (fieldDate) this.applyFieldDateCondition(whereClause, fieldDate);
+    if (fieldDates)
+      fieldDates.forEach((fd) => this.applyFieldDateCondition(whereClause, fd));
+
+    // Filtros OR flexibles
+    if (OR) {
+      const orConditions: Record<string, any>[] = [];
+      if (OR.searchByField) {
+        Object.entries(OR.searchByField).forEach(([key, value]) => {
+          const condition: Record<string, any> = {};
+          condition[key] =
+            typeof value === 'string'
+              ? this.buildFlexibleSearchCondition(value)
+              : value;
+          orConditions.push(condition);
+        });
+      }
+      if (OR.searchByFieldsRelational) {
+        OR.searchByFieldsRelational.forEach((relation) => {
+          Object.entries(relation).forEach(([relationName, fields]) => {
+            const condition: Record<string, any> = {};
+            condition[relationName] = this.buildRecursiveConditions(
+              fields,
+              enumFields,
+              dateFields,
+              relationName,
+            );
+            orConditions.push(condition);
+          });
+        });
+      }
+      if (orConditions.length > 0) whereClause['OR'] = orConditions;
+    }
+
+    // Arrays y resto
+    if (arrayByField) {
+      Object.entries(arrayByField).forEach(([key, values]) => {
+        // Para campos booleanos, usar OR con equals
+        if (
+          key === 'isActive' ||
+          key === 'isBlacklist' ||
+          key === 'isPendingDeletePayment'
+        ) {
+          const booleanValues = Array.isArray(values) ? values : [values];
+          if (booleanValues.length === 1) {
+            whereClause[key] = booleanValues[0];
+          } else {
+            whereClause['OR'] = [
+              ...(whereClause['OR'] || []),
+              ...booleanValues.map((value) => ({ [key]: value })),
+            ];
+          }
+        } else {
+          // Para otros campos (enums, etc.), usar in
+          whereClause[key] = { in: Array.isArray(values) ? values : [values] };
+        }
+      });
+    }
+
+    // Manejar rangos de fecha especiales (ej: dateRange)
+    if (rest.dateRange && typeof rest.dateRange === 'string') {
+      const [start, end] = rest.dateRange.split(' - ');
+      if (start && end) {
+        whereClause.OR = [
+          // Reservations that start during the requested period
+          {
+            checkInDate: {
+              gte: new Date(start),
+              lt: new Date(end),
+            },
+          },
+          // Reservations that end during the requested period
+          {
+            checkOutDate: {
+              gt: new Date(start),
+              lte: new Date(end),
+            },
+          },
+          // Reservations that span the entire requested period
+          {
+            AND: [
+              { checkInDate: { lte: new Date(start) } },
+              { checkOutDate: { gte: new Date(end) } },
+            ],
+          },
+        ];
+      }
+      delete rest.dateRange; // Remove the special field
+    }
+
+    Object.entries(rest).forEach(([key, value]) => {
+      if (value !== undefined) whereClause[key] = value;
+    });
+
+    return whereClause;
+  }
+
+  protected buildOrderByClause<T>(
+    sortOptions?: SortOptions<T>,
+    hasCreatedAtField?: boolean,
+    sortDescByCreation?: boolean,
+  ): Record<string, any> | undefined {
+    if (!sortOptions && !hasCreatedAtField) return undefined;
+    const orderBy: Record<string, any> = {};
+    if (sortOptions?.field)
+      orderBy[sortOptions.field as string] = sortOptions.order ?? 'asc';
+    if (!sortOptions && hasCreatedAtField)
+      orderBy['createdAt'] = sortDescByCreation ? 'desc' : 'asc';
+    return orderBy;
+  }
+
+  private isEnumField(field: string, enumFields?: string[]): boolean {
+    return enumFields?.some((enumField) => field.includes(enumField)) ?? false;
+  }
+
+  private applyFieldNumberCondition(
+    where: Record<string, any>,
+    fieldNumber: FieldNumberOptions<any>,
+  ): void {
+    where[String(fieldNumber.field)] = {
+      [fieldNumber.operator]: fieldNumber.value,
+    };
+  }
+
+  private applyFieldDateCondition(
+    where: Record<string, any>,
+    fieldDate: FieldDateOptions<any>,
+  ): void {
+    const value = fieldDate.value.includes(' - ')
+      ? {
+          gte: new Date(fieldDate.value.split(' - ')[0]),
+          lte: new Date(fieldDate.value.split(' - ')[1]),
+        }
+      : new Date(fieldDate.value);
+    where[String(fieldDate.field)] =
+      fieldDate.operator === 'range'
+        ? value
+        : { [fieldDate.operator || 'equals']: value };
+  }
+
+  private buildRecursiveConditions(
+    fields: any,
+    enumFields?: string[],
+    dateFields?: string[],
+    relationPrefix?: string,
+  ): any {
+    const conditions: Record<string, any> = {};
+
+    if (typeof fields === 'object' && fields !== null) {
+      Object.entries(fields).forEach(([fieldName, fieldValue]) => {
+        const fieldPath = relationPrefix
+          ? `${relationPrefix}.${fieldName}`
+          : fieldName;
+
+        if (typeof fieldValue === 'string') {
+          conditions[fieldName] =
+            this.isEnumField(fieldPath, enumFields) ||
+            this.isDateField(fieldPath, dateFields)
+              ? fieldValue
+              : this.buildFlexibleSearchCondition(fieldValue);
+        } else if (typeof fieldValue === 'object' && fieldValue !== null) {
+          conditions[fieldName] = this.buildRecursiveConditions(
+            fieldValue,
+            enumFields,
+            dateFields,
+            fieldPath,
+          );
+        } else {
+          conditions[fieldName] = fieldValue;
+        }
+      });
+    } else if (typeof fields === 'string') {
+      const fieldPath = relationPrefix || '';
+      return this.isEnumField(fieldPath, enumFields) ||
+        this.isDateField(fieldPath, dateFields)
+        ? fields
+        : this.buildFlexibleSearchCondition(fields);
+    }
+
+    return conditions;
+  }
+
+  private isDateField(field: string, dateFields?: string[]): boolean {
+    return dateFields?.some((dateField) => field.includes(dateField)) ?? false;
+  }
+
+  private buildSearchConditionsForRelation(
+    fields: any,
+    enumFields?: string[],
+    dateFields?: string[],
+    relationName?: string,
+  ): any {
+    // Crear condición OR para buscar en múltiples campos de una relación
+    const orConditions: any[] = [];
+
+    if (typeof fields === 'object' && fields !== null) {
+      Object.entries(fields).forEach(([fieldName, fieldValue]) => {
+        if (typeof fieldValue === 'string') {
+          // Crear condición para este campo específico
+          const fieldPath = relationName
+            ? `${relationName}.${fieldName}`
+            : fieldName;
+
+          // Solo agregar condición si no es un campo especial (como number que ya se maneja diferente)
+          if (fieldName !== 'number') {
+            orConditions.push({
+              [fieldName]: this.buildFlexibleSearchCondition(
+                fieldValue,
+                fieldPath,
+                enumFields,
+                dateFields,
+              ),
+            });
+          }
+        } else if (typeof fieldValue === 'object' && fieldValue !== null) {
+          // Para campos anidados (como RoomTypes)
+          orConditions.push({
+            [fieldName]: this.buildRecursiveConditions(
+              fieldValue,
+              enumFields,
+              dateFields,
+              fieldName,
+            ),
+          });
+        } else if (typeof fieldValue === 'number') {
+          // Para campos numéricos (como room.number)
+          orConditions.push({
+            [fieldName]: fieldValue,
+          });
+        }
+      });
+    }
+
+    return orConditions.length > 0 ? { OR: orConditions } : {};
+  }
+
+  private buildFlexibleSearchCondition(
+    searchValue: string,
+    fieldPath?: string,
+    enumFields?: string[],
+    dateFields?: string[],
+  ): any {
+    // Verificar si es un campo enum o fecha
+    if (fieldPath) {
+      if (
+        this.isEnumField(fieldPath, enumFields) ||
+        this.isDateField(fieldPath, dateFields)
+      ) {
+        return searchValue;
+      }
+    }
+
+    // Lógica inteligente de búsqueda basada en la longitud del término
+    const wordCount = searchValue.trim().split(/\s+/).length;
+
+    // Para términos largos (3+ palabras): ser estricto, buscar frase completa
+    if (wordCount >= 3) {
+      return {
+        contains: searchValue,
+        mode: 'insensitive' as const,
+      };
+    }
+
+    // Para términos medianos (2 palabras): buscar frase completa
+    if (wordCount === 2) {
+      return {
+        contains: searchValue,
+        mode: 'insensitive' as const,
+      };
+    }
+
+    // Para términos cortos (1 palabra): ser más flexible
+    return {
+      contains: searchValue,
+      mode: 'insensitive' as const,
+    };
   }
 }
