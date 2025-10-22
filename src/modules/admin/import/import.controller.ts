@@ -1,7 +1,6 @@
 import {
   Controller,
   Post,
-  Delete,
   UseInterceptors,
   UploadedFile,
 } from '@nestjs/common';
@@ -10,13 +9,7 @@ import { ImportService } from './import.service';
 import { Auth } from '../auth/decorators';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { UserData } from 'src/interfaces';
-import {
-  ApiTags,
-  ApiConsumes,
-  ApiBody,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
 
 @ApiTags('Import Excel')
 @Controller('import')
@@ -49,34 +42,37 @@ export class ImportController {
     return await this.importService.importExcelFile(file, user);
   }
 
-  @Delete('cleanup')
-  @ApiOperation({
-    summary: 'Limpiar todos los datos importados',
-    description:
-      'Elimina todos los datos creados por la importación de Excel (reservas, pagos, clientes temporales, etc.)',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Limpieza completada exitosamente',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean' },
-        message: { type: 'string' },
-        deletedCounts: {
-          type: 'object',
-          properties: {
-            payments: { type: 'number' },
-            reservations: { type: 'number' },
-            customers: { type: 'number' },
-            auditLogs: { type: 'number' },
+  // Temporarily commented out due to safety concerns - this endpoint deletes reservations and is very dangerous
+  /*
+    @Delete('cleanup')
+    @ApiOperation({
+      summary: 'Limpiar todos los datos importados',
+      description:
+        'Elimina todos los datos creados por la importación de Excel (reservas, pagos, clientes temporales, etc.)',
+    })
+    @ApiResponse({
+      status: 200,
+      description: 'Limpieza completada exitosamente',
+      schema: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean' },
+          message: { type: 'string' },
+          deletedCounts: {
+            type: 'object',
+            properties: {
+              payments: { type: 'number' },
+              reservations: { type: 'number' },
+              customers: { type: 'number' },
+              auditLogs: { type: 'number' },
+            },
           },
         },
       },
-    },
-  })
-  @ApiResponse({ status: 400, description: 'Error en la limpieza' })
-  async cleanupImportedData(@GetUser() user: UserData) {
-    return await this.importService.cleanupImportedData(user);
-  }
+    })
+    @ApiResponse({ status: 400, description: 'Error en la limpieza' })
+    async cleanupImportedData(@GetUser() user: UserData) {
+      return await this.importService.cleanupImportedData(user);
+    }
+  */
 }
