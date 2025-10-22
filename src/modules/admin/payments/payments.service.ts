@@ -1088,12 +1088,15 @@ export class PaymentsService {
           amountPaid: payment.amountPaid,
           date: payment.date,
           status: payment.status,
-          reservation: {
-            customer: {
-              id: payment.reservation.customer.id,
-              name: payment.reservation.customer.name,
-            },
-          },
+          reservation:
+            payment.reservation && payment.reservation.customer
+              ? {
+                  customer: {
+                    id: payment.reservation.customer.id,
+                    name: payment.reservation.customer.name,
+                  },
+                }
+              : null,
         }),
       });
     } catch (error) {
