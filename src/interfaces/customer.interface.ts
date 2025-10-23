@@ -20,6 +20,12 @@ export type CustomerData = Pick<
   | 'documentNumber'
   | 'maritalStatus'
   | 'isActive'
+  | 'isBlacklist'
+  | 'blacklistReason'
+  | 'blacklistDate'
+  | 'blacklistedById'
+  | 'createdByLandingPage'
+  | 'mustCompleteData'
 > & {
   email?: string;
   birthDate?: string;
@@ -28,6 +34,11 @@ export type CustomerData = Pick<
   companyName?: string;
   ruc?: string;
   companyAddress?: string;
+  blacklistedBy?: {
+    id: string;
+    name: string;
+    email: string;
+  };
 };
 
 export type ResponseApiCustomer = {

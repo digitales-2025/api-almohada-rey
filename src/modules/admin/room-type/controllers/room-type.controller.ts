@@ -82,13 +82,13 @@ export class RoomTypeController {
   }
 
   /**
-   * Obtiene todos los tipos de habitaciones con paginación
+   * Obtiene todos los tipos de habitaciones con paginación y filtros avanzados
    */
   @Get('paginated')
   @ApiOperation({
-    summary: 'Obtener tipos de habitaciones paginados con sus imágenes',
+    summary: 'Obtener tipos de habitaciones paginados con filtros avanzados',
     description:
-      'Devuelve una lista paginada de tipos de habitaciones con sus imágenes asociadas',
+      'Devuelve una lista paginada de tipos de habitaciones con filtros por estado activo y búsqueda flexible en nombre, descripción y precio (OR)',
   })
   @ApiQuery({
     name: 'page',
@@ -102,6 +102,35 @@ export class RoomTypeController {
     description: 'Cantidad de elementos por página',
     type: Number,
     example: 10,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'search',
+    description:
+      'Término de búsqueda en nombre, descripción y precio del tipo de habitación (búsqueda flexible con OR)',
+    type: String,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'isActive',
+    description: 'Filtro por estado activo (array)',
+    type: String,
+    example: 'true,false',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    description: 'Campo para ordenar',
+    type: String,
+    example: 'name',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    description: 'Orden de clasificación',
+    type: String,
+    enum: ['asc', 'desc'],
+    example: 'desc',
     required: false,
   })
   @ApiResponse({
@@ -152,6 +181,10 @@ export class RoomTypeController {
     @GetUser() user: UserPayload,
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
+    @Query('search') search?: string,
+    @Query('isActive') isActive?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ): Promise<
     PaginatedResponse<
       RoomType & { imagesRoomType: Array<{ id: string; url: string }> }
@@ -160,10 +193,62 @@ export class RoomTypeController {
     const pageNumber = parseInt(page, 10) || 1;
     const pageSizeNumber = parseInt(pageSize, 10) || 10;
 
-    return this.roomTypeService.findAllPaginated(user, {
-      page: pageNumber,
-      pageSize: pageSizeNumber,
-    });
+    // Construir filtros
+    const filterOptions: any = {};
+
+    // Filtro por isActive (array booleano)
+    if (isActive) {
+      const isActiveArray = isActive.split(',').map((a) => a.trim() === 'true');
+      filterOptions.arrayByField = {
+        ...filterOptions.arrayByField,
+        isActive: isActiveArray,
+      };
+    }
+
+    // Búsqueda simple en campos del tipo de habitación
+    if (search) {
+      // Usar OR a nivel superior para buscar en múltiples campos
+      const orConditions = [
+        // Búsqueda por nombre
+        {
+          name: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        // Búsqueda por descripción
+        {
+          description: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+      ];
+
+      // Búsqueda por precio (convertir string a número si es posible)
+      const numericSearch = parseFloat(search);
+      if (!isNaN(numericSearch)) {
+        orConditions.push({
+          price: numericSearch,
+        } as any);
+      }
+
+      filterOptions.OR = orConditions;
+    }
+
+    // Construir opciones de ordenamiento
+    const sortOptions: any = {};
+    if (sortBy) {
+      sortOptions.field = sortBy;
+      sortOptions.order = sortOrder || 'desc';
+    }
+
+    return this.roomTypeService.findAllPaginated(
+      user,
+      { page: pageNumber, pageSize: pageSizeNumber },
+      filterOptions,
+      sortOptions,
+    );
   }
 
   @Get('summary/active')

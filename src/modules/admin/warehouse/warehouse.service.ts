@@ -13,6 +13,10 @@ import { SummaryWarehouseData, WarehouseData } from 'src/interfaces';
 import { handleException } from 'src/utils';
 import { PaginationService } from 'src/pagination/pagination.service';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
+import {
+  FilterOptions,
+  SortOptions,
+} from 'src/prisma/src/interfaces/base.repository.interfaces';
 import { WarehouseType } from '@prisma/client';
 import { StockData } from 'src/interfaces/warehouse.interface';
 import { WarehouseExcelReport } from './warehouse.excel.report';
@@ -127,22 +131,59 @@ export class WarehouseService {
   }
 
   /**
-   * Obtiene todos los almacenes de forma paginada
-   * @param options Opciones de paginación (página y tamaño de página)
+   * Obtiene todos los almacenes de forma paginada con filtros avanzados
+   * @param pagination Opciones de paginación
+   * @param filterOptions Filtros avanzados
+   * @param sortOptions Opciones de ordenamiento
+   * @param user Usuario que realiza la consulta
    * @returns Lista paginada de almacenes con información resumida
    */
-  async findAllPaginated(options: {
-    page: number;
-    pageSize: number;
-  }): Promise<PaginatedResponse<SummaryWarehouseData>> {
+  async findAllPaginated(
+    pagination: { page: number; pageSize: number },
+    filterOptions?: FilterOptions<any>,
+    sortOptions?: SortOptions<any>,
+    user?: { isSuperAdmin: boolean },
+  ): Promise<PaginatedResponse<SummaryWarehouseData>> {
     try {
-      const { page, pageSize } = options;
+      const { page, pageSize } = pagination;
 
-      // Usamos el servicio de paginación con transformer personalizado
-      const paginatedResult = await this.paginationService.paginate<any, any>({
+      // Definir campos enum y fecha para el modelo Warehouse
+      const enumFields = ['type']; // WarehouseType enum
+      const dateFields = ['createdAt', 'updatedAt'];
+
+      // Construir filtros base según el usuario
+      const baseFilters: any = {};
+      if (!user?.isSuperAdmin) {
+        // Si no es super admin, excluir almacenes DEPOSIT
+        baseFilters.searchByField = {
+          ...baseFilters.searchByField,
+          type: { not: 'DEPOSIT' },
+        };
+      }
+
+      // Combinar filtros base con filtros avanzados
+      const combinedFilterOptions = {
+        ...baseFilters,
+        ...filterOptions,
+        // Combinar searchByField si existen ambos
+        searchByField: {
+          ...baseFilters.searchByField,
+          ...filterOptions?.searchByField,
+        },
+      };
+
+      // Usar el servicio de paginación avanzada
+      const paginatedResult = await this.paginationService.paginateAdvanced<
+        any,
+        any
+      >({
         model: 'warehouse',
         page,
         pageSize,
+        filterOptions: combinedFilterOptions,
+        sortOptions,
+        enumFields,
+        dateFields,
         select: {
           id: true,
           type: true,
@@ -157,7 +198,6 @@ export class WarehouseService {
         orderBy: {
           createdAt: 'asc',
         },
-        // Sin transformer custom aquí, lo haremos manualmente después
       });
 
       // Aplicamos la transformación manual para calcular totales
@@ -184,6 +224,12 @@ export class WarehouseService {
       };
     } catch (error) {
       this.logger.error('Error getting paginated warehouses', error.stack);
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
       handleException(error, 'Error getting paginated warehouses');
     }
   }

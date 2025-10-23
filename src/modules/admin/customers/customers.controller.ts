@@ -161,7 +161,7 @@ export class CustomersController {
   }
 
   @Get('paginated')
-  @ApiOperation({ summary: 'Get paginated customers' })
+  @ApiOperation({ summary: 'Get paginated customers with advanced search' })
   @ApiQuery({
     name: 'page',
     description: 'Page number',
@@ -176,19 +176,168 @@ export class CustomersController {
     example: 10,
     required: false,
   })
+  @ApiQuery({
+    name: 'search',
+    description:
+      'Search term to filter customers by name, email, phone, address, birthPlace, country, department, province, occupation, documentNumber, companyName, ruc, companyAddress',
+    type: String,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'isActive',
+    description:
+      'Filter by active status (true/false). Can pass multiple values comma-separated',
+    type: String,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'documentType',
+    description:
+      'Filter by document type (DNI, PASSPORT, FOREIGNER_CARD). Can pass multiple values comma-separated',
+    type: String,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'maritalStatus',
+    description:
+      'Filter by marital status (SINGLE, MARRIED, DIVORCED, WIDOWED). Can pass multiple values comma-separated',
+    type: String,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'isBlacklist',
+    description:
+      'Filter by blacklist status (true/false). Can pass multiple values comma-separated',
+    type: String,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    description: 'Field to sort by (name, createdAt, documentNumber, etc.)',
+    type: String,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    description: 'Sort order (asc or desc)',
+    type: String,
+    required: false,
+  })
   @ApiOkResponse({ description: 'Customers found paginated successfully' })
   findAllPaginated(
     @GetUser() user: UserPayload,
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
+    @Query('search') search?: string,
+    @Query('isActive') isActive?: string,
+    @Query('documentType') documentType?: string,
+    @Query('maritalStatus') maritalStatus?: string,
+    @Query('isBlacklist') isBlacklist?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
   ): Promise<PaginatedResponse<CustomerData>> {
     const pageNumber = parseInt(page, 10) || 1;
     const pageSizeNumber = parseInt(pageSize, 10) || 10;
 
-    return this.customersService.findAllPaginated(user, {
-      page: pageNumber,
-      pageSize: pageSizeNumber,
-    });
+    // Parse array parameters
+    const parseArrayParam = (param?: string) => {
+      if (!param) return undefined;
+      return param.split(',').map((item) => {
+        const trimmed = item.trim();
+        // Convert boolean strings
+        if (trimmed === 'true') return true;
+        if (trimmed === 'false') return false;
+        return trimmed;
+      });
+    };
+
+    // Build filter options
+    const filterOptions: any = {};
+
+    // Search functionality - ROBUST AND COMPLETE
+    if (search) {
+      // 1. Campos directos del cliente
+      filterOptions.searchByField = {
+        name: search,
+        email: search,
+        phone: search,
+        address: search,
+        birthPlace: search,
+        country: search,
+        department: search,
+        province: search,
+        occupation: search,
+        documentNumber: search,
+        companyName: search,
+        ruc: search,
+        companyAddress: search,
+      };
+    }
+
+    // Boolean array filters
+    if (isActive) {
+      const isActiveArray = parseArrayParam(isActive);
+      if (isActiveArray && isActiveArray.length === 1) {
+        filterOptions.searchByField = {
+          ...filterOptions.searchByField,
+          isActive: isActiveArray[0],
+        };
+      } else if (isActiveArray && isActiveArray.length > 1) {
+        filterOptions.arrayByField = {
+          ...filterOptions.arrayByField,
+          isActive: isActiveArray,
+        };
+      }
+    }
+
+    // Enum array filters
+    if (documentType) {
+      filterOptions.arrayByField = {
+        ...filterOptions.arrayByField,
+        documentType: parseArrayParam(documentType),
+      };
+    }
+
+    if (maritalStatus) {
+      filterOptions.arrayByField = {
+        ...filterOptions.arrayByField,
+        maritalStatus: parseArrayParam(maritalStatus),
+      };
+    }
+
+    // Boolean array filters - isBlacklist
+    if (isBlacklist) {
+      const isBlacklistArray = parseArrayParam(isBlacklist);
+      if (isBlacklistArray && isBlacklistArray.length === 1) {
+        filterOptions.searchByField = {
+          ...filterOptions.searchByField,
+          isBlacklist: isBlacklistArray[0],
+        };
+      } else if (isBlacklistArray && isBlacklistArray.length > 1) {
+        filterOptions.arrayByField = {
+          ...filterOptions.arrayByField,
+          isBlacklist: isBlacklistArray,
+        };
+      }
+    }
+
+    // Sort options
+    const sortOptions = sortBy
+      ? {
+          field: sortBy as keyof any,
+          order: (sortOrder as 'asc' | 'desc') || 'asc',
+        }
+      : undefined;
+
+    return this.customersService.findAllPaginated(
+      user,
+      {
+        page: pageNumber,
+        pageSize: pageSizeNumber,
+      },
+      filterOptions,
+      sortOptions,
+    );
   }
 
   @Get('searchByDocNumber')

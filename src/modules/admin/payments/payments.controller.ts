@@ -77,7 +77,11 @@ export class PaymentsController {
     return this.paymentsService.findAll();
   }
 
-  @ApiOperation({ summary: 'Get paginated payments' })
+  @ApiOperation({
+    summary: 'Get paginated payments with advanced filters',
+    description:
+      'Get payments with advanced filtering by status, reservation ID, and flexible search in customer, payment, room, room type, and product data (OR search)',
+  })
   @ApiQuery({
     name: 'page',
     description: 'Page number',
@@ -92,20 +96,228 @@ export class PaymentsController {
     example: 10,
     required: false,
   })
+  @ApiQuery({
+    name: 'search',
+    description:
+      'Search term for customer name, email, phone, document, department, province, country, payment code, observations, room number, room type (suite), or products (flexible OR search)',
+    type: String,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'status',
+    description: 'Filter by payment status (array)',
+    type: String,
+    example: 'PENDING,PAID',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'reservationId',
+    description: 'Filter by specific reservation ID',
+    type: String,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    description: 'Field to sort by',
+    type: String,
+    example: 'date',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    description: 'Sort order',
+    type: String,
+    enum: ['asc', 'desc'],
+    example: 'desc',
+    required: false,
+  })
   @ApiOkResponse({ description: 'Payments paginated retrieved successfully' })
   @Get('paginated/all')
   findAllPaginated(
     @GetUser() user: UserData,
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('reservationId') reservationId?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ): Promise<PaginatedResponse<SummaryPaymentData>> {
     const pageNumber = parseInt(page, 10) || 1;
     const pageSizeNumber = parseInt(pageSize, 10) || 10;
 
-    return this.paymentsService.findAllPaginated({
-      page: pageNumber,
-      pageSize: pageSizeNumber,
-    });
+    // Construir filtros
+    const filterOptions: any = {};
+
+    // Filtro por ID de reserva específica
+    if (reservationId) {
+      filterOptions.searchByField = {
+        ...filterOptions.searchByField,
+        reservationId: reservationId,
+      };
+    }
+
+    // Filtro por estado (array)
+    if (status) {
+      const statusArray = status.split(',').map((s) => s.trim());
+      filterOptions.arrayByField = {
+        ...filterOptions.arrayByField,
+        status: statusArray,
+      };
+    }
+
+    // Búsqueda potente en múltiples campos
+    if (search) {
+      // Usar OR a nivel superior para manejar búsquedas en múltiples campos
+      filterOptions.OR = [
+        // Campos directos del pago
+        {
+          code: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          observations: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        // Campos de la reserva (fechas no soportan contains, se omiten)
+        // Búsqueda por número de habitación (solo si es un número válido)
+        ...(parseInt(search) && !isNaN(parseInt(search))
+          ? [
+              {
+                reservation: {
+                  room: {
+                    number: parseInt(search),
+                  },
+                },
+              },
+            ]
+          : []),
+        // Búsqueda por tipo de habitación
+        {
+          reservation: {
+            room: {
+              RoomTypes: {
+                name: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+            },
+          },
+        },
+        // Búsqueda por productos en payment details
+        {
+          paymentDetail: {
+            some: {
+              product: {
+                OR: [
+                  {
+                    name: {
+                      contains: search,
+                      mode: 'insensitive',
+                    },
+                  },
+                  {
+                    code: {
+                      contains: search,
+                      mode: 'insensitive',
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+        // Campos del cliente
+        {
+          reservation: {
+            customer: {
+              name: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+        {
+          reservation: {
+            customer: {
+              email: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+        {
+          reservation: {
+            customer: {
+              phone: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+        {
+          reservation: {
+            customer: {
+              documentNumber: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+        {
+          reservation: {
+            customer: {
+              department: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+        {
+          reservation: {
+            customer: {
+              province: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+        {
+          reservation: {
+            customer: {
+              country: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+      ];
+    }
+
+    // Construir opciones de ordenamiento
+    const sortOptions: any = {};
+    if (sortBy) {
+      sortOptions.field = sortBy;
+      sortOptions.order = sortOrder || 'desc';
+    }
+
+    return this.paymentsService.findAllPaginated(
+      { page: pageNumber, pageSize: pageSizeNumber },
+      filterOptions,
+      sortOptions,
+    );
   }
 
   @ApiOperation({ summary: 'Get payment by ID' })

@@ -256,6 +256,51 @@ export class ReservationController {
     type: String,
     required: false,
   })
+  @ApiQuery({
+    name: 'search',
+    description:
+      'Search term to filter reservations by customer fields (name, email, phone, address, birthPlace, country, department, province, occupation, documentNumber, companyName, ruc, companyAddress, blacklistReason), room fields (number, room type name), and user fields (receptionist name, email)',
+    type: String,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'isActive',
+    description:
+      'Filter by active status (true/false). Can pass multiple values comma-separated',
+    type: String,
+    required: false,
+    example: 'true,false',
+  })
+  @ApiQuery({
+    name: 'isPendingDeletePayment',
+    description:
+      'Filter by pending delete payment status (true/false). Can pass multiple values comma-separated',
+    type: String,
+    required: false,
+    example: 'true,false',
+  })
+  @ApiQuery({
+    name: 'status',
+    description:
+      'Filter by reservation status. Can pass multiple values comma-separated',
+    type: String,
+    required: false,
+    example: 'CONFIRMED,CHECKED_IN',
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    description: 'Field to sort by',
+    type: String,
+    required: false,
+    example: 'createdAt',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    description: 'Sort order (asc/desc)',
+    type: String,
+    required: false,
+    example: 'desc',
+  })
   @ApiOkResponse({
     schema: {
       title: 'DetailedReservationPaginatedResponse',
@@ -277,21 +322,143 @@ export class ReservationController {
     @Query('customerId') customerId?: string,
     @Query('checkInDate') checkInDate?: string,
     @Query('checkOutDate') checkOutDate?: string,
+    @Query('search') search?: string,
+    @Query('isActive') isActive?: string,
+    @Query('isPendingDeletePayment') isPendingDeletePayment?: string,
+    @Query('status') status?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
   ): Promise<PaginatedResponse<DetailedReservation>> {
     const pageNumber = parseInt(page, 10) ?? 1;
     const pageSizeNumber = parseInt(pageSize, 10) ?? 10;
-    // TODO: Update service to use pagination parameters
+
+    // Parse array parameters
+    const parseArrayParam = (param?: string) => {
+      if (!param) return undefined;
+      return param.split(',').map((item) => {
+        const trimmed = item.trim();
+        if (trimmed === 'true') return true;
+        if (trimmed === 'false') return false;
+        return trimmed;
+      });
+    };
+
+    // Build filter options
+    const filterOptions: any = {};
+
+    // Search functionality - ROBUST AND COMPLETE
+    if (search) {
+      // 1. Campos directos de la reserva
+      filterOptions.searchByField = {
+        origin: search,
+        reason: search,
+      };
+
+      // 2. Campos relacionales - Customer
+      filterOptions.searchByFieldsRelational = [
+        {
+          customer: {
+            // Campos principales del cliente
+            name: search,
+            department: search,
+            province: search,
+            country: search,
+            email: search,
+            phone: search,
+            documentNumber: search,
+            companyName: search,
+            address: search,
+            birthPlace: search,
+            occupation: search,
+            companyAddress: search,
+            ruc: search,
+            blacklistReason: search,
+          },
+        },
+        // 3. Campos relacionales - Room y RoomTypes
+        {
+          room: {
+            // Número de habitación (si es numérico)
+            ...(isNaN(Number(search)) ? {} : { number: Number(search) }),
+            // Tipo de habitación
+            RoomTypes: { name: search },
+          },
+        },
+        // 4. Campos relacionales - User (recepcionista)
+        {
+          user: {
+            name: search,
+            email: search,
+          },
+        },
+      ];
+    }
+
+    // Boolean array filters
+    if (isActive) {
+      const isActiveArray = parseArrayParam(isActive);
+      if (isActiveArray && isActiveArray.length === 1) {
+        // Si es un solo valor, usar equals en lugar de in
+        filterOptions.searchByField = {
+          ...filterOptions.searchByField,
+          isActive: isActiveArray[0],
+        };
+      } else if (isActiveArray && isActiveArray.length > 1) {
+        // Si son múltiples valores, usar in
+        filterOptions.arrayByField = {
+          ...filterOptions.arrayByField,
+          isActive: isActiveArray,
+        };
+      }
+    }
+
+    if (isPendingDeletePayment) {
+      const isPendingArray = parseArrayParam(isPendingDeletePayment);
+      if (isPendingArray && isPendingArray.length === 1) {
+        // Si es un solo valor, usar equals en lugar de in
+        filterOptions.searchByField = {
+          ...filterOptions.searchByField,
+          isPendingDeletePayment: isPendingArray[0],
+        };
+      } else if (isPendingArray && isPendingArray.length > 1) {
+        // Si son múltiples valores, usar in
+        filterOptions.arrayByField = {
+          ...filterOptions.arrayByField,
+          isPendingDeletePayment: isPendingArray,
+        };
+      }
+    }
+
+    if (status) {
+      filterOptions.arrayByField = {
+        ...filterOptions.arrayByField,
+        status: parseArrayParam(status),
+      };
+    }
+
+    // Sort options
+    const sortOptions = sortBy
+      ? {
+          field: sortBy as keyof Reservation,
+          order: (sortOrder as 'asc' | 'desc') || 'desc',
+        }
+      : undefined;
+
     return this.reservationService.findManyPaginated(
       user,
       {
         page: pageNumber,
         pageSize: pageSizeNumber,
       },
+      // Legacy params for backward compatibility
       {
         customerId,
         checkInDate,
         checkOutDate,
       },
+      // New advanced filter options
+      filterOptions,
+      sortOptions,
     );
   }
 

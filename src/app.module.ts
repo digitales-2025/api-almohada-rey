@@ -27,6 +27,7 @@ import { ReservationModule as LandingReservationModule } from './modules/landing
 import { ExpenseModule } from './modules/admin/expense/expense.module';
 import { WarehouseModule } from './modules/admin/warehouse/warehouse.module';
 import { ReportsModule } from './modules/admin/reports/reports.module';
+import { ImportModule } from './modules/admin/import/import.module';
 /* import { PaymentModule } from './modules/landing/payment/payment.module'; */
 import { BetterAuthMiddleware } from './modules/admin/auth/better-auth.middleware';
 
@@ -53,6 +54,7 @@ import { BetterAuthMiddleware } from './modules/admin/auth/better-auth.middlewar
     ExpenseModule,
     WarehouseModule,
     ReportsModule,
+    ImportModule,
     /*     PaymentModule, */
   ],
   controllers: [AppController],

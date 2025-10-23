@@ -49,16 +49,16 @@ export class AuthService {
       });
 
       if (!userDB) {
-        throw new NotFoundException('User not registered');
+        throw new NotFoundException('Usuario no registrado');
       }
 
       if (!userDB.isActive) {
-        throw new NotFoundException('User account is inactive');
+        throw new NotFoundException('Cuenta de usuario inactiva');
       }
 
       // Verificar que el usuario no necesita cambiar contraseña
       if (userDB.mustChangePassword) {
-        throw new ForbiddenException('You must change your password');
+        throw new ForbiddenException('Debe cambiar su contraseña');
       }
 
       // Usar Better Auth nativo para autenticar y setear cookies

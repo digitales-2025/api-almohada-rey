@@ -20,7 +20,6 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { TypeMovements } from '@prisma/client';
 import {
   HttpResponse,
   MovementsData,
@@ -74,12 +73,10 @@ export class MovementsController {
   }
 
   @Get('type/paginated')
-  @ApiOperation({ summary: 'Get paginated movements by type' })
-  @ApiQuery({
-    name: 'type',
-    required: true,
-    enum: TypeMovements,
-    description: 'Type of movement (INPUT or OUTPUT)',
+  @ApiOperation({
+    summary: 'Get paginated movements with advanced filters',
+    description:
+      'Get movements with advanced filtering by warehouse type, search in movements details and products',
   })
   @ApiQuery({
     name: 'page',
@@ -95,10 +92,40 @@ export class MovementsController {
     example: 10,
     required: false,
   })
+  @ApiQuery({
+    name: 'search',
+    description: 'Search term for movements details and products',
+    type: String,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'warehouseType',
+    description: 'Filter by warehouse type',
+    enum: ['COMMERCIAL', 'INTERNAL_USE', 'DEPOSIT'],
+    required: false,
+  })
+  @ApiQuery({
+    name: 'type',
+    description: 'Filter by movement type',
+    enum: ['INPUT', 'OUTPUT'],
+    required: false,
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    description: 'Field to sort by',
+    type: String,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    description: 'Sort order',
+    enum: ['asc', 'desc'],
+    required: false,
+  })
   @ApiOkResponse({
-    description: 'Paginated list of movements by type',
+    description: 'Paginated list of movements with filters applied',
     schema: {
-      title: 'MovementsByTypePaginatedResponse',
+      title: 'MovementsPaginatedResponse',
       type: 'object',
       properties: {
         data: {
@@ -115,7 +142,10 @@ export class MovementsController {
                 type: 'object',
                 properties: {
                   id: { type: 'string' },
-                  type: { type: 'string', enum: ['CENTRAL', 'LOCAL'] },
+                  type: {
+                    type: 'string',
+                    enum: ['COMMERCIAL', 'INTERNAL_USE', 'DEPOSIT'],
+                  },
                 },
               },
               typePurchaseOrder: { type: 'string', nullable: true },
@@ -137,18 +167,72 @@ export class MovementsController {
       },
     },
   })
-  findByTypePaginated(
-    @Query('type') type: TypeMovements,
+  findAllPaginated(
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
+    @Query('search') search?: string,
+    @Query('warehouseType') warehouseType?: string,
+    @Query('type') type?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ): Promise<PaginatedResponse<SummaryMovementsData>> {
     const pageNumber = parseInt(page, 10) || 1;
     const pageSizeNumber = parseInt(pageSize, 10) || 10;
 
-    return this.movementsService.findByType(type, {
-      page: pageNumber,
-      pageSize: pageSizeNumber,
-    });
+    // Construir filtros
+    const filterOptions: any = {};
+
+    // Filtro por tipo de almacén
+    if (warehouseType) {
+      filterOptions.searchByFieldsRelational = [
+        {
+          warehouse: {
+            type: warehouseType,
+          },
+        },
+      ];
+    }
+
+    // Filtro por tipo de movimiento
+    if (type) {
+      filterOptions.searchByField = {
+        ...filterOptions.searchByField,
+        type: type,
+      };
+    }
+
+    // Búsqueda en relaciones (movementsDetail y product)
+    if (search) {
+      const searchConditions = [
+        {
+          movementsDetail: {
+            product: {
+              name: search,
+              code: search,
+            },
+          },
+        },
+      ];
+
+      if (filterOptions.searchByFieldsRelational) {
+        filterOptions.searchByFieldsRelational.push(...searchConditions);
+      } else {
+        filterOptions.searchByFieldsRelational = searchConditions;
+      }
+    }
+
+    // Construir opciones de ordenamiento
+    const sortOptions: any = {};
+    if (sortBy) {
+      sortOptions.field = sortBy;
+      sortOptions.order = sortOrder || 'desc';
+    }
+
+    return this.movementsService.findAllPaginated(
+      { page: pageNumber, pageSize: pageSizeNumber },
+      filterOptions,
+      sortOptions,
+    );
   }
 
   @ApiOperation({

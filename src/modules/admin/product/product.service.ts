@@ -24,6 +24,10 @@ import {
 import { DeleteProductDto } from './dto/delete-product.dto';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 import { PaginationService } from 'src/pagination/pagination.service';
+import {
+  FilterOptions,
+  SortOptions,
+} from 'src/prisma/src/interfaces/base.repository.interfaces';
 
 @Injectable()
 export class ProductService {
@@ -191,32 +195,52 @@ export class ProductService {
   }
 
   /**
-   * Obtiene todos los productos de forma paginada con filtro opcional por tipo.
+   * Obtiene todos los productos de forma paginada con filtros avanzados.
    * @param user Usuario que realiza la consulta
-   * @param options Opciones de paginación y filtrado
+   * @param pagination Opciones de paginación
+   * @param filterOptions Filtros avanzados
+   * @param sortOptions Opciones de ordenamiento
    * @returns Lista paginada de productos
    */
   async findAllPaginated(
     user: UserPayload,
-    options: {
-      page: number;
-      pageSize: number;
-      type?: ProductType; // Filtro opcional por tipo
-    },
+    pagination: { page: number; pageSize: number },
+    filterOptions?: FilterOptions<any>,
+    sortOptions?: SortOptions<any>,
   ): Promise<PaginatedResponse<ProductData>> {
     try {
-      const { page, pageSize, type } = options;
+      const { page, pageSize } = pagination;
 
-      return await this.paginationService.paginate<any, ProductData>({
+      // Definir campos enum y fecha para el modelo Product
+      const enumFields = ['type']; // ProductType enum
+      const dateFields = ['createdAt', 'updatedAt'];
+
+      // Construir filtros base según el usuario
+      const baseFilters: any = {};
+      if (!user.isSuperAdmin) {
+        baseFilters.searchByField = { isActive: true };
+      }
+
+      // Combinar filtros base con filtros avanzados
+      const combinedFilterOptions = {
+        ...baseFilters,
+        ...filterOptions,
+        // Combinar searchByField si existen ambos
+        searchByField: {
+          ...baseFilters.searchByField,
+          ...filterOptions?.searchByField,
+        },
+      };
+
+      // Usar el servicio de paginación avanzada
+      return await this.paginationService.paginateAdvanced<any, ProductData>({
         model: 'product',
         page,
         pageSize,
-        where: {
-          // Filtrar por isActive solo si no es super admin
-          ...(user.isSuperAdmin ? {} : { isActive: true }),
-          // Filtrar por tipo si se proporciona
-          ...(type ? { type } : {}),
-        },
+        filterOptions: combinedFilterOptions,
+        sortOptions,
+        enumFields,
+        dateFields,
         select: {
           id: true,
           code: true,
@@ -239,6 +263,12 @@ export class ProductService {
       });
     } catch (error) {
       this.logger.error('Error getting paginated products', error.stack);
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
       handleException(error, 'Error getting paginated products');
     }
   }
