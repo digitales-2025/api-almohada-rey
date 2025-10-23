@@ -88,7 +88,7 @@ export class RoomTypeController {
   @ApiOperation({
     summary: 'Obtener tipos de habitaciones paginados con filtros avanzados',
     description:
-      'Devuelve una lista paginada de tipos de habitaciones con filtros por estado activo y búsqueda en campos del tipo de habitación',
+      'Devuelve una lista paginada de tipos de habitaciones con filtros por estado activo y búsqueda flexible en nombre, descripción y precio (OR)',
   })
   @ApiQuery({
     name: 'page',
@@ -107,7 +107,7 @@ export class RoomTypeController {
   @ApiQuery({
     name: 'search',
     description:
-      'Término de búsqueda en nombre y descripción del tipo de habitación',
+      'Término de búsqueda en nombre, descripción y precio del tipo de habitación (búsqueda flexible con OR)',
     type: String,
     required: false,
   })
@@ -207,11 +207,33 @@ export class RoomTypeController {
 
     // Búsqueda simple en campos del tipo de habitación
     if (search) {
-      filterOptions.searchByField = {
-        ...filterOptions.searchByField,
-        name: search,
-        description: search,
-      };
+      // Usar OR a nivel superior para buscar en múltiples campos
+      const orConditions = [
+        // Búsqueda por nombre
+        {
+          name: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        // Búsqueda por descripción
+        {
+          description: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+      ];
+
+      // Búsqueda por precio (convertir string a número si es posible)
+      const numericSearch = parseFloat(search);
+      if (!isNaN(numericSearch)) {
+        orConditions.push({
+          price: numericSearch,
+        } as any);
+      }
+
+      filterOptions.OR = orConditions;
     }
 
     // Construir opciones de ordenamiento

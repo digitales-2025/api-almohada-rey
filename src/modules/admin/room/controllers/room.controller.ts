@@ -88,7 +88,7 @@ export class RoomController {
   @ApiOperation({
     summary: 'Obtener habitaciones paginadas con filtros avanzados',
     description:
-      'Devuelve una lista paginada de habitaciones con filtros por estado, tipo de piso, estado activo y búsqueda en habitación y tipo de habitación',
+      'Devuelve una lista paginada de habitaciones con filtros por estado, tipo de piso, estado activo y búsqueda en número, área y tipo de habitación',
   })
   @ApiQuery({
     name: 'page',
@@ -107,7 +107,7 @@ export class RoomController {
   @ApiQuery({
     name: 'search',
     description:
-      'Término de búsqueda en número de habitación y nombre del tipo de habitación',
+      'Término de búsqueda en número de habitación, área y nombre del tipo de habitación',
     type: String,
     required: false,
   })
@@ -253,20 +253,24 @@ export class RoomController {
       };
     }
 
-    // Búsqueda relacional en habitación y tipo de habitación
+    // Búsqueda en habitación y tipo de habitación
     if (search) {
-      const searchConditions = [
-        {
-          number: search, // Búsqueda por número de habitación
-        },
+      // Usar OR a nivel superior para manejar búsquedas en múltiples campos
+      filterOptions.OR = [
+        // Búsqueda por número de habitación (convertir string a número si es posible)
+        ...(parseInt(search) ? [{ number: parseInt(search) }] : []),
+        // Búsqueda por área (convertir string a float si es posible)
+        ...(parseFloat(search) ? [{ area: parseFloat(search) }] : []),
+        // Búsqueda por nombre del tipo de habitación (relacional)
         {
           RoomTypes: {
-            name: search, // Búsqueda por nombre del tipo de habitación
+            name: {
+              contains: search,
+              mode: 'insensitive',
+            },
           },
         },
       ];
-
-      filterOptions.searchByFieldsRelational = searchConditions;
     }
 
     // Construir opciones de ordenamiento

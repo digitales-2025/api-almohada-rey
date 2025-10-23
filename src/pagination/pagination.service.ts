@@ -179,7 +179,7 @@ export class PaginationService {
     const {
       searchByField,
       searchByFieldsRelational,
-      OR,
+      OR: controllerOR,
       fieldNumber,
       fieldNumbers,
       fieldDate,
@@ -266,10 +266,10 @@ export class PaginationService {
       fieldDates.forEach((fd) => this.applyFieldDateCondition(whereClause, fd));
 
     // Filtros OR flexibles
-    if (OR) {
+    if (controllerOR) {
       const orConditions: Record<string, any>[] = [];
-      if (OR.searchByField) {
-        Object.entries(OR.searchByField).forEach(([key, value]) => {
+      if (controllerOR.searchByField) {
+        Object.entries(controllerOR.searchByField).forEach(([key, value]) => {
           const condition: Record<string, any> = {};
           condition[key] =
             typeof value === 'string'
@@ -278,8 +278,8 @@ export class PaginationService {
           orConditions.push(condition);
         });
       }
-      if (OR.searchByFieldsRelational) {
-        OR.searchByFieldsRelational.forEach((relation) => {
+      if (controllerOR.searchByFieldsRelational) {
+        controllerOR.searchByFieldsRelational.forEach((relation) => {
           Object.entries(relation).forEach(([relationName, fields]) => {
             const condition: Record<string, any> = {};
             condition[relationName] = this.buildRecursiveConditions(
@@ -354,6 +354,19 @@ export class PaginationService {
     Object.entries(rest).forEach(([key, value]) => {
       if (value !== undefined) whereClause[key] = value;
     });
+
+    // Si hay un OR del controlador, usarlo como condición principal
+    if (controllerOR && Array.isArray(controllerOR)) {
+      if (Object.keys(whereClause).length > 0) {
+        // Combinar con filtros existentes usando AND
+        return {
+          AND: [whereClause, { OR: controllerOR }],
+        };
+      } else {
+        // Solo usar el OR del controlador
+        return { OR: controllerOR };
+      }
+    }
 
     return whereClause;
   }

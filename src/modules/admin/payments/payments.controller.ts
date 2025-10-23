@@ -80,7 +80,7 @@ export class PaymentsController {
   @ApiOperation({
     summary: 'Get paginated payments with advanced filters',
     description:
-      'Get payments with advanced filtering by status, reservation ID, and search in customer and payment data',
+      'Get payments with advanced filtering by status, reservation ID, and flexible search in customer, payment, room, room type, and product data (OR search)',
   })
   @ApiQuery({
     name: 'page',
@@ -99,7 +99,7 @@ export class PaymentsController {
   @ApiQuery({
     name: 'search',
     description:
-      'Search term for customer name, email, phone, document, department, province, country, payment code, or observations',
+      'Search term for customer name, email, phone, document, department, province, country, payment code, observations, room number, room type (suite), or products (flexible OR search)',
     type: String,
     required: false,
   })
@@ -168,36 +168,142 @@ export class PaymentsController {
 
     // Búsqueda potente en múltiples campos
     if (search) {
-      const searchConditions = [
+      // Usar OR a nivel superior para manejar búsquedas en múltiples campos
+      filterOptions.OR = [
         // Campos directos del pago
         {
-          code: search,
-          observations: search,
+          code: {
+            contains: search,
+            mode: 'insensitive',
+          },
         },
-        // Campos de la reserva
+        {
+          observations: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        // Campos de la reserva (fechas no soportan contains, se omiten)
+        // Búsqueda por número de habitación (solo si es un número válido)
+        ...(parseInt(search) && !isNaN(parseInt(search))
+          ? [
+              {
+                reservation: {
+                  room: {
+                    number: parseInt(search),
+                  },
+                },
+              },
+            ]
+          : []),
+        // Búsqueda por tipo de habitación
         {
           reservation: {
-            checkInDate: search,
-            checkOutDate: search,
+            room: {
+              RoomTypes: {
+                name: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+            },
+          },
+        },
+        // Búsqueda por productos en payment details
+        {
+          paymentDetail: {
+            some: {
+              product: {
+                OR: [
+                  {
+                    name: {
+                      contains: search,
+                      mode: 'insensitive',
+                    },
+                  },
+                  {
+                    code: {
+                      contains: search,
+                      mode: 'insensitive',
+                    },
+                  },
+                ],
+              },
+            },
           },
         },
         // Campos del cliente
         {
           reservation: {
             customer: {
-              name: search,
-              email: search,
-              phone: search,
-              documentNumber: search,
-              department: search,
-              province: search,
-              country: search,
+              name: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+        {
+          reservation: {
+            customer: {
+              email: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+        {
+          reservation: {
+            customer: {
+              phone: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+        {
+          reservation: {
+            customer: {
+              documentNumber: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+        {
+          reservation: {
+            customer: {
+              department: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+        {
+          reservation: {
+            customer: {
+              province: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+        {
+          reservation: {
+            customer: {
+              country: {
+                contains: search,
+                mode: 'insensitive',
+              },
             },
           },
         },
       ];
-
-      filterOptions.searchByFieldsRelational = searchConditions;
     }
 
     // Construir opciones de ordenamiento

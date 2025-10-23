@@ -66,7 +66,7 @@ export class ProductController {
   @ApiOperation({
     summary: 'Get paginated products with advanced filters',
     description:
-      'Get products with advanced filtering by type, isActive status, and search in product fields',
+      'Get products with advanced filtering by type, isActive status, and search in product fields (name, code, unit cost)',
   })
   @ApiQuery({
     name: 'page',
@@ -84,7 +84,7 @@ export class ProductController {
   })
   @ApiQuery({
     name: 'search',
-    description: 'Search term for product name, code, or description',
+    description: 'Search term for product name, code, or unit cost (price)',
     type: String,
     required: false,
   })
@@ -159,6 +159,15 @@ export class ProductController {
         name: search,
         code: search,
       };
+
+      // Búsqueda por precio (unitCost) - convertir string a número si es posible
+      const numericSearch = parseFloat(search);
+      if (!isNaN(numericSearch)) {
+        filterOptions.searchByField = {
+          ...filterOptions.searchByField,
+          unitCost: numericSearch,
+        };
+      }
     }
 
     // Construir opciones de ordenamiento

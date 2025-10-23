@@ -530,6 +530,10 @@ export class ImportService {
         observations: record['OBSERVACIONES'] || null,
         isActive: false, // ✅ CORRECCIÓN: CHECKED_OUT debe tener isActive: false
         createdByLandingPage: false,
+        createdAt:
+          checkInDate && !isNaN(checkInDate.getTime())
+            ? checkInDate
+            : new Date(), // Validar que checkInDate sea válido
       },
     });
 
@@ -579,6 +583,7 @@ export class ImportService {
     const paymentDateISO = NormalizationUtils.generateRandomDateInRange(
       checkInDateObj,
       checkOutDateObj,
+      'date', // Usar formato de fecha para compatibilidad con frontend
     );
 
     // Crear pago principal
@@ -590,6 +595,19 @@ export class ImportService {
         status: PaymentDetailStatus.PAID,
         date: paymentDateISO, // ✅ Ya es string ISO
         reservationId: reservation.id,
+        createdAt:
+          checkInDateObj &&
+          !isNaN(checkInDateObj.getTime()) &&
+          checkOutDateObj &&
+          !isNaN(checkOutDateObj.getTime())
+            ? new Date(
+                NormalizationUtils.generateRandomDateInRange(
+                  checkInDateObj,
+                  checkOutDateObj,
+                  'iso', // Usar ISO completo para createdAt
+                ),
+              )
+            : new Date(), // Validar que las fechas sean válidas
       },
     });
 
@@ -610,6 +628,19 @@ export class ImportService {
         unitPrice: roomPrice,
         subtotal: roomTotal,
         days: nights,
+        createdAt:
+          checkInDateObj &&
+          !isNaN(checkInDateObj.getTime()) &&
+          checkOutDateObj &&
+          !isNaN(checkOutDateObj.getTime())
+            ? new Date(
+                NormalizationUtils.generateRandomDateInRange(
+                  checkInDateObj,
+                  checkOutDateObj,
+                  'iso', // Usar ISO completo para createdAt
+                ),
+              )
+            : new Date(), // Validar que las fechas sean válidas
       },
     });
     paymentDetails.push(roomDetail);
@@ -648,6 +679,19 @@ export class ImportService {
           unitPrice: 0,
           subtotal: 0,
           typePaymentDetail: documentType,
+          createdAt:
+            checkInDateObj &&
+            !isNaN(checkInDateObj.getTime()) &&
+            checkOutDateObj &&
+            !isNaN(checkOutDateObj.getTime())
+              ? new Date(
+                  NormalizationUtils.generateRandomDateInRange(
+                    checkInDateObj,
+                    checkOutDateObj,
+                    'iso', // Usar ISO completo para createdAt
+                  ),
+                )
+              : new Date(), // Validar que las fechas sean válidas
         },
       });
       paymentDetails.push(documentDetail);
@@ -692,7 +736,8 @@ export class ImportService {
             paymentDate: NormalizationUtils.generateRandomDateInRange(
               checkIn,
               checkOut,
-            ), // ✅ Usar tu utilidad que ahora retorna ISO completo
+              'date', // Usar formato de fecha para compatibilidad con frontend
+            ),
             description: `Desayuno - ${breakfastsToAdd} día(s)`,
             type: 'EXTRA_SERVICE',
             method: paymentMethod,
@@ -701,6 +746,19 @@ export class ImportService {
             unitPrice: breakfastPrice,
             subtotal: breakfastPrice * breakfastsToAdd,
             quantity: breakfastsToAdd,
+            createdAt:
+              checkIn &&
+              !isNaN(checkIn.getTime()) &&
+              checkOut &&
+              !isNaN(checkOut.getTime())
+                ? new Date(
+                    NormalizationUtils.generateRandomDateInRange(
+                      checkIn,
+                      checkOut,
+                      'iso', // Usar ISO completo para createdAt
+                    ),
+                  )
+                : new Date(), // Validar que las fechas sean válidas
           },
         });
         paymentDetails.push(breakfastDetail);
@@ -762,7 +820,8 @@ export class ImportService {
             paymentDate: NormalizationUtils.generateRandomDateInRange(
               checkIn,
               checkOut,
-            ), // ✅ Usar tu utilidad que ahora retorna ISO completo
+              'date', // Usar formato de fecha para compatibilidad con frontend
+            ),
             description: `${product.name} - ${quantity} unidad(es)`,
             type: 'EXTRA_SERVICE',
             method: paymentMethod,
@@ -771,6 +830,19 @@ export class ImportService {
             unitPrice: product.unitCost,
             subtotal: subtotal,
             quantity: quantity,
+            createdAt:
+              checkIn &&
+              !isNaN(checkIn.getTime()) &&
+              checkOut &&
+              !isNaN(checkOut.getTime())
+                ? new Date(
+                    NormalizationUtils.generateRandomDateInRange(
+                      checkIn,
+                      checkOut,
+                      'iso', // Usar ISO completo para createdAt
+                    ),
+                  )
+                : new Date(), // Validar que las fechas sean válidas
           },
         });
 

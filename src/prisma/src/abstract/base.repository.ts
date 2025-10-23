@@ -1011,30 +1011,38 @@ export abstract class BaseRepository<T extends BaseEntity> {
     // Filtros OR flexibles
     if (OR) {
       const orConditions: Record<string, any>[] = [];
-      if (OR.searchByField) {
-        Object.entries(OR.searchByField).forEach(([key, value]) => {
-          const condition: Record<string, any> = {};
-          condition[key] =
-            typeof value === 'string'
-              ? this.buildFlexibleSearchCondition(value)
-              : value;
-          orConditions.push(condition);
-        });
-      }
-      if (OR.searchByFieldsRelational) {
-        OR.searchByFieldsRelational.forEach((relation) => {
-          Object.entries(relation).forEach(([relationName, fields]) => {
+
+      // Si OR es un array directo de condiciones (nuevo formato)
+      if (Array.isArray(OR)) {
+        orConditions.push(...OR);
+      } else {
+        // Formato legacy con searchByField y searchByFieldsRelational
+        if (OR.searchByField) {
+          Object.entries(OR.searchByField).forEach(([key, value]) => {
             const condition: Record<string, any> = {};
-            condition[relationName] = this.buildRecursiveConditions(
-              fields,
-              enumFields,
-              dateFields,
-              relationName,
-            );
+            condition[key] =
+              typeof value === 'string'
+                ? this.buildFlexibleSearchCondition(value)
+                : value;
             orConditions.push(condition);
           });
-        });
+        }
+        if (OR.searchByFieldsRelational) {
+          OR.searchByFieldsRelational.forEach((relation) => {
+            Object.entries(relation).forEach(([relationName, fields]) => {
+              const condition: Record<string, any> = {};
+              condition[relationName] = this.buildRecursiveConditions(
+                fields,
+                enumFields,
+                dateFields,
+                relationName,
+              );
+              orConditions.push(condition);
+            });
+          });
+        }
       }
+
       if (orConditions.length > 0) whereClause['OR'] = orConditions;
     }
 

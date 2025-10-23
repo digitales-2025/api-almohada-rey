@@ -145,13 +145,36 @@ export class WarehouseController {
 
     // Búsqueda en productos del stock
     if (search) {
-      filterOptions.searchByFieldsRelational = [
+      // Usar OR a nivel superior para manejar warehouses con y sin stock
+      filterOptions.OR = [
+        // Búsqueda en productos del stock (warehouses que tienen stock)
         {
           stock: {
-            product: {
-              name: search,
-              code: search,
+            some: {
+              product: {
+                OR: [
+                  {
+                    name: {
+                      contains: search,
+                      mode: 'insensitive',
+                    },
+                  },
+                  {
+                    code: {
+                      contains: search,
+                      mode: 'insensitive',
+                    },
+                  },
+                ],
+              },
             },
+          },
+        },
+        // Buscar por código del warehouse - usar contains para búsquedas flexibles
+        {
+          code: {
+            contains: search,
+            mode: 'insensitive',
           },
         },
       ];

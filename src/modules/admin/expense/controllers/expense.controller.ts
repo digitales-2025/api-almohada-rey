@@ -269,4 +269,48 @@ export class ExpenseController {
   ): Promise<BaseApiResponse<HotelExpenseEntity[]>> {
     return this.expenseService.deleteMany(deleteHotelExpenseDto, user);
   }
+
+  /**
+   * Genera gastos automáticos para un año específico
+   */
+  @Post('generate/:year')
+  @ApiOperation({
+    summary: 'Generar gastos automáticos para un año',
+    description:
+      'Genera gastos realistas basados en datos históricos para todos los meses del año especificado',
+  })
+  @ApiParam({
+    name: 'year',
+    description: 'Año para el cual generar los gastos (ejemplo: 2025)',
+    type: Number,
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Gastos generados exitosamente',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        message: { type: 'string' },
+        data: {
+          type: 'object',
+          properties: {
+            year: { type: 'number' },
+            totalExpenses: { type: 'number' },
+            totalAmount: { type: 'number' },
+          },
+        },
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'Año inválido',
+  })
+  generateExpenses(
+    @Param('year') year: string,
+    @GetUser() user: UserData,
+  ): Promise<BaseApiResponse<any>> {
+    const yearNumber = parseInt(year, 10);
+    return this.expenseService.generateExpensesForYear(yearNumber, user);
+  }
 }

@@ -226,11 +226,23 @@ export class NormalizationUtils {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   }
 
-  static generateRandomDateInRange(checkIn: Date, checkOut: Date): string {
+  static generateRandomDateInRange(
+    checkIn: Date,
+    checkOut: Date,
+    format: 'iso' | 'date' = 'iso',
+  ): string {
     const start = checkIn.getTime();
     const end = checkOut.getTime();
     const randomTime = start + Math.random() * (end - start);
-    return new Date(randomTime).toISOString(); // ✅ Retornar ISO completo con hora
+    const randomDate = new Date(randomTime);
+
+    if (format === 'date') {
+      // Retornar solo la fecha en formato yyyy-MM-dd para compatibilidad con el frontend
+      return randomDate.toISOString().split('T')[0];
+    } else {
+      // Retornar ISO completo con hora (comportamiento original)
+      return randomDate.toISOString();
+    }
   }
 
   /**
@@ -247,7 +259,7 @@ export class NormalizationUtils {
     const peruvianLocations: { [key: string]: string } = {
       // Departamentos
       amazonas: 'Amazonas',
-      ancash: 'Áncash',
+      ancash: 'Ancash',
       apurímac: 'Apurímac',
       apurimac: 'Apurímac',
       arequipa: 'Arequipa',
@@ -284,26 +296,26 @@ export class NormalizationUtils {
       'rodriguez de mendoza': 'Amazonas',
       utcubamba: 'Amazonas',
 
-      huaraz: 'Áncash',
-      aija: 'Áncash',
-      'antonio raymondi': 'Áncash',
-      asunción: 'Áncash',
-      bolognesi: 'Áncash',
-      carhuaz: 'Áncash',
-      'carlos f. fitzcarrald': 'Áncash',
-      casma: 'Áncash',
-      corongo: 'Áncash',
-      huari: 'Áncash',
-      huarmey: 'Áncash',
-      huaylas: 'Áncash',
-      'mariscal luzuriaga': 'Áncash',
-      ocros: 'Áncash',
-      pallasca: 'Áncash',
-      pomabamba: 'Áncash',
-      recuay: 'Áncash',
-      santa: 'Áncash',
-      sihuas: 'Áncash',
-      yungay: 'Áncash',
+      huaraz: 'Ancash',
+      aija: 'Ancash',
+      'antonio raymondi': 'Ancash',
+      asunción: 'Ancash',
+      bolognesi: 'Ancash',
+      carhuaz: 'Ancash',
+      'carlos f. fitzcarrald': 'Ancash',
+      casma: 'Ancash',
+      corongo: 'Ancash',
+      huari: 'Ancash',
+      huarmey: 'Ancash',
+      huaylas: 'Ancash',
+      'mariscal luzuriaga': 'Ancash',
+      ocros: 'Ancash',
+      pallasca: 'Ancash',
+      pomabamba: 'Ancash',
+      recuay: 'Ancash',
+      santa: 'Ancash',
+      sihuas: 'Ancash',
+      yungay: 'Ancash',
 
       abancay: 'Apurímac',
       andahuaylas: 'Apurímac',
@@ -436,85 +448,6 @@ export class NormalizationUtils {
       nasca: 'Ica',
       palpa: 'Ica',
       pisco: 'Ica',
-
-      // Nuevos mapeos de nacionalidades no normalizadas
-      juliaca: 'Puno',
-      mollendo: 'Arequipa',
-      pedregal: 'Arequipa', // Pertenece a Majes, Arequipa
-      arequia: 'Arequipa', // Variante de Arequipa
-      cuzco: 'Cusco', // Variante de Cusco
-      ananea: 'Puno',
-      'cabana san roman': 'Puno',
-      'san martin porres': 'Lima',
-      atico: 'Arequipa',
-      'puno-ayaviri': 'Puno',
-      'juliaca-puno': 'Puno',
-      'nazca - ica': 'Ica',
-      comas: 'Lima',
-      camama: 'Arequipa', // Error de tipeo de Camaná, Arequipa
-      cotahuasi: 'Arequipa', // Provincia de La Unión, Arequipa
-      'la joya': 'Arequipa', // Provincia de Arequipa
-      chuquibamba: 'Arequipa', // Provincia de Condesuyos, Arequipa
-      aequipa: 'Arequipa', // Error de tipeo de Arequipa
-
-      jukliaca: 'Puno', // Variante de Juliaca
-      ayaviri: 'Puno',
-      sicuani: 'Cusco',
-      espinar: 'Cusco',
-      surquillo: 'Lima',
-      chala: 'Arequipa',
-      'peru-lince': 'Lima',
-      'lim a': 'Lima',
-      llima: 'Lima',
-      arerquipa: 'Arequipa',
-      andahuylas: 'Apurímac',
-      omate: 'Moquegua',
-      majes: 'Arequipa',
-      aplao: 'Arequipa',
-      huancyo: 'Junín',
-      limatambo: 'Lima',
-      coñumbuque: 'San Martín',
-      moyobamaba: 'San Martín',
-      camaná: 'Arequipa',
-      ollachea: 'Puno',
-      quillabanba: 'Cusco',
-      chinbote: 'Áncash',
-      cocachacra: 'Arequipa',
-      'nasca 9': 'Ica',
-      aqp: 'Arequipa',
-      'lima-peru': 'Lima',
-      'peru/piura': 'Piura',
-      'peru/lima': 'Lima',
-      'peru/ ancash': 'Áncash',
-      'junin-peru': 'Junín',
-      'lima- callao': 'Callao',
-      'puno- san roman': 'Puno',
-      'moquegua-mariscal nieto': 'Moquegua',
-      'moquegua-masrical nieto': 'Moquegua',
-      chivay: 'Arequipa',
-      'urubamba- yucay': 'Cusco',
-      'tacna-peru': 'Tacna',
-      chaparra: 'Arequipa',
-      'san borja-lima': 'Lima',
-      'jesus maria-lima': 'Lima',
-      'jesus maria lima': 'Lima',
-      tacxna: 'Tacna',
-      julkiaca: 'Puno',
-      carabeli: 'Arequipa',
-      àrequipa: 'Arequipa',
-      pucalpa: 'Ucayali',
-      'lima- san miguel': 'Lima',
-      matarani: 'Arequipa',
-      arrequipa: 'Arequipa',
-      mejia: 'Arequipa',
-      chumbivilcas: 'Cusco',
-      'la union': 'Arequipa',
-      caravely: 'Arequipa',
-
-      // Casos con formato especial
-      'peru-anchash': 'Áncash',
-      'callao lima': 'Callao',
-      'callao-lima': 'Callao',
     };
 
     return peruvianLocations[normalized] || null;
@@ -725,21 +658,6 @@ export class NormalizationUtils {
       israelí: 'Israel',
       israeli: 'Israel',
       israel: 'Israel',
-      // Ciudades extranjeras
-      quito: 'Ecuador',
-      loja: 'Ecuador',
-      azogues: 'Ecuador',
-      'azogues - ecuador': 'Ecuador',
-      durango: 'México',
-      queretaro: 'México',
-      bolivia: 'Bolivia',
-      chile: 'Chile',
-      japan: 'Japón',
-      venezuela: 'Venezuela',
-      pilipinas: 'Filipinas',
-      pèru: 'Perú',
-      eslovakia: 'Eslovaquia',
-      ecuador: 'Ecuador',
     };
 
     // Si es un mapeo directo, retornarlo
@@ -750,7 +668,7 @@ export class NormalizationUtils {
     // Departamentos del Perú - todos mapean a Perú
     const peruvianDepartments = [
       'amazonas',
-      'áncash',
+      'ancash',
       'apurímac',
       'apurimac',
       'arequipa',
@@ -1029,7 +947,7 @@ export class NormalizationUtils {
       'luxemburgo',
       'madagascar',
       'malasia',
-      'malawi',
+      'malaui',
       'maldivas',
       'mali',
       'malta',
@@ -1113,11 +1031,6 @@ export class NormalizationUtils {
         .join(' ');
     }
 
-    // Casos especiales basados en tipo de documento
-    if (normalized === 'p' && documentType === 'DNI') {
-      return 'Perú';
-    }
-
     // Casos especiales - variaciones comunes
     const specialCases: { [key: string]: string } = {
       eeuu: 'Estados Unidos',
@@ -1158,24 +1071,6 @@ export class NormalizationUtils {
       'emiratos árabes unidos': 'Emiratos Árabes Unidos',
       sudafrica: 'Sudáfrica',
       sudáfrica: 'Sudáfrica',
-      // Ciudades capitales que mapean a sus países
-      bogota: 'Colombia',
-      bogotá: 'Colombia',
-      // Nuevos mapeos de nacionalidades no normalizadas
-      yangon: 'Myanmar',
-      barquisimeto: 'Venezuela',
-      thihtih: 'Polinesia Francesa', // Tahití
-      caba: 'Cuba', // Capital Federal Argentina o Cuba
-      'brasilia-brasil': 'Brasil',
-      'potosi bilivia': 'Bolivia',
-      'potosi bolivia': 'Bolivia',
-      'potosi-bilivia': 'Bolivia', // Variante con guión
-      ukrania: 'Ucrania',
-      ucrania: 'Ucrania',
-      // Casos con formato especial
-      'peru-anchash': 'Perú', // Se manejará en detectPeruvianDepartment
-      'callao lima': 'Perú', // Se manejará en detectPeruvianDepartment
-      // Otras variaciones comunes
       sudamerica: 'Otro',
       sudamericano: 'Otro',
       sudamericana: 'Otro',
