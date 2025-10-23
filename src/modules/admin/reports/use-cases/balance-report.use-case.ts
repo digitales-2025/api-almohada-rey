@@ -7,28 +7,13 @@ import { colors } from 'src/utils/colors/colors.utils';
 export class BalanceReportUseCase {
   async execute(
     data: BalanceData,
-    { month, year }: { month: number; year: number },
+    { startDate, endDate }: { startDate: string; endDate: string },
   ): Promise<ExcelJS.Workbook> {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Balance');
 
     // -- Título principal --
-    const monthNames = [
-      '',
-      'Enero',
-      'Febrero',
-      'Marzo',
-      'Abril',
-      'Mayo',
-      'Junio',
-      'Julio',
-      'Agosto',
-      'Septiembre',
-      'Octubre',
-      'Noviembre',
-      'Diciembre',
-    ];
-    const title = `Balance de Ganancias y Gastos - ${monthNames[month]} ${year}`;
+    const title = `Balance de Ganancias y Gastos - ${startDate} a ${endDate}`;
     sheet.mergeCells('A1:M1');
     const titleCell = sheet.getCell('A1');
     titleCell.value = title;
@@ -85,8 +70,8 @@ export class BalanceReportUseCase {
           pattern: 'solid',
           fgColor: { argb: `FF${colors.WARNING}` },
         };
-        sheet.mergeCells(`G${subtituloRow.number}:L${subtituloRow.number}`);
-      } else if (colNumber === 13) {
+        sheet.mergeCells(`G${subtituloRow.number}:M${subtituloRow.number}`);
+      } else if (colNumber === 14) {
         // BALANCE
         cell.font = {
           bold: true,
@@ -156,8 +141,10 @@ export class BalanceReportUseCase {
       }
     });
 
-    // -- Generar días del mes completo --
-    const diasEnMes = new Date(year, month, 0).getDate();
+    // -- Generar días del rango de fechas --
+    const start = new Date(startDate + 'T00:00:00');
+    const end = new Date(endDate + 'T00:00:00');
+    const current = new Date(start);
 
     // Crear mapas para búsqueda rápida de datos por fecha
     const profitMap: Record<string, any> = {};
@@ -184,8 +171,56 @@ export class BalanceReportUseCase {
     let totalGastOtro = 0;
     let totalGastos = 0;
 
-    for (let dia = 1; dia <= diasEnMes; dia++) {
-      const fechaStr = `${year}-${month.toString().padStart(2, '0')}-${dia.toString().padStart(2, '0')}`;
+    let currentMonth = null;
+    const monthNames = [
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre',
+    ];
+
+    while (current <= end) {
+      const fechaStr = current.toISOString().split('T')[0];
+
+      // Verificar si cambió el mes
+      const month = current.getMonth();
+      const year = current.getFullYear();
+
+      if (currentMonth !== month) {
+        // Si no es el primer mes, agregar totales del mes anterior
+        if (currentMonth !== null) {
+          this.addMonthTotals(sheet, monthNames[currentMonth]);
+        }
+
+        // Agregar separador de mes
+        const monthRow = sheet.addRow([]);
+        const monthCell = sheet.getCell(`A${monthRow.number}`);
+        monthCell.value = monthNames[month] + ' ' + year;
+        monthCell.font = {
+          bold: true,
+          size: 12,
+          color: { argb: colors.PRIMARY },
+        };
+        monthCell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF0F0F0' },
+        };
+        monthCell.alignment = { horizontal: 'center' };
+
+        // Mergear celdas para el separador de mes (balance tiene más columnas)
+        sheet.mergeCells(`A${monthRow.number}:N${monthRow.number}`);
+
+        currentMonth = month;
+      }
 
       // Obtener datos de ganancias para esta fecha (o valores por defecto)
       const profit = profitMap[fechaStr] || {
@@ -256,6 +291,14 @@ export class BalanceReportUseCase {
       totalGastFactura += expense.gastosFactura;
       totalGastOtro += expense.gastosOtro;
       totalGastos += expense.amount;
+
+      // Avanzar al siguiente día
+      current.setDate(current.getDate() + 1);
+    }
+
+    // Agregar totales del último mes
+    if (currentMonth !== null) {
+      this.addMonthTotals(sheet, monthNames[currentMonth]);
     }
 
     // -- Fila de totales --
@@ -313,7 +356,7 @@ export class BalanceReportUseCase {
     sheet.addRow([]);
 
     // -- Resumen de balance --
-    const resumenTitle = `RESUMEN DE BALANCE - ${monthNames[month]} ${year}`;
+    const resumenTitle = `RESUMEN DE BALANCE - ${startDate} a ${endDate}`;
     sheet.mergeCells(
       `A${sheet.lastRow.number + 1}:E${sheet.lastRow.number + 1}`,
     );
@@ -359,7 +402,7 @@ export class BalanceReportUseCase {
     // -- SECCIÓN DE BALANCE NETO --
     sheet.addRow([]);
     sheet.addRow([]);
-    const balanceNetoTitle = `BALANCE NETO FISCAL - ${monthNames[month]} ${year}`;
+    const balanceNetoTitle = `BALANCE NETO FISCAL - ${startDate} a ${endDate}`;
     sheet.mergeCells(
       `A${sheet.lastRow.number + 1}:E${sheet.lastRow.number + 1}`,
     );
@@ -638,7 +681,11 @@ export class BalanceReportUseCase {
     }
 
     // -- Formato de moneda para valores monetarios en la tabla principal --
-    for (let i = 5; i <= diasEnMes + 5; i++) {
+    const daysInRange = Math.ceil(
+      (new Date(endDate).getTime() - new Date(startDate).getTime()) /
+        (1000 * 60 * 60 * 24),
+    );
+    for (let i = 5; i <= daysInRange + 5; i++) {
       // Solo filas de datos
       [3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14].forEach((j) => {
         // Columnas con montos
@@ -667,5 +714,322 @@ export class BalanceReportUseCase {
     });
 
     return workbook;
+  }
+
+  /**
+   * Genera un reporte comparativo de balance entre dos años
+   * @param data1 Datos del primer año
+   * @param data2 Datos del segundo año
+   * @param years Años a comparar
+   * @returns Workbook con 3 hojas: Resumen Comparativo, Detalle Año 1, Detalle Año 2
+   */
+  async executeCompare(
+    data1: BalanceData,
+    data2: BalanceData,
+    { year1, year2 }: { year1: number; year2: number },
+  ): Promise<ExcelJS.Workbook> {
+    const workbook = new ExcelJS.Workbook();
+
+    // Hoja 1: Resumen Comparativo
+    const summarySheet = workbook.addWorksheet('Resumen Comparativo');
+    this.createBalanceComparisonSummary(
+      summarySheet,
+      data1,
+      data2,
+      year1,
+      year2,
+    );
+
+    // Hoja 2: Detalle Año 1
+    const detailSheet1 = workbook.addWorksheet(`Detalle ${year1}`);
+    this.createBalanceDetailSheet(detailSheet1, data1, year1);
+
+    // Hoja 3: Detalle Año 2
+    const detailSheet2 = workbook.addWorksheet(`Detalle ${year2}`);
+    this.createBalanceDetailSheet(detailSheet2, data2, year2);
+
+    return workbook;
+  }
+
+  private createBalanceComparisonSummary(
+    sheet: ExcelJS.Worksheet,
+    data1: BalanceData,
+    data2: BalanceData,
+    year1: number,
+    year2: number,
+  ) {
+    // Título principal
+    sheet.mergeCells('A1:F1');
+    const titleCell = sheet.getCell('A1');
+    titleCell.value = `Reporte Comparativo de Balance - ${year1} vs ${year2}`;
+    titleCell.font = { size: 16, bold: true, color: { argb: colors.PRIMARY } };
+    titleCell.alignment = { horizontal: 'center' };
+
+    // Subtítulo
+    sheet.mergeCells('A2:F2');
+    const subtitleCell = sheet.getCell('A2');
+    subtitleCell.value = 'Análisis comparativo de ingresos vs gastos';
+    subtitleCell.font = { size: 12, italic: true };
+    subtitleCell.alignment = { horizontal: 'center' };
+
+    // Espacio
+    sheet.getRow(3).height = 20;
+
+    // Encabezados de la tabla comparativa
+    const headers = [
+      'Concepto',
+      `${year1} (S/)`,
+      `${year2} (S/)`,
+      'Diferencia (S/)',
+      'Variación (%)',
+      'Tendencia',
+    ];
+
+    const headerRow = sheet.getRow(4);
+    headers.forEach((header, index) => {
+      const cell = headerRow.getCell(index + 1);
+      cell.value = header;
+      cell.font = { bold: true, color: { argb: 'FFFFFF' } };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: colors.PRIMARY },
+      };
+      cell.alignment = { horizontal: 'center' };
+    });
+
+    // Calcular totales por concepto
+    const concepts = ['Ingresos', 'Gastos', 'Balance'];
+    let currentRow = 5;
+
+    concepts.forEach((concept) => {
+      const amount1 = this.getTotalByConcept(data1, concept);
+      const amount2 = this.getTotalByConcept(data2, concept);
+      const difference = amount1 - amount2;
+      const variation = amount2 !== 0 ? (difference / amount2) * 100 : 0;
+      const trend = this.getTrendIcon(variation, concept);
+
+      const row = sheet.getRow(currentRow);
+      row.getCell(1).value = concept;
+      row.getCell(2).value = amount1;
+      row.getCell(3).value = amount2;
+      row.getCell(4).value = difference;
+      row.getCell(5).value = variation;
+      row.getCell(6).value = trend;
+
+      // Formatear números
+      row.getCell(2).numFmt = '#,##0.00';
+      row.getCell(3).numFmt = '#,##0.00';
+      row.getCell(4).numFmt = '#,##0.00';
+      row.getCell(5).numFmt = '0.00"%"';
+
+      // Colorear según concepto y tendencia
+      if (concept === 'Ingresos') {
+        if (variation > 0) {
+          row.getCell(4).font = { color: { argb: '00AA00' } }; // Verde para aumento de ingresos
+          row.getCell(5).font = { color: { argb: '00AA00' } };
+        } else if (variation < 0) {
+          row.getCell(4).font = { color: { argb: 'AA0000' } }; // Rojo para disminución de ingresos
+          row.getCell(5).font = { color: { argb: 'AA0000' } };
+        }
+      } else if (concept === 'Gastos') {
+        if (variation > 0) {
+          row.getCell(4).font = { color: { argb: 'AA0000' } }; // Rojo para aumento de gastos
+          row.getCell(5).font = { color: { argb: 'AA0000' } };
+        } else if (variation < 0) {
+          row.getCell(4).font = { color: { argb: '00AA00' } }; // Verde para reducción de gastos
+          row.getCell(5).font = { color: { argb: '00AA00' } };
+        }
+      } else if (concept === 'Balance') {
+        if (variation > 0) {
+          row.getCell(4).font = { color: { argb: '00AA00' } }; // Verde para balance positivo
+          row.getCell(5).font = { color: { argb: '00AA00' } };
+        } else if (variation < 0) {
+          row.getCell(4).font = { color: { argb: 'AA0000' } }; // Rojo para balance negativo
+          row.getCell(5).font = { color: { argb: 'AA0000' } };
+        }
+      }
+
+      currentRow++;
+    });
+
+    // Fila de totales
+    const totalRow = sheet.getRow(currentRow);
+    const total1 = this.getTotalAmount(data1);
+    const total2 = this.getTotalAmount(data2);
+    const totalDiff = total1 - total2;
+    const totalVariation = total2 !== 0 ? (totalDiff / total2) * 100 : 0;
+
+    totalRow.getCell(1).value = 'TOTAL BALANCE';
+    totalRow.getCell(1).font = { bold: true };
+    totalRow.getCell(2).value = total1;
+    totalRow.getCell(3).value = total2;
+    totalRow.getCell(4).value = totalDiff;
+    totalRow.getCell(5).value = totalVariation;
+    totalRow.getCell(6).value = this.getTrendIcon(totalVariation, 'Balance');
+
+    // Formatear totales
+    totalRow.getCell(2).numFmt = '#,##0.00';
+    totalRow.getCell(3).numFmt = '#,##0.00';
+    totalRow.getCell(4).numFmt = '#,##0.00';
+    totalRow.getCell(5).numFmt = '0.00"%"';
+
+    // Estilo de la fila de totales
+    totalRow.eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'F0F0F0' },
+      };
+    });
+
+    // Ajustar ancho de columnas
+    sheet.columns = [
+      { width: 25 }, // Concepto
+      { width: 15 }, // Año 1
+      { width: 15 }, // Año 2
+      { width: 15 }, // Diferencia
+      { width: 12 }, // Variación
+      { width: 10 }, // Tendencia
+    ];
+  }
+
+  private createBalanceDetailSheet(
+    sheet: ExcelJS.Worksheet,
+    data: BalanceData,
+    year: number,
+  ) {
+    // Título
+    sheet.mergeCells('A1:F1');
+    const titleCell = sheet.getCell('A1');
+    titleCell.value = `Reporte de Balance - ${year}`;
+    titleCell.font = { size: 16, bold: true, color: { argb: colors.PRIMARY } };
+    titleCell.alignment = { horizontal: 'center' };
+
+    // Espacio
+    sheet.getRow(2).height = 20;
+
+    // Encabezados
+    const headers = [
+      'Fecha',
+      'Concepto',
+      'Descripción',
+      'Cantidad',
+      'Precio Unit.',
+      'Total',
+    ];
+    const headerRow = sheet.getRow(3);
+    headers.forEach((header, index) => {
+      const cell = headerRow.getCell(index + 1);
+      cell.value = header;
+      cell.font = { bold: true, color: { argb: 'FFFFFF' } };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: colors.PRIMARY },
+      };
+      cell.alignment = { horizontal: 'center' };
+    });
+
+    // Datos - Combinar profit y expense
+    let currentRow = 4;
+
+    // Agregar datos de profit
+    data.profit.forEach((item) => {
+      const row = sheet.getRow(currentRow);
+      row.getCell(1).value = item.date;
+      row.getCell(2).value = 'Ingresos';
+      row.getCell(3).value =
+        `Reservas: ${item.totalReservas}, Extras: ${item.totalExtras}`;
+      row.getCell(4).value = item.conteo;
+      row.getCell(5).value = item.total / item.conteo || 0; // Promedio
+      row.getCell(6).value = item.total;
+
+      // Formatear números
+      row.getCell(4).numFmt = '#,##0';
+      row.getCell(5).numFmt = '#,##0.00';
+      row.getCell(6).numFmt = '#,##0.00';
+
+      currentRow++;
+    });
+
+    // Agregar datos de expense
+    data.expense.forEach((item) => {
+      const row = sheet.getRow(currentRow);
+      row.getCell(1).value = item.date;
+      row.getCell(2).value = 'Gastos';
+      row.getCell(3).value =
+        item.description || item.category || 'Sin descripción';
+      row.getCell(4).value = 1; // Cantidad fija para gastos
+      row.getCell(5).value = item.amount;
+      row.getCell(6).value = item.amount;
+
+      // Formatear números
+      row.getCell(4).numFmt = '#,##0';
+      row.getCell(5).numFmt = '#,##0.00';
+      row.getCell(6).numFmt = '#,##0.00';
+
+      currentRow++;
+    });
+
+    // Ajustar ancho de columnas
+    sheet.columns = [
+      { width: 12 }, // Fecha
+      { width: 20 }, // Concepto
+      { width: 30 }, // Descripción
+      { width: 12 }, // Cantidad
+      { width: 15 }, // Precio Unit.
+      { width: 15 }, // Total
+    ];
+  }
+
+  private getTotalByConcept(data: BalanceData, concept: string): number {
+    if (concept === 'Ingresos') {
+      return data.profit.reduce((sum, item) => sum + item.total, 0);
+    } else if (concept === 'Gastos') {
+      return data.expense.reduce((sum, item) => sum + item.amount, 0);
+    }
+    return 0;
+  }
+
+  private getTotalAmount(data: BalanceData): number {
+    const income = this.getTotalByConcept(data, 'Ingresos');
+    const expenses = this.getTotalByConcept(data, 'Gastos');
+    return income - expenses; // Balance = Ingresos - Gastos
+  }
+
+  private getTrendIcon(variation: number, concept: string): string {
+    if (concept === 'Gastos') {
+      // Para gastos, menos es mejor
+      if (variation < -5) return '📉'; // Reducción de gastos = bueno
+      if (variation > 5) return '📈'; // Aumento de gastos = malo
+    } else {
+      // Para ingresos y balance, más es mejor
+      if (variation > 5) return '📈';
+      if (variation < -5) return '📉';
+    }
+    return '➡️';
+  }
+
+  private addMonthTotals(sheet: ExcelJS.Worksheet, monthName: string) {
+    // Agregar fila de totales del mes
+    const totalRow = sheet.addRow(['TOTAL ' + monthName.toUpperCase()]);
+
+    // Mergear celdas para el total del mes (balance tiene más columnas)
+    sheet.mergeCells(`A${totalRow.number}:N${totalRow.number}`);
+
+    // Estilo para el total del mes
+    const totalCell = sheet.getCell(`A${totalRow.number}`);
+    totalCell.font = { bold: true, size: 11, color: { argb: colors.PRIMARY } };
+    totalCell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE8E8E8' },
+    };
+    totalCell.alignment = { horizontal: 'center' };
+
+    // Agregar fila vacía para separación
+    sheet.addRow([]);
   }
 }

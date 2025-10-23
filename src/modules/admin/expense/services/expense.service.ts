@@ -19,6 +19,10 @@ import {
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { PaginationParams } from 'src/utils/paginated-response/pagination.types';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
+import {
+  FilterOptions,
+  SortOptions,
+} from 'src/prisma/src/interfaces/base.repository.interfaces';
 
 import { AuditService } from '../../audit/audit.service';
 import { Prisma } from '@prisma/client';
@@ -113,29 +117,85 @@ export class ExpenseService {
 
   async findByDatePaginated(
     pagination: PaginationParams,
-    filters: { month?: string; year?: string },
+    filters: {
+      month?: string;
+      year?: string;
+      search?: string;
+      category?: string;
+      paymentMethod?: string;
+      documentType?: string;
+    },
+    sortOptions?: SortOptions<any>,
   ): Promise<PaginatedResponse<HotelExpenseEntity>> {
     try {
-      const where: Prisma.HotelExpenseWhereInput = {};
+      // Construir filtros base para fechas
+      const baseWhere: Prisma.HotelExpenseWhereInput = {};
 
-      // Manejo de filtros separados por mes y año
+      // Manejo de filtros separados por mes y año (mantener lógica existente)
       if (filters.year && filters.month) {
         // Si tenemos ambos, año y mes
-        where.date = { startsWith: `${filters.year}-${filters.month}` };
+        baseWhere.date = { startsWith: `${filters.year}-${filters.month}` };
       } else if (filters.year && !filters.month) {
         // Solo año
-        where.date = { startsWith: `${filters.year}-` };
+        baseWhere.date = { startsWith: `${filters.year}-` };
       } else if (!filters.year && filters.month) {
         // Solo mes
         // Busca fechas que tengan -MM- en la posición correcta (YYYY-MM-DD)
-        where.date = { contains: `-${filters.month}-` };
+        baseWhere.date = { contains: `-${filters.month}-` };
       }
-      // Si no hay ningún filtro, se muestran todos los registros
 
+      // Construir filtros avanzados
+      const filterOptions: FilterOptions<any> = {};
+
+      // Filtro por categoría (array)
+      if (filters.category) {
+        const categoryArray = filters.category.split(',').map((c) => c.trim());
+        filterOptions.arrayByField = {
+          ...filterOptions.arrayByField,
+          category: categoryArray,
+        };
+      }
+
+      // Filtro por método de pago (array)
+      if (filters.paymentMethod) {
+        const paymentMethodArray = filters.paymentMethod
+          .split(',')
+          .map((p) => p.trim());
+        filterOptions.arrayByField = {
+          ...filterOptions.arrayByField,
+          paymentMethod: paymentMethodArray,
+        };
+      }
+
+      // Filtro por tipo de documento (array)
+      if (filters.documentType) {
+        const documentTypeArray = filters.documentType
+          .split(',')
+          .map((d) => d.trim());
+        filterOptions.arrayByField = {
+          ...filterOptions.arrayByField,
+          documentType: documentTypeArray,
+        };
+      }
+
+      // Búsqueda simple en campos del gasto
+      if (filters.search) {
+        filterOptions.searchByField = {
+          ...filterOptions.searchByField,
+          description: filters.search,
+          documentNumber: filters.search,
+        };
+      }
+
+      // Usar el BaseRepository con filtros avanzados
       return await this.expenseRepository.findManyPaginated<HotelExpenseEntity>(
         pagination,
         {
-          where,
+          where: baseWhere, // Filtros de fecha existentes
+          filterOptions, // Nuevos filtros avanzados
+          sortOptions, // Opciones de ordenamiento
+          enumFields: ['category', 'paymentMethod', 'documentType'],
+          dateFields: ['date', 'createdAt', 'updatedAt'],
           orderBy: { createdAt: 'desc' },
         },
       );
@@ -264,6 +324,613 @@ export class ExpenseService {
       return await this.reactivateExpensesUseCase.execute(ids, user);
     } catch (error) {
       this.errorHandler.handleError(error, 'reactivating');
+      throw error;
+    }
+  }
+
+  /**
+   * Genera gastos automáticos para todo un año basado en datos históricos reales
+   */
+  async generateExpensesForYear(
+    year: number,
+    user: UserData,
+  ): Promise<BaseApiResponse<any>> {
+    try {
+      // Validar que el año sea válido
+      if (!year || year < 2020 || year > 2030) {
+        throw new BadRequestException(
+          'Año inválido. Debe estar entre 2020 y 2030',
+        );
+      }
+
+      // Plantilla de gastos basada en datos reales de enero
+      const expenseTemplates = [
+        // FACTURAS - Imagen 1 (Gastos fijos mayores)
+        {
+          description: 'B & W RENISSE SAC',
+          baseAmount: 280,
+          variance: 30,
+          documentPrefix: '1296',
+          category: 'FIXED',
+          paymentMethod: 'TRANSFER',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Star Market SAC',
+          baseAmount: 100,
+          variance: 20,
+          documentPrefix: '1297',
+          category: 'VARIABLE',
+          paymentMethod: 'TRANSFER',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'AUREN SA',
+          baseAmount: 270,
+          variance: 25,
+          documentPrefix: '1298',
+          category: 'FIXED',
+          paymentMethod: 'TRANSFER',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Ingenieria y Servicios DIFFERENT SC RL',
+          baseAmount: 160,
+          variance: 30,
+          documentPrefix: '1299',
+          category: 'FIXED',
+          paymentMethod: 'TRANSFER',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Ingenieria y Servicios DIFFERENT SC RL',
+          baseAmount: 80,
+          variance: 15,
+          documentPrefix: '1300',
+          category: 'FIXED',
+          paymentMethod: 'TRANSFER',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'CHEMTRADE SAC',
+          baseAmount: 70,
+          variance: 15,
+          documentPrefix: '1301',
+          category: 'VARIABLE',
+          paymentMethod: 'TRANSFER',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'INST TECNICO PROFESIONAL STEP SAC',
+          baseAmount: 70,
+          variance: 10,
+          documentPrefix: '1302',
+          category: 'FIXED',
+          paymentMethod: 'TRANSFER',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Quimica Ingenieria y Proyectos Sac',
+          baseAmount: 888,
+          variance: 100,
+          documentPrefix: '1303',
+          category: 'VARIABLE',
+          paymentMethod: 'TRANSFER',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Interlinks Consulting Group Sac',
+          baseAmount: 75,
+          variance: 10,
+          documentPrefix: '1304',
+          category: 'FIXED',
+          paymentMethod: 'TRANSFER',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Quimica Ingenieria y Proyectos Sac',
+          baseAmount: 888,
+          variance: 120,
+          documentPrefix: '1305',
+          category: 'VARIABLE',
+          paymentMethod: 'TRANSFER',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'CICB Latin America S.A.',
+          baseAmount: 210,
+          variance: 30,
+          documentPrefix: '1306',
+          category: 'FIXED',
+          paymentMethod: 'TRANSFER',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Tech Storage Company SAC',
+          baseAmount: 358,
+          variance: 50,
+          documentPrefix: '1307',
+          category: 'VARIABLE',
+          paymentMethod: 'TRANSFER',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Alerta Peru Proyectos Sac',
+          baseAmount: 690,
+          variance: 80,
+          documentPrefix: '1308',
+          category: 'FIXED',
+          paymentMethod: 'TRANSFER',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'VMWARE SIST INTEGRAL DE SEG SAC',
+          baseAmount: 350,
+          variance: 40,
+          documentPrefix: '1309',
+          category: 'FIXED',
+          paymentMethod: 'TRANSFER',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Interlinks Consulting Group Sac',
+          baseAmount: 75,
+          variance: 10,
+          documentPrefix: '1310',
+          category: 'FIXED',
+          paymentMethod: 'TRANSFER',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'CICB Latin America SA',
+          baseAmount: 140,
+          variance: 20,
+          documentPrefix: '1311',
+          category: 'FIXED',
+          paymentMethod: 'TRANSFER',
+          documentType: 'INVOICE',
+        },
+
+        // FACTURAS - Imagen 2 (Gastos variables menores - alimentos, productos)
+        {
+          description: 'Compañia Food Retail SAC',
+          baseAmount: 110.88,
+          variance: 20,
+          documentPrefix: 'BF-2204197',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Distrib. Arianita & Analy E.I.R.L',
+          baseAmount: 40.5,
+          variance: 10,
+          documentPrefix: 'M1-82B',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Corporación RICO Sac',
+          baseAmount: 34.4,
+          variance: 10,
+          documentPrefix: 'F94L-0820',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Mas Ventas EIRL',
+          baseAmount: 24.7,
+          variance: 8,
+          documentPrefix: 'F001-28794',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Compañia Food Retail SAC',
+          baseAmount: 64.76,
+          variance: 15,
+          documentPrefix: '25-2201092',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Mas Ventas EIRL',
+          baseAmount: 27.7,
+          variance: 8,
+          documentPrefix: 'B1-28848',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Corporación RICO Sac',
+          baseAmount: 19.0,
+          variance: 6,
+          documentPrefix: 'F94L-60589',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Jolas y Gas Sac',
+          baseAmount: 50.0,
+          variance: 10,
+          documentPrefix: '1-29922',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Makro Supermayorista SA',
+          baseAmount: 216.46,
+          variance: 50,
+          documentPrefix: '20-1708478',
+          category: 'VARIABLE',
+          paymentMethod: 'CARD',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Corporación RICO Sac',
+          baseAmount: 13.4,
+          variance: 5,
+          documentPrefix: 'F94L-61038',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Distribuciones Arequipa Sac',
+          baseAmount: 110.01,
+          variance: 25,
+          documentPrefix: '1-16587',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Corporación RICO Sac',
+          baseAmount: 78.3,
+          variance: 20,
+          documentPrefix: 'F94L-61167',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'CVC Progreso Representaciones EIRL',
+          baseAmount: 450.0,
+          variance: 50,
+          documentPrefix: 'E001-1334',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'La Yema Dorada EIRL',
+          baseAmount: 148.0,
+          variance: 30,
+          documentPrefix: 'F001-8686',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Sanitas Perú S.A. EPS',
+          baseAmount: 858.0,
+          variance: 50,
+          documentPrefix: 'F002-1829187',
+          category: 'FIXED',
+          paymentMethod: 'TRANSFER',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Jgipay SAC',
+          baseAmount: 1.0,
+          variance: 0.5,
+          documentPrefix: 'F001-1479676',
+          category: 'OTHER',
+          paymentMethod: 'TRANSFER',
+          documentType: 'INVOICE',
+        },
+        {
+          description: 'Jgipay SAC',
+          baseAmount: 100.87,
+          variance: 20,
+          documentPrefix: 'F001-14656269',
+          category: 'OTHER',
+          paymentMethod: 'TRANSFER',
+          documentType: 'INVOICE',
+        },
+
+        // BOLETAS - Imagen 1 (Servicios varios)
+        {
+          description: 'Servicio de Limpieza',
+          baseAmount: 350,
+          variance: 50,
+          documentPrefix: '120',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'Mantenimiento General',
+          baseAmount: 115,
+          variance: 30,
+          documentPrefix: '120',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'Servicio Técnico',
+          baseAmount: 210,
+          variance: 40,
+          documentPrefix: '120',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'Reparaciones Varias',
+          baseAmount: 60,
+          variance: 20,
+          documentPrefix: '120',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'Servicio de Lavandería',
+          baseAmount: 330,
+          variance: 50,
+          documentPrefix: '120',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'Mantenimiento Equipos',
+          baseAmount: 465,
+          variance: 60,
+          documentPrefix: '121',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'Servicio de Jardinería',
+          baseAmount: 150,
+          variance: 30,
+          documentPrefix: '121',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'Reparación de Instalaciones',
+          baseAmount: 80,
+          variance: 20,
+          documentPrefix: '121',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'Servicio de Fumigación',
+          baseAmount: 120,
+          variance: 25,
+          documentPrefix: '121',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'Mantenimiento Preventivo',
+          baseAmount: 80,
+          variance: 20,
+          documentPrefix: '121',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'Servicio de Pintura',
+          baseAmount: 235,
+          variance: 40,
+          documentPrefix: '121',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'Reparación Eléctrica',
+          baseAmount: 70,
+          variance: 20,
+          documentPrefix: '121',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'Mantenimiento de Aires',
+          baseAmount: 110,
+          variance: 25,
+          documentPrefix: '121',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'Servicio de Plomería',
+          baseAmount: 80,
+          variance: 20,
+          documentPrefix: '121',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'Reparación de Mobiliario',
+          baseAmount: 320,
+          variance: 50,
+          documentPrefix: '121',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'Servicio de Carpintería',
+          baseAmount: 120,
+          variance: 30,
+          documentPrefix: '122',
+          category: 'VARIABLE',
+          paymentMethod: 'CASH',
+          documentType: 'RECEIPT',
+        },
+
+        // BOLETAS - Imagen 2 (Servicios públicos y alquileres - gastos fijos mensuales)
+        {
+          description: 'SEDAPAR - Agua',
+          baseAmount: 270.2,
+          variance: 30,
+          documentPrefix: 'N/A',
+          category: 'FIXED',
+          paymentMethod: 'TRANSFER',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'MOVISTAR - Internet/Teléfono',
+          baseAmount: 73.38,
+          variance: 5,
+          documentPrefix: 'N/A',
+          category: 'FIXED',
+          paymentMethod: 'TRANSFER',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'SEAL - Energía Eléctrica',
+          baseAmount: 333.7,
+          variance: 50,
+          documentPrefix: 'N/A',
+          category: 'FIXED',
+          paymentMethod: 'TRANSFER',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'Claro - Telefonía Móvil',
+          baseAmount: 48.99,
+          variance: 5,
+          documentPrefix: 'N/A',
+          category: 'FIXED',
+          paymentMethod: 'TRANSFER',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'Claro - Plan Adicional',
+          baseAmount: 85.0,
+          variance: 10,
+          documentPrefix: 'N/A',
+          category: 'FIXED',
+          paymentMethod: 'TRANSFER',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'Alquiler Hotel',
+          baseAmount: 2000.0,
+          variance: 0,
+          documentPrefix: 'N/A',
+          category: 'FIXED',
+          paymentMethod: 'TRANSFER',
+          documentType: 'RECEIPT',
+        },
+        {
+          description: 'Alquiler Carro',
+          baseAmount: 400.0,
+          variance: 0,
+          documentPrefix: 'N/A',
+          category: 'FIXED',
+          paymentMethod: 'TRANSFER',
+          documentType: 'RECEIPT',
+        },
+      ];
+
+      const generatedExpenses = [];
+      let totalAmount = 0;
+
+      // Generar gastos para cada mes del año
+      for (let month = 1; month <= 12; month++) {
+        let documentCounter = 1000 + month * 100; // Para hacer números de documento únicos por mes
+
+        for (const template of expenseTemplates) {
+          // Calcular monto con variación aleatoria
+          const variance = template.variance * (Math.random() * 2 - 1); // Entre -variance y +variance
+          const amount =
+            Math.round((template.baseAmount + variance) * 100) / 100;
+
+          // Generar una fecha aleatoria dentro del mes
+          const daysInMonth = new Date(year, month, 0).getDate();
+          const randomDay = Math.floor(Math.random() * daysInMonth) + 1;
+          const date = `${year}-${month.toString().padStart(2, '0')}-${randomDay.toString().padStart(2, '0')}`;
+
+          // Generar número de documento único
+          let documentNumber;
+          if (template.documentPrefix === 'N/A') {
+            documentNumber = template.documentPrefix;
+          } else if (template.documentPrefix.includes('-')) {
+            // Para documentos como "BF-2204197", mantener el formato pero cambiar el número
+            const prefix = template.documentPrefix.split('-')[0];
+            documentNumber = `${prefix}-${documentCounter}`;
+          } else if (template.documentPrefix.includes('.')) {
+            // Para boletas como "120.05"
+            const baseNumber = parseInt(template.documentPrefix) + month;
+            const decimal = Math.floor(Math.random() * 99);
+            documentNumber = `${baseNumber}.${decimal.toString().padStart(2, '0')}`;
+          } else {
+            // Para números simples como "1296"
+            documentNumber = (
+              parseInt(template.documentPrefix) + documentCounter
+            ).toString();
+          }
+
+          documentCounter++;
+
+          const expenseData: CreateHotelExpenseDto = {
+            description: template.description,
+            category: template.category as any,
+            paymentMethod: template.paymentMethod as any,
+            amount,
+            date,
+            documentType: template.documentType as any,
+            documentNumber: documentNumber,
+          };
+
+          const result = await this.create(expenseData, user);
+          if (result.success && result.data) {
+            generatedExpenses.push(result.data);
+            totalAmount += amount;
+          }
+        }
+      }
+
+      this.logger.log(
+        `Generated ${generatedExpenses.length} expenses for year ${year}. Total amount: ${totalAmount}`,
+      );
+
+      return {
+        success: true,
+        message: `Se generaron ${generatedExpenses.length} gastos para el año ${year}`,
+        data: {
+          year,
+          totalExpenses: generatedExpenses.length,
+          totalAmount: Math.round(totalAmount * 100) / 100,
+        },
+      };
+    } catch (error) {
+      this.errorHandler.handleError(error, 'creating');
       throw error;
     }
   }

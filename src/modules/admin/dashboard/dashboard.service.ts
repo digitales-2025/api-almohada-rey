@@ -111,34 +111,42 @@ export class DashboardService {
       const totalRoomDays = totalRooms * daysInYear;
 
       // 4. Obtenemos todas las reservas en el año especificado con estado CHECKED_IN o CHECKED_OUT
+      // IMPORTANTE: Solo consideramos reservas que efectivamente tienen días ocupados en el año
       const reservations = await this.prisma.reservation.findMany({
         where: {
-          OR: [
-            // Reservas que comienzan en el año seleccionado
+          AND: [
             {
-              checkInDate: {
-                gte: startDate,
-                lte: endDate,
-              },
-            },
-            // Reservas que terminan en el año seleccionado
-            {
-              checkOutDate: {
-                gte: startDate,
-                lte: endDate,
-              },
-            },
-            // Reservas que abarcan el año completo (empiezan antes y terminan después)
-            {
-              AND: [
-                { checkInDate: { lt: startDate } },
-                { checkOutDate: { gt: endDate } },
+              OR: [
+                // Reservas que comienzan en el año seleccionado
+                {
+                  checkInDate: {
+                    gte: startDate,
+                    lte: endDate,
+                  },
+                },
+                // Reservas que terminan en el año seleccionado
+                {
+                  checkOutDate: {
+                    gte: startDate,
+                    lte: endDate,
+                  },
+                },
+                // Reservas que abarcan el año completo (empiezan antes y terminan después)
+                {
+                  AND: [
+                    { checkInDate: { lt: startDate } },
+                    { checkOutDate: { gt: endDate } },
+                  ],
+                },
               ],
             },
+            {
+              status: {
+                in: ['CHECKED_IN', 'CHECKED_OUT'],
+              },
+            },
+            // Asegurar que checkOutDate > checkInDate (esto se maneja en el código)
           ],
-          status: {
-            in: ['CHECKED_IN', 'CHECKED_OUT'],
-          },
         },
         select: {
           checkInDate: true,
@@ -147,7 +155,8 @@ export class DashboardService {
       });
 
       // 5. Calculamos el número de habitaciones-día ocupadas
-      let occupiedRoomDays = 0;
+      // NUEVA LÓGICA: Calcular día por día para evitar solapamientos
+      const occupiedDays = new Set<string>(); // Usamos Set para evitar duplicados
 
       for (const reservation of reservations) {
         // Ajustamos las fechas para que estén dentro del año
@@ -159,6 +168,11 @@ export class DashboardService {
           Math.min(reservation.checkOutDate.getTime(), endDate.getTime()),
         );
 
+        // Verificamos que las fechas efectivas sean válidas
+        if (effectiveCheckOut <= effectiveCheckIn) {
+          continue; // Saltamos reservas con fechas inválidas
+        }
+
         // Calculamos la duración de la estancia en días
         const stayDurationMs =
           effectiveCheckOut.getTime() - effectiveCheckIn.getTime();
@@ -166,8 +180,22 @@ export class DashboardService {
           stayDurationMs / (1000 * 60 * 60 * 24),
         );
 
-        occupiedRoomDays += stayDurationDays;
+        // Validación adicional: no permitir estancias extremadamente largas
+        if (stayDurationDays > 365) {
+          continue;
+        }
+
+        // Agregamos cada día de la estancia al Set (evita duplicados automáticamente)
+        const currentDate = new Date(effectiveCheckIn);
+        while (currentDate < effectiveCheckOut) {
+          const dateString = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
+          occupiedDays.add(dateString);
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
       }
+
+      // El número de habitaciones-día ocupadas es el número de días únicos ocupados
+      const occupiedRoomDays = occupiedDays.size;
 
       // 6. Calculamos la tasa de ocupación (porcentaje)
       const occupancyRate =
@@ -660,11 +688,13 @@ export class DashboardService {
           select: {
             checkInDate: true,
             checkOutDate: true,
+            roomId: true,
           },
         });
 
         // Calcular días-habitación ocupados para este tipo
-        let occupiedRoomDays = 0;
+        // LÓGICA CORREGIDA: Calcular por habitación individual para evitar solapamientos
+        const roomOccupiedDays = new Map<string, Set<string>>(); // roomId -> Set de días ocupados
 
         for (const reservation of reservations) {
           // Ajustar las fechas para que estén dentro del año
@@ -675,14 +705,32 @@ export class DashboardService {
             Math.min(reservation.checkOutDate.getTime(), endDate.getTime()),
           );
 
-          // Calcular duración de la estancia en días
-          const stayDurationMs =
-            effectiveCheckOut.getTime() - effectiveCheckIn.getTime();
-          const stayDurationDays = Math.ceil(
-            stayDurationMs / (1000 * 60 * 60 * 24),
-          );
+          // Verificar que las fechas efectivas sean válidas
+          if (effectiveCheckOut <= effectiveCheckIn) {
+            continue; // Saltar reservas con fechas inválidas
+          }
 
-          occupiedRoomDays += stayDurationDays;
+          // Obtener el roomId de la reserva
+          const roomId = reservation.roomId;
+
+          // Inicializar el Set para esta habitación si no existe
+          if (!roomOccupiedDays.has(roomId)) {
+            roomOccupiedDays.set(roomId, new Set<string>());
+          }
+
+          // Agregar cada día de la estancia al Set de esta habitación específica
+          const currentDate = new Date(effectiveCheckIn);
+          while (currentDate < effectiveCheckOut) {
+            const dateString = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
+            roomOccupiedDays.get(roomId)!.add(dateString);
+            currentDate.setDate(currentDate.getDate() + 1);
+          }
+        }
+
+        // Sumar los días ocupados de todas las habitaciones de este tipo
+        let occupiedRoomDays = 0;
+        for (const [, days] of roomOccupiedDays) {
+          occupiedRoomDays += days.size;
         }
 
         // Calcular porcentaje de ocupación
@@ -827,15 +875,12 @@ export class DashboardService {
       });
 
       // Resto de la lógica para calcular ingresos...
-      let totalIncome = 0;
       let totalRoomReservations = 0;
       let totalServices = 0;
       let totalProducts = 0;
       let totalLateCheckout = 0;
 
       for (const payment of payments) {
-        totalIncome += payment.amountPaid;
-
         for (const detail of payment.paymentDetail) {
           const subtotal = detail.subtotal;
 
@@ -856,6 +901,13 @@ export class DashboardService {
           }
         }
       }
+
+      // Calcular el total de ingresos como la suma de todos los subtotales
+      const totalIncome =
+        totalRoomReservations +
+        totalServices +
+        totalProducts +
+        totalLateCheckout;
 
       // 2. CÁLCULO DE GASTOS TOTALES
       let totalExpenses = 0;
@@ -1133,8 +1185,9 @@ export class DashboardService {
         }
       }
 
-      // Convertir a array y ordenar por cantidad de clientes (descendente)
+      // Convertir a array, filtrar países con "-" y ordenar por cantidad de clientes (descendente)
       const sortedCountries = Object.entries(countryCounts)
+        .filter(([countryProvince]) => !countryProvince.includes('-')) // Excluir países con "-"
         .map(([countryProvince, totalCustomers]) => ({
           countryProvince,
           totalCustomers,
@@ -1150,9 +1203,9 @@ export class DashboardService {
   }
 
   /**
-   * Obtiene las top 10 provincias de Perú con más clientes para un año específico.
+   * Obtiene los top 10 departamentos de Perú con más clientes para un año específico.
    * @param year Año para el que se desean obtener las estadísticas
-   * @returns Top 10 provincias de Perú con más clientes
+   * @returns Top 10 departamentos de Perú con más clientes
    */
   async findTop10ProvincesCustomers(
     year: number,
@@ -1172,31 +1225,31 @@ export class DashboardService {
           isActive: true,
           // Solo incluir clientes de Perú
           country: 'Perú',
-          // Solo incluir clientes con provincia definida
-          province: {
+          // Solo incluir clientes con departamento definido
+          department: {
             not: null,
           },
         },
         select: {
-          province: true,
+          department: true,
         },
       });
 
-      // Contar clientes por provincia
-      const provinceCounts: { [key: string]: number } = {};
+      // Contar clientes por departamento
+      const departmentCounts: { [key: string]: number } = {};
 
       for (const customer of customers) {
-        if (customer.province) {
-          if (provinceCounts[customer.province]) {
-            provinceCounts[customer.province]++;
+        if (customer.department) {
+          if (departmentCounts[customer.department]) {
+            departmentCounts[customer.department]++;
           } else {
-            provinceCounts[customer.province] = 1;
+            departmentCounts[customer.department] = 1;
           }
         }
       }
 
       // Convertir a array y ordenar por cantidad de clientes (descendente)
-      const sortedProvinces = Object.entries(provinceCounts)
+      const sortedDepartments = Object.entries(departmentCounts)
         .map(([countryProvince, totalCustomers]) => ({
           countryProvince,
           totalCustomers,
@@ -1204,14 +1257,14 @@ export class DashboardService {
         .sort((a, b) => b.totalCustomers - a.totalCustomers)
         .slice(0, 10); // Tomar solo los 10 primeros
 
-      return sortedProvinces;
+      return sortedDepartments;
     } catch (error) {
       this.logger.error(
-        'Error obteniendo top 10 provincias de Perú con más clientes',
+        'Error obteniendo top 10 departamentos de Perú con más clientes',
       );
       handleException(
         error,
-        'Error obteniendo top 10 provincias de Perú con más clientes',
+        'Error obteniendo top 10 departamentos de Perú con más clientes',
       );
     }
   }

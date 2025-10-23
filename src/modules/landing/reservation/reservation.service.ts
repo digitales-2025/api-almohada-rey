@@ -5,7 +5,6 @@ import { DetailedRoom } from 'src/modules/admin/room/entities/room.entity';
 import { RoomRepository } from 'src/modules/admin/room/repositories/room.repository';
 import { BaseErrorHandler } from 'src/utils/error-handlers/service-error.handler';
 import { errorDictionary } from './translation-dictionary';
-import { getLimaTime } from 'src/utils/dates/peru-datetime';
 import { CheckAvailableRoomsQueryDto } from './dto/landing-check-available-rooms.dto';
 import { Translation } from '../i18n/translation';
 import { ReservationService } from 'src/modules/admin/reservation/reservation.service';
@@ -18,6 +17,7 @@ import { ConfirmPaymentLandingUseCase } from 'src/modules/admin/reservation/use-
 import { BaseApiResponse } from 'src/utils/base-response/BaseApiResponse.dto';
 import { Reservation } from 'src/modules/admin/reservation/entities/reservation.entity';
 import { TypedEventEmitter } from 'src/event-emitter/typed-event-emitter.class';
+import { getCurrentLimaTime } from 'src/utils/dates/peru-datetime';
 
 @Injectable()
 export class LandingReservationService {
@@ -96,7 +96,7 @@ export class LandingReservationService {
       }
 
       // Validate that check-in is not in the past
-      const startOfToday = getLimaTime();
+      const startOfToday = getCurrentLimaTime();
       startOfToday.setHours(0, 0, 0, 0); // Set to the start of today
       if (parsedCheckInDate < startOfToday) {
         throw new BadRequestException(

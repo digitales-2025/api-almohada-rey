@@ -82,13 +82,13 @@ export class RoomController {
   }
 
   /**
-   * Obtiene habitaciones paginadas
+   * Obtiene habitaciones paginadas con filtros avanzados
    */
   @Get('paginated')
   @ApiOperation({
-    summary: 'Obtener habitaciones paginadas con información detallada',
+    summary: 'Obtener habitaciones paginadas con filtros avanzados',
     description:
-      'Devuelve una lista paginada de habitaciones con sus tipos e imagen principal',
+      'Devuelve una lista paginada de habitaciones con filtros por estado, tipo de piso, estado activo y búsqueda en número, área y tipo de habitación',
   })
   @ApiQuery({
     name: 'page',
@@ -102,6 +102,49 @@ export class RoomController {
     description: 'Cantidad de elementos por página',
     type: Number,
     example: 10,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'search',
+    description:
+      'Término de búsqueda en número de habitación, área y nombre del tipo de habitación',
+    type: String,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'isActive',
+    description: 'Filtro por estado activo (array)',
+    type: String,
+    example: 'true,false',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'status',
+    description: 'Filtro por estado de habitación (array)',
+    type: String,
+    example: 'AVAILABLE,CLEANING',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'floorType',
+    description: 'Filtro por tipo de piso (array)',
+    type: String,
+    example: 'LAMINATING,CARPETING',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    description: 'Campo para ordenar',
+    type: String,
+    example: 'number',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    description: 'Orden de clasificación',
+    type: String,
+    enum: ['asc', 'desc'],
+    example: 'asc',
     required: false,
   })
   @ApiResponse({
@@ -119,11 +162,14 @@ export class RoomController {
               number: { type: 'number' },
               status: {
                 type: 'string',
-                enum: ['AVAILABLE', 'OCCUPIED', 'CLEANING', 'MAINTENANCE'],
+                enum: ['AVAILABLE', 'OCCUPIED', 'CLEANING', 'INCOMPLETE'],
               },
               tv: { type: 'boolean' },
               area: { type: 'number' },
-              floorType: { type: 'string' },
+              floorType: {
+                type: 'string',
+                enum: ['LAMINATING', 'CARPETING'],
+              },
               isActive: { type: 'boolean' },
               RoomTypes: {
                 type: 'object',
@@ -167,14 +213,79 @@ export class RoomController {
     @GetUser() user: UserPayload,
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
+    @Query('search') search?: string,
+    @Query('isActive') isActive?: string,
+    @Query('status') status?: string,
+    @Query('floorType') floorType?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ): Promise<PaginatedResponse<FindAllRoom>> {
     const pageNumber = parseInt(page, 10) || 1;
     const pageSizeNumber = parseInt(pageSize, 10) || 10;
 
-    return this.roomService.findAllPaginated(user, {
-      page: pageNumber,
-      pageSize: pageSizeNumber,
-    });
+    // Construir filtros
+    const filterOptions: any = {};
+
+    // Filtro por isActive (array booleano)
+    if (isActive) {
+      const isActiveArray = isActive.split(',').map((a) => a.trim() === 'true');
+      filterOptions.arrayByField = {
+        ...filterOptions.arrayByField,
+        isActive: isActiveArray,
+      };
+    }
+
+    // Filtro por status (array enum)
+    if (status) {
+      const statusArray = status.split(',').map((s) => s.trim());
+      filterOptions.arrayByField = {
+        ...filterOptions.arrayByField,
+        status: statusArray,
+      };
+    }
+
+    // Filtro por floorType (array enum)
+    if (floorType) {
+      const floorTypeArray = floorType.split(',').map((f) => f.trim());
+      filterOptions.arrayByField = {
+        ...filterOptions.arrayByField,
+        floorType: floorTypeArray,
+      };
+    }
+
+    // Búsqueda en habitación y tipo de habitación
+    if (search) {
+      // Usar OR a nivel superior para manejar búsquedas en múltiples campos
+      filterOptions.OR = [
+        // Búsqueda por número de habitación (convertir string a número si es posible)
+        ...(parseInt(search) ? [{ number: parseInt(search) }] : []),
+        // Búsqueda por área (convertir string a float si es posible)
+        ...(parseFloat(search) ? [{ area: parseFloat(search) }] : []),
+        // Búsqueda por nombre del tipo de habitación (relacional)
+        {
+          RoomTypes: {
+            name: {
+              contains: search,
+              mode: 'insensitive',
+            },
+          },
+        },
+      ];
+    }
+
+    // Construir opciones de ordenamiento
+    const sortOptions: any = {};
+    if (sortBy) {
+      sortOptions.field = sortBy;
+      sortOptions.order = sortOrder || 'asc';
+    }
+
+    return this.roomService.findAllPaginated(
+      user,
+      { page: pageNumber, pageSize: pageSizeNumber },
+      filterOptions,
+      sortOptions,
+    );
   }
 
   /**

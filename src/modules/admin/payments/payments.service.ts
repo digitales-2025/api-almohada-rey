@@ -37,6 +37,10 @@ import { UpdatePaymentDetailsBatchDto } from './dto/updatePaymentDetailsBatch.dt
 import { calculateStayNights } from 'src/utils/dates/peru-datetime';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 import { PaginationService } from 'src/pagination/pagination.service';
+import {
+  FilterOptions,
+  SortOptions,
+} from 'src/prisma/src/interfaces/base.repository.interfaces';
 import { MovementsService } from '../movements/movements.service';
 import { CreateMovementDto } from '../movements/dto/create-movement.dto';
 import { WarehouseService } from '../warehouse/warehouse.service';
@@ -1048,21 +1052,36 @@ export class PaymentsService {
   }
 
   /**
-   * Obtiene todos los pagos paginados.
-   * @param options Opciones para la paginación
+   * Obtiene todos los pagos paginados con filtros avanzados.
+   * @param pagination Opciones para la paginación
+   * @param filterOptions Filtros avanzados
+   * @param sortOptions Opciones de ordenamiento
    * @returns PaginatedResponse con los pagos paginados
    */
-  async findAllPaginated(options: {
-    page: number;
-    pageSize: number;
-  }): Promise<PaginatedResponse<SummaryPaymentData>> {
+  async findAllPaginated(
+    pagination: { page: number; pageSize: number },
+    filterOptions?: FilterOptions<any>,
+    sortOptions?: SortOptions<any>,
+  ): Promise<PaginatedResponse<SummaryPaymentData>> {
     try {
-      const { page, pageSize } = options;
+      const { page, pageSize } = pagination;
 
-      return await this.paginationService.paginate<any, SummaryPaymentData>({
+      // Definir campos enum y fecha para el modelo Payment
+      const enumFields = ['status']; // PaymentDetailStatus enum
+      const dateFields = ['date', 'createdAt', 'updatedAt'];
+
+      // Usar el servicio de paginación avanzada
+      return await this.paginationService.paginateAdvanced<
+        any,
+        SummaryPaymentData
+      >({
         model: 'payment',
         page,
         pageSize,
+        filterOptions,
+        sortOptions,
+        enumFields,
+        dateFields,
         select: {
           id: true,
           code: true,
@@ -1070,16 +1089,29 @@ export class PaymentsService {
           amountPaid: true,
           date: true,
           status: true,
+          observations: true,
           reservation: {
             select: {
+              id: true,
+              checkInDate: true,
+              checkOutDate: true,
               customer: {
                 select: {
                   id: true,
                   name: true,
+                  email: true,
+                  phone: true,
+                  documentNumber: true,
+                  department: true,
+                  province: true,
+                  country: true,
                 },
               },
             },
           },
+        },
+        orderBy: {
+          createdAt: 'desc',
         },
         transformer: (payment) => ({
           id: payment.id,
@@ -1088,16 +1120,35 @@ export class PaymentsService {
           amountPaid: payment.amountPaid,
           date: payment.date,
           status: payment.status,
-          reservation: {
-            customer: {
-              id: payment.reservation.customer.id,
-              name: payment.reservation.customer.name,
-            },
-          },
+          observations: payment.observations,
+          reservation:
+            payment.reservation && payment.reservation.customer
+              ? {
+                  id: payment.reservation.id,
+                  checkInDate: payment.reservation.checkInDate,
+                  checkOutDate: payment.reservation.checkOutDate,
+                  customer: {
+                    id: payment.reservation.customer.id,
+                    name: payment.reservation.customer.name,
+                    email: payment.reservation.customer.email,
+                    phone: payment.reservation.customer.phone,
+                    documentNumber: payment.reservation.customer.documentNumber,
+                    department: payment.reservation.customer.department,
+                    province: payment.reservation.customer.province,
+                    country: payment.reservation.customer.country,
+                  },
+                }
+              : null,
         }),
       });
     } catch (error) {
       this.logger.error('Error getting paginated payments', error.stack);
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
       handleException(error, 'Error getting paginated payments');
     }
   }

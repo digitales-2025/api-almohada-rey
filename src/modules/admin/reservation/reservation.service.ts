@@ -48,6 +48,10 @@ import { LateCheckoutDto } from './dto/late-checkout.dto';
 import { ExtendStayDto } from './dto/extend-stay.dto';
 import { RemoveLateCheckoutUseCase } from './use-cases/removeLateCheckout.use.case';
 import { ReasonResponseDto } from './dto/reasons-response.dto';
+import {
+  FilterOptions,
+  SortOptions,
+} from 'src/prisma/src/interfaces/base.repository.interfaces';
 
 @Injectable()
 export class ReservationService {
@@ -351,105 +355,117 @@ export class ReservationService {
     }
   }
 
-  //In the future some filters may be applied
   async findManyPaginated(
     user: UserPayload,
     pagination?: PaginationParams,
     additionalParams?: FilterQueryParamsByField<Reservation>,
-    // filter?: any,
+    filterOptions?: FilterOptions<Reservation>,
+    sortOptions?: SortOptions<Reservation>,
   ): Promise<PaginatedResponse<DetailedReservation>> {
     try {
-      let filter: any = {};
+      // Definir campos que son enums y fechas para el buildWhereClause
+      const enumFields = ['status'];
+      const dateFields = [
+        'checkInDate',
+        'checkOutDate',
+        'createdAt',
+        'updatedAt',
+      ];
+
+      // Filtros base para usuarios no super admin
+      const baseFilters: FilterOptions<Reservation> = {};
       if (!user.isSuperAdmin) {
-        filter = { isActive: true };
+        baseFilters.searchByField = { isActive: true };
       }
 
-      // Extract date parameters if they exist
+      // Combinar filtros base con los proporcionados
+      const combinedFilterOptions: FilterOptions<Reservation> = {
+        ...baseFilters,
+        ...filterOptions,
+      };
+
+      // Manejar filtros adicionales legacy (compatibilidad)
+      const legacyParams = { ...additionalParams };
+
+      // Extraer y procesar fechas legacy si existen
       let checkInDate: Date | undefined;
       let checkOutDate: Date | undefined;
 
-      if (additionalParams?.checkInDate) {
-        checkInDate = new Date(additionalParams.checkInDate as string);
-        delete additionalParams.checkInDate; // Remove from additionalParams to avoid conflicts
+      if (legacyParams?.checkInDate) {
+        checkInDate = new Date(legacyParams.checkInDate as string);
+        delete legacyParams.checkInDate;
       }
 
-      if (additionalParams?.checkOutDate) {
-        checkOutDate = new Date(additionalParams.checkOutDate as string);
-        delete additionalParams.checkOutDate; // Remove from additionalParams to avoid conflicts
+      if (legacyParams?.checkOutDate) {
+        checkOutDate = new Date(legacyParams.checkOutDate as string);
+        delete legacyParams.checkOutDate;
       }
 
-      // Validate that check-in is before check-out if both dates are provided
+      // Validar fechas si existen
       if (checkInDate && checkOutDate && checkInDate >= checkOutDate) {
         throw new BadRequestException(
           'La fecha de check-in debe ser anterior a la fecha de check-out',
         );
       }
 
-      if (additionalParams) {
-        filter = {
-          ...filter,
-          ...additionalParams,
+      // Agregar filtros de fecha legacy al filterOptions si no están ya definidos
+      if (checkInDate || checkOutDate) {
+        if (!combinedFilterOptions.searchByField) {
+          combinedFilterOptions.searchByField = {};
+        }
+
+        if (checkInDate && !checkOutDate) {
+          combinedFilterOptions.fieldDate = {
+            field: 'checkInDate',
+            value: checkInDate.toISOString(),
+            operator: 'gte',
+          };
+        } else if (!checkInDate && checkOutDate) {
+          combinedFilterOptions.fieldDate = {
+            field: 'checkOutDate',
+            value: checkOutDate.toISOString(),
+            operator: 'lte',
+          };
+        } else if (checkInDate && checkOutDate) {
+          // Para rangos de fecha, usar el campo searchByField con un valor especial
+          // que será manejado por lógica adicional en el repository
+          combinedFilterOptions.searchByField!['dateRange'] =
+            `${checkInDate.toISOString()} - ${checkOutDate.toISOString()}`;
+        }
+      }
+
+      // Agregar otros parámetros legacy
+      if (legacyParams && Object.keys(legacyParams).length > 0) {
+        combinedFilterOptions.searchByField = {
+          ...combinedFilterOptions.searchByField,
+          ...legacyParams,
         };
       }
 
-      // Si solo hay fecha de entrada
-      if (checkInDate && !checkOutDate) {
-        filter = {
-          ...filter,
-          checkInDate: { gte: checkInDate },
-        };
-      }
-
-      // Si solo hay fecha de salida
-      if (!checkInDate && checkOutDate) {
-        filter = {
-          ...filter,
-          checkOutDate: { lte: checkOutDate },
-        };
-      }
-
-      // Add date range filter if both dates are provided
-      if (checkInDate && checkOutDate) {
-        filter.OR = [
-          // Reservations that start during the requested period
-          {
-            checkInDate: {
-              gte: checkInDate,
-              lt: checkOutDate,
+      const repositoryParams = {
+        filterOptions: combinedFilterOptions,
+        sortOptions,
+        enumFields,
+        dateFields,
+        include: {
+          room: {
+            include: {
+              RoomTypes: true,
             },
           },
-          // Reservations that end during the requested period
-          {
-            checkOutDate: {
-              gt: checkInDate,
-              lte: checkOutDate,
-            },
-          },
-          // Reservations that span the entire requested period
-          {
-            AND: [
-              { checkInDate: { lte: checkInDate } },
-              { checkOutDate: { gte: checkOutDate } },
-            ],
-          },
-        ];
-      }
-
-      return this.reservationRepository.findManyPaginated<DetailedReservation>(
-        pagination,
-        {
-          where: filter,
-          include: {
-            room: {
-              include: {
-                RoomTypes: true,
-              },
-            },
-            user: true,
-            customer: true,
-          },
+          user: true,
+          customer: true,
         },
-      );
+      };
+
+      // Usar el método avanzado del repository
+      const result =
+        await this.reservationRepository.findManyPaginated<DetailedReservation>(
+          pagination,
+          repositoryParams,
+        );
+
+      return result;
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
     }

@@ -30,6 +30,10 @@ import { validateArray, validateChanges } from 'src/prisma/src/utils';
 import { AuditService } from '../../audit/audit.service';
 import { AuditActionType } from '@prisma/client';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
+import {
+  FilterOptions,
+  SortOptions,
+} from 'src/prisma/src/interfaces/base.repository.interfaces';
 
 @Injectable()
 export class RoomTypeService {
@@ -158,30 +162,51 @@ export class RoomTypeService {
   }
 
   /**
-   * Obtiene todos los tipos de habitaciones con sus imágenes de forma paginada
+   * Obtiene todos los tipos de habitaciones con sus imágenes de forma paginada con filtros avanzados
    * @param user Usuario que realiza la consulta
-   * @param options Opciones de paginación (página y tamaño de página)
+   * @param pagination Opciones de paginación
+   * @param filterOptions Filtros avanzados
+   * @param sortOptions Opciones de ordenamiento
    * @returns Lista paginada de tipos de habitación con sus imágenes
    */
   async findAllPaginated(
     user: UserPayload,
-    options: { page: number; pageSize: number },
+    pagination: { page: number; pageSize: number },
+    filterOptions?: FilterOptions<any>,
+    sortOptions?: SortOptions<any>,
   ): Promise<
     PaginatedResponse<
       RoomType & { imagesRoomType: Array<{ id: string; url: string }> }
     >
   > {
     try {
-      const { page, pageSize } = options;
+      const { page, pageSize } = pagination;
 
-      // Definir filtro según el rol del usuario
-      const filter = user.isSuperAdmin ? {} : { isActive: true };
+      // Construir filtros base según el rol del usuario
+      const baseFilters: any = {};
+      if (!user.isSuperAdmin) {
+        baseFilters.searchByField = { isActive: true };
+      }
 
-      // Obtener los tipos de habitaciones paginados usando el método del repositorio base
+      // Combinar filtros base con filtros avanzados
+      const combinedFilterOptions = {
+        ...baseFilters,
+        ...filterOptions,
+        // Combinar searchByField si existen ambos
+        searchByField: {
+          ...baseFilters.searchByField,
+          ...filterOptions?.searchByField,
+        },
+      };
+
+      // Obtener los tipos de habitaciones paginados usando el método del repositorio base con filtros avanzados
       const paginatedResult = await this.roomTypeRepository.findManyPaginated(
         { page, pageSize },
         {
-          where: filter,
+          filterOptions: combinedFilterOptions,
+          sortOptions,
+          enumFields: [], // No hay enums en RoomType
+          dateFields: ['createdAt', 'updatedAt'],
           orderBy: { createdAt: 'desc' },
         },
       );

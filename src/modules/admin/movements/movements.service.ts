@@ -26,6 +26,10 @@ import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedRespons
 import { PaginationService } from 'src/pagination/pagination.service';
 import { UpdateMovementDetailDto } from './dto/update-movement-detail.dto';
 import { UpdatePaymentDetailDto } from '../payments/dto/update-payment-detail.dto';
+import {
+  FilterOptions,
+  SortOptions,
+} from 'src/prisma/src/interfaces/base.repository.interfaces';
 
 @Injectable()
 export class MovementsService {
@@ -567,24 +571,34 @@ export class MovementsService {
   }
 
   /**
-   * Busca los movimientos por su tipo de forma paginada
-   * @param type Tipo de movimiento (INPUT o OUTPUT)
-   * @param options Opciones de paginación (página y tamaño de página)
-   * @returns Lista paginada de movimientos por tipo
+   * Busca los movimientos con paginación avanzada y filtros
+   * @param options Opciones de paginación y filtros
+   * @returns Lista paginada de movimientos con filtros aplicados
    */
-  async findByType(
-    type: TypeMovements,
-    options: { page: number; pageSize: number },
+  async findAllPaginated(
+    pagination: { page: number; pageSize: number },
+    filterOptions?: FilterOptions<any>,
+    sortOptions?: SortOptions<any>,
   ): Promise<PaginatedResponse<SummaryMovementsData>> {
     try {
-      const { page, pageSize } = options;
+      const { page, pageSize } = pagination;
 
-      // Usar el servicio de paginación para consultar los datos
-      return await this.paginationService.paginate<any, SummaryMovementsData>({
+      // Definir campos enum y fecha para el modelo Movements
+      const enumFields = ['type'];
+      const dateFields = ['dateMovement', 'createdAt', 'updatedAt'];
+
+      // Usar el servicio de paginación avanzada
+      return await this.paginationService.paginateAdvanced<
+        any,
+        SummaryMovementsData
+      >({
         model: 'movements',
         page,
         pageSize,
-        where: { type },
+        filterOptions,
+        sortOptions,
+        enumFields,
+        dateFields,
         select: {
           id: true,
           codeUnique: true,
@@ -635,10 +649,7 @@ export class MovementsService {
         }),
       });
     } catch (error) {
-      this.logger.error(
-        'Error getting paginated movements by type',
-        error.stack,
-      );
+      this.logger.error('Error getting paginated movements', error.stack);
       if (
         error instanceof BadRequestException ||
         error instanceof NotFoundException
@@ -646,7 +657,7 @@ export class MovementsService {
         throw error;
       }
 
-      handleException(error, 'Error getting paginated movements by type');
+      handleException(error, 'Error getting paginated movements');
     }
   }
 
