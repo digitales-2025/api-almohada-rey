@@ -76,7 +76,7 @@ export class MovementsController {
   @ApiOperation({
     summary: 'Get paginated movements with advanced filters',
     description:
-      'Get movements with advanced filtering by warehouse type, search in movements details and products',
+      'Get movements with advanced filtering by warehouse type, movement type, and flexible search in movements details, products, code, description, and document number (OR search)',
   })
   @ApiQuery({
     name: 'page',
@@ -94,7 +94,8 @@ export class MovementsController {
   })
   @ApiQuery({
     name: 'search',
-    description: 'Search term for movements details and products',
+    description:
+      'Search term for movements details, products, code, description, and document number (flexible OR search)',
     type: String,
     required: false,
   })
@@ -184,13 +185,28 @@ export class MovementsController {
 
     // Filtro por tipo de almacén
     if (warehouseType) {
-      filterOptions.searchByFieldsRelational = [
-        {
-          warehouse: {
-            type: warehouseType,
+      // Manejar múltiples valores separados por comas
+      const warehouseTypes = warehouseType
+        .split(',')
+        .map((type) => type.trim());
+
+      if (warehouseTypes.length === 1) {
+        // Un solo tipo
+        filterOptions.searchByFieldsRelational = [
+          {
+            warehouse: {
+              type: warehouseTypes[0],
+            },
           },
-        },
-      ];
+        ];
+      } else {
+        // Múltiples tipos - usar OR directamente
+        filterOptions.OR = warehouseTypes.map((type) => ({
+          warehouse: {
+            type: type,
+          },
+        }));
+      }
     }
 
     // Filtro por tipo de movimiento
@@ -203,22 +219,53 @@ export class MovementsController {
 
     // Búsqueda en relaciones (movementsDetail y product)
     if (search) {
-      const searchConditions = [
+      // Usar OR a nivel superior para manejar búsquedas en múltiples campos
+      filterOptions.OR = [
+        // Búsqueda en productos del movementsDetail
         {
           movementsDetail: {
-            product: {
-              name: search,
-              code: search,
+            some: {
+              product: {
+                OR: [
+                  {
+                    name: {
+                      contains: search,
+                      mode: 'insensitive',
+                    },
+                  },
+                  {
+                    code: {
+                      contains: search,
+                      mode: 'insensitive',
+                    },
+                  },
+                ],
+              },
             },
           },
         },
+        // Búsqueda por código único del movimiento
+        {
+          codeUnique: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        // Búsqueda por descripción del movimiento
+        {
+          description: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        // Búsqueda por número de documento (si existe)
+        {
+          documentNumber: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
       ];
-
-      if (filterOptions.searchByFieldsRelational) {
-        filterOptions.searchByFieldsRelational.push(...searchConditions);
-      } else {
-        filterOptions.searchByFieldsRelational = searchConditions;
-      }
     }
 
     // Construir opciones de ordenamiento
