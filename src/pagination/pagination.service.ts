@@ -237,16 +237,13 @@ export class PaginationService {
       // Si hay condiciones OR relacionales, combinarlas con filtros directos
       if (orConditions.length > 0) {
         if (Object.keys(whereClause).length > 0) {
-          // Combinar filtros directos con relacionales usando OR
-          whereClause.OR = [
-            // Filtros directos como una condición
-            { ...whereClause },
-            // Condiciones relacionales
-            ...orConditions,
-          ];
-          // Limpiar filtros directos del nivel principal
-          Object.keys(whereClause).forEach((key) => {
-            if (key !== 'OR') delete whereClause[key];
+          // Combinar filtros directos con relacionales usando AND
+          // Los filtros directos se mantienen en el nivel principal
+          // Los filtros relacionales se combinan con AND
+          orConditions.forEach((condition) => {
+            Object.keys(condition).forEach((relationName) => {
+              whereClause[relationName] = condition[relationName];
+            });
           });
         } else {
           // Solo condiciones relacionales

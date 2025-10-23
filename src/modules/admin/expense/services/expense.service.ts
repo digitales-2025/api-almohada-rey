@@ -343,6 +343,32 @@ export class ExpenseService {
         );
       }
 
+      // Determinar hasta qué mes generar
+      const currentDate = new Date();
+      const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth() + 1; // getMonth() retorna 0-11
+
+      let maxMonth = 12; // Por defecto generar todo el año
+
+      // Si el año solicitado es el año actual, solo generar hasta el mes anterior
+      if (year === currentYear) {
+        maxMonth = currentMonth - 1;
+
+        // Si estamos en enero, no hay meses anteriores para generar
+        if (maxMonth < 1) {
+          throw new BadRequestException(
+            'No se pueden generar gastos para el año actual en enero. Espere al siguiente mes.',
+          );
+        }
+      }
+
+      // Si el año es futuro, no permitir
+      if (year > currentYear) {
+        throw new BadRequestException(
+          'No se pueden generar gastos para años futuros',
+        );
+      }
+
       // Plantilla de gastos basada en datos reales de enero
       const expenseTemplates = [
         // FACTURAS - Imagen 1 (Gastos fijos mayores)
@@ -861,8 +887,8 @@ export class ExpenseService {
       const generatedExpenses = [];
       let totalAmount = 0;
 
-      // Generar gastos para cada mes del año
-      for (let month = 1; month <= 12; month++) {
+      // Generar gastos para cada mes del año (hasta maxMonth)
+      for (let month = 1; month <= maxMonth; month++) {
         let documentCounter = 1000 + month * 100; // Para hacer números de documento únicos por mes
 
         for (const template of expenseTemplates) {
@@ -917,14 +943,15 @@ export class ExpenseService {
       }
 
       this.logger.log(
-        `Generated ${generatedExpenses.length} expenses for year ${year}. Total amount: ${totalAmount}`,
+        `Generated ${generatedExpenses.length} expenses for year ${year} (months 1-${maxMonth}). Total amount: ${totalAmount}`,
       );
 
       return {
         success: true,
-        message: `Se generaron ${generatedExpenses.length} gastos para el año ${year}`,
+        message: `Se generaron ${generatedExpenses.length} gastos para el año ${year} (enero - ${this.getMonthName(maxMonth)})`,
         data: {
           year,
+          monthsGenerated: maxMonth,
           totalExpenses: generatedExpenses.length,
           totalAmount: Math.round(totalAmount * 100) / 100,
         },
@@ -933,5 +960,26 @@ export class ExpenseService {
       this.errorHandler.handleError(error, 'creating');
       throw error;
     }
+  }
+
+  /**
+   * Obtiene el nombre del mes en español
+   */
+  private getMonthName(month: number): string {
+    const months = [
+      'enero',
+      'febrero',
+      'marzo',
+      'abril',
+      'mayo',
+      'junio',
+      'julio',
+      'agosto',
+      'septiembre',
+      'octubre',
+      'noviembre',
+      'diciembre',
+    ];
+    return months[month - 1];
   }
 }
