@@ -1443,6 +1443,841 @@ export class ImportService {
     return { checkInDate, checkOutDate };
   }
 
+  async deleteDataByExcel(file: Express.Multer.File, user: UserData) {
+    if (!file) {
+      throw new BadRequestException('Archivo Excel requerido');
+    }
+
+    // Verificaciones de seguridad
+    if (!user || !user.id) {
+      throw new BadRequestException(
+        'Usuario no válido para realizar la eliminación',
+      );
+    }
+
+    if (user.userRol !== 'ADMIN') {
+      throw new BadRequestException(
+        'Solo los administradores pueden realizar eliminaciones',
+      );
+    }
+
+    // Validar tipo de archivo
+    const allowedMimeTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel', // .xls
+    ];
+
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException(
+        'Solo se permiten archivos Excel (.xlsx, .xls)',
+      );
+    }
+
+    try {
+      // Leer el archivo Excel (reutilizar lógica de importExcelFile)
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(file.buffer as any);
+
+      const worksheet = workbook.worksheets[0];
+      if (!worksheet) {
+        throw new BadRequestException(
+          'El archivo Excel no contiene hojas de trabajo',
+        );
+      }
+
+      // Obtener los headers (primera fila)
+      const headerRow = worksheet.getRow(1);
+      const headers: string[] = [];
+      headerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        headers[colNumber - 1] = cell.text || cell.value?.toString() || '';
+      });
+
+      // Convertir datos a formato esperado
+      const data = [];
+      const rowCount = worksheet.rowCount;
+
+      for (let rowNumber = 2; rowNumber <= rowCount; rowNumber++) {
+        const row = worksheet.getRow(rowNumber);
+        const record: any = {};
+
+        for (let colIndex = 0; colIndex < headers.length; colIndex++) {
+          const header = headers[colIndex];
+          if (header) {
+            const cell = row.getCell(colIndex + 1);
+            let cellValue = cell.text;
+
+            if (!cellValue && cell.value !== null && cell.value !== undefined) {
+              if (cell.value instanceof Date) {
+                cellValue = this.formatDateForExcel(cell.value);
+              } else {
+                cellValue = cell.value.toString();
+              }
+            }
+
+            record[header] = cellValue || '';
+          }
+        }
+
+        // Solo agregar filas que tengan al menos un campo con valor
+        if (
+          Object.values(record).some(
+            (value) =>
+              value && typeof value === 'string' && value.trim() !== '',
+          )
+        ) {
+          data.push(record);
+        }
+      }
+
+      if (data.length === 0) {
+        throw new BadRequestException(
+          'No se encontraron datos válidos en el archivo Excel',
+        );
+      }
+
+      this.logger.log(`Iniciando eliminación de ${data.length} registros...`, {
+        userId: user.id,
+        totalRecords: data.length,
+      });
+
+      return await this.prisma.$transaction(async (prisma) => {
+        const results = {
+          processed: 0,
+          deleted: 0,
+          notFound: 0,
+          errors: [],
+          deletedCounts: {
+            customers: 0,
+            reservations: 0,
+            payments: 0,
+            paymentDetails: 0,
+            auditLogs: 0,
+          },
+        };
+
+        // Procesar cada registro del Excel
+        for (const [index, record] of data.entries()) {
+          try {
+            const deleteResult = await this.deleteSingleRecord(
+              record,
+              prisma,
+              user,
+            );
+
+            if (deleteResult.found) {
+              results.deleted++;
+              results.deletedCounts.customers +=
+                deleteResult.deletedCounts.customers || 0;
+              results.deletedCounts.reservations +=
+                deleteResult.deletedCounts.reservations || 0;
+              results.deletedCounts.payments +=
+                deleteResult.deletedCounts.payments || 0;
+              results.deletedCounts.paymentDetails +=
+                deleteResult.deletedCounts.paymentDetails || 0;
+              results.deletedCounts.auditLogs +=
+                deleteResult.deletedCounts.auditLogs || 0;
+            } else {
+              results.notFound++;
+            }
+
+            results.processed++;
+          } catch (error) {
+            results.errors.push({
+              recordIndex: index + 1,
+              error: error.message,
+              data: {
+                nombre: record['APELLIDOS Y NOMBRES'],
+                documento: record['Nº DOCUMENTO'],
+                fecha: record['FECHA'],
+              },
+            });
+            this.logger.error(
+              `Error eliminando registro ${index + 1}: ${error.message}`,
+            );
+          }
+        }
+
+        this.logger.log('Eliminación completada', {
+          processed: results.processed,
+          deleted: results.deleted,
+          notFound: results.notFound,
+          errors: results.errors.length,
+          deletedCounts: results.deletedCounts,
+        });
+
+        return {
+          success: true,
+          message: `Eliminación completada: ${results.deleted} registros eliminados, ${results.notFound} no encontrados`,
+          ...results,
+        };
+      });
+    } catch (error) {
+      this.logger.error(
+        `Error procesando archivo Excel para eliminación: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Error al procesar el archivo Excel: ${error.message}`,
+      );
+    }
+  }
+
+  private async deleteSingleRecord(
+    record: any,
+    prisma: any,
+    user: UserData,
+  ): Promise<{
+    found: boolean;
+    deletedCounts: {
+      customers: number;
+      reservations: number;
+      payments: number;
+      paymentDetails: number;
+      auditLogs: number;
+    };
+  }> {
+    // Normalizar documento para buscar
+    const documentNumber = NormalizationUtils.normalizeDocumentNumber(
+      record['Nº DOCUMENTO'],
+      NormalizationUtils.normalizeDocumentType(record['TIPO DOCUMENTO']),
+    );
+
+    if (!documentNumber || !record['APELLIDOS Y NOMBRES']) {
+      throw new Error('Datos insuficientes para identificar el registro');
+    }
+
+    // Buscar cliente usando estrategia robusta (como en el import)
+    const customer = await this.findCustomerForDeletion(
+      record,
+      documentNumber,
+      prisma,
+    );
+
+    if (!customer) {
+      return {
+        found: false,
+        deletedCounts: {
+          customers: 0,
+          reservations: 0,
+          payments: 0,
+          paymentDetails: 0,
+          auditLogs: 0,
+        },
+      };
+    }
+
+    // Calcular fechas para buscar reservas específicas
+    const { checkInDate } = await this.calculateDatesWithStrategy(
+      record,
+      prisma,
+    );
+
+    // Buscar reservas específicas del cliente que coincidan con las fechas del Excel
+    const reservations = await prisma.reservation.findMany({
+      where: {
+        customerId: customer.id,
+        // Buscar por rango de fechas para ser más específico
+        checkInDate: {
+          gte: new Date(checkInDate.getTime() - 24 * 60 * 60 * 1000), // 1 día antes
+          lte: new Date(checkInDate.getTime() + 24 * 60 * 60 * 1000), // 1 día después
+        },
+        // Solo reservas importadas (no de landing page)
+        createdByLandingPage: false,
+        // Solo reservas en estado CHECKED_OUT (importadas)
+        status: 'CHECKED_OUT',
+      },
+      include: {
+        payment: {
+          include: {
+            paymentDetail: true,
+          },
+        },
+      },
+    });
+
+    const deletedCounts = {
+      customers: 0, // ✅ NO eliminar customers
+      reservations: 0,
+      payments: 0,
+      paymentDetails: 0,
+      auditLogs: 0,
+    };
+
+    // Si no hay reservas específicas que coincidan, no eliminar nada
+    if (reservations.length === 0) {
+      return {
+        found: false,
+        deletedCounts,
+      };
+    }
+
+    // Eliminar en orden: PaymentDetails -> Payments -> Reservations
+    // ✅ NO eliminar Customer
+    for (const reservation of reservations) {
+      // 1. Buscar y eliminar PaymentDetails primero
+      if (reservation.payment && reservation.payment.id) {
+        const deletedPaymentDetails = await prisma.paymentDetail.deleteMany({
+          where: {
+            paymentId: reservation.payment.id,
+          },
+        });
+        deletedCounts.paymentDetails += deletedPaymentDetails.count;
+
+        // 2. Eliminar Payment
+        await prisma.payment.delete({
+          where: { id: reservation.payment.id },
+        });
+        deletedCounts.payments++;
+      } else {
+        // Si no hay payment relacionado, buscar payments por reservationId
+        const payments = await prisma.payment.findMany({
+          where: { reservationId: reservation.id },
+          include: { paymentDetail: true },
+        });
+
+        for (const payment of payments) {
+          // Eliminar PaymentDetails
+          if (payment.paymentDetail) {
+            const deletedPaymentDetails = await prisma.paymentDetail.deleteMany(
+              {
+                where: { paymentId: payment.id },
+              },
+            );
+            deletedCounts.paymentDetails += deletedPaymentDetails.count;
+          }
+
+          // Eliminar Payment
+          await prisma.payment.delete({
+            where: { id: payment.id },
+          });
+          deletedCounts.payments++;
+        }
+      }
+
+      // 3. Eliminar Reservation
+      await prisma.reservation.delete({
+        where: { id: reservation.id },
+      });
+      deletedCounts.reservations++;
+    }
+
+    // Eliminar AuditLogs relacionados solo con las reservas eliminadas
+    const deletedAuditLogs = await prisma.audit.deleteMany({
+      where: {
+        entityId: { in: reservations.map((r) => r.id) },
+        entityType: 'reservation',
+        action: 'CREATE', // Solo logs de creación de reservas
+      },
+    });
+    deletedCounts.auditLogs = deletedAuditLogs.count;
+
+    // Registrar auditoría de la eliminación de reservas (no de customer)
+    for (const reservation of reservations) {
+      await prisma.audit.create({
+        data: {
+          entityId: reservation.id,
+          entityType: 'reservation',
+          action: 'DELETE',
+          performedById: user.id,
+          createdAt: new Date(),
+        },
+      });
+    }
+
+    return { found: true, deletedCounts };
+  }
+
+  async generateImportAnalysisExcel(
+    file: Express.Multer.File,
+    user: UserData,
+  ): Promise<ExcelJS.Workbook> {
+    if (!file) {
+      throw new BadRequestException('Archivo Excel requerido');
+    }
+
+    // Verificaciones de seguridad
+    if (!user || !user.id) {
+      throw new BadRequestException(
+        'Usuario no válido para realizar el análisis',
+      );
+    }
+
+    if (user.userRol !== 'ADMIN') {
+      throw new BadRequestException(
+        'Solo los administradores pueden realizar el análisis',
+      );
+    }
+
+    // Validar tipo de archivo
+    const allowedMimeTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel', // .xls
+    ];
+
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException(
+        'Solo se permiten archivos Excel (.xlsx, .xls)',
+      );
+    }
+
+    try {
+      // Leer el archivo Excel original
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(file.buffer as any);
+
+      const worksheet = workbook.worksheets[0];
+      if (!worksheet) {
+        throw new BadRequestException(
+          'El archivo Excel no contiene hojas de trabajo',
+        );
+      }
+
+      // Obtener los headers (primera fila)
+      const headerRow = worksheet.getRow(1);
+      const headers: string[] = [];
+      headerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        headers[colNumber - 1] = cell.text || cell.value?.toString() || '';
+      });
+
+      // Convertir datos a formato esperado
+      const data = [];
+      const rowCount = worksheet.rowCount;
+
+      for (let rowNumber = 2; rowNumber <= rowCount; rowNumber++) {
+        const row = worksheet.getRow(rowNumber);
+        const record: any = {};
+
+        for (let colIndex = 0; colIndex < headers.length; colIndex++) {
+          const header = headers[colIndex];
+          if (header) {
+            const cell = row.getCell(colIndex + 1);
+            let cellValue = cell.text;
+
+            if (!cellValue && cell.value !== null && cell.value !== undefined) {
+              if (cell.value instanceof Date) {
+                cellValue = this.formatDateForExcel(cell.value);
+              } else {
+                cellValue = cell.value.toString();
+              }
+            }
+
+            record[header] = cellValue || '';
+          }
+        }
+
+        // Solo agregar filas que tengan al menos un campo con valor
+        if (
+          Object.values(record).some(
+            (value) =>
+              value && typeof value === 'string' && value.trim() !== '',
+          )
+        ) {
+          data.push(record);
+        }
+      }
+
+      if (data.length === 0) {
+        throw new BadRequestException(
+          'No se encontraron datos válidos en el archivo Excel',
+        );
+      }
+
+      this.logger.log(`Analizando ${data.length} registros del Excel...`, {
+        userId: user.id,
+        totalRecords: data.length,
+      });
+
+      // Analizar cada registro del Excel
+      const importedRecords = [];
+      const missingRecords = [];
+
+      for (const [index, record] of data.entries()) {
+        try {
+          // Normalizar documento para buscar
+          const documentNumber = NormalizationUtils.normalizeDocumentNumber(
+            record['Nº DOCUMENTO'],
+            NormalizationUtils.normalizeDocumentType(record['TIPO DOCUMENTO']),
+          );
+
+          if (!documentNumber || !record['APELLIDOS Y NOMBRES']) {
+            missingRecords.push({
+              ...record,
+              _rowNumber: index + 2, // +2 porque empieza en fila 2 (después del header)
+              _reason: 'Datos insuficientes',
+            });
+            continue;
+          }
+
+          // Buscar cliente por documento
+          const customer = await this.prisma.customer.findUnique({
+            where: { documentNumber },
+          });
+
+          if (!customer) {
+            missingRecords.push({
+              ...record,
+              _rowNumber: index + 2,
+              _reason: 'Cliente no encontrado',
+            });
+            continue;
+          }
+
+          // Calcular fechas para buscar reservas específicas
+          const { checkInDate } = await this.calculateDatesWithStrategy(
+            record,
+            this.prisma,
+          );
+
+          // Buscar reservas específicas del cliente que coincidan con las fechas del Excel
+          const reservations = await this.prisma.reservation.findMany({
+            where: {
+              customerId: customer.id,
+              checkInDate: {
+                gte: new Date(checkInDate.getTime() - 24 * 60 * 60 * 1000), // 1 día antes
+                lte: new Date(checkInDate.getTime() + 24 * 60 * 60 * 1000), // 1 día después
+              },
+              createdByLandingPage: false,
+              status: 'CHECKED_OUT',
+            },
+          });
+
+          if (reservations.length === 0) {
+            missingRecords.push({
+              ...record,
+              _rowNumber: index + 2,
+              _reason: 'Reserva no encontrada',
+            });
+          } else {
+            importedRecords.push({
+              ...record,
+              _rowNumber: index + 2,
+              _reservationId: reservations[0].id,
+              _customerId: customer.id,
+            });
+          }
+        } catch (error) {
+          missingRecords.push({
+            ...record,
+            _rowNumber: index + 2,
+            _reason: `Error: ${error.message}`,
+          });
+        }
+      }
+
+      // Crear nuevo Excel con los resultados
+      const resultWorkbook = new ExcelJS.Workbook();
+
+      // Metadatos corporativos
+      resultWorkbook.creator = 'Hotel La Almohada del Rey';
+      resultWorkbook.company = 'Hotel La Almohada del Rey';
+      resultWorkbook.subject = 'Análisis de Estado de Importación';
+      resultWorkbook.description =
+        'Análisis detallado de registros importados y faltantes';
+      resultWorkbook.created = new Date();
+      resultWorkbook.modified = new Date();
+
+      // Hoja 1: Registros Importados
+      const importedSheet = resultWorkbook.addWorksheet(
+        'Registros Importados',
+        {
+          properties: {
+            tabColor: { argb: 'FF4CAF50' }, // Verde para importados
+          },
+        },
+      );
+      this.addHeadersToSheet(
+        importedSheet,
+        'REGISTROS IMPORTADOS EXITOSAMENTE',
+        importedRecords.length,
+      );
+      this.addRecordsToSheet(importedSheet, importedRecords);
+
+      // Hoja 2: Registros Faltantes
+      const missingSheet = resultWorkbook.addWorksheet('Registros Faltantes', {
+        properties: {
+          tabColor: { argb: 'FFFF5722' }, // Rojo para faltantes
+        },
+      });
+      this.addHeadersToSheet(
+        missingSheet,
+        'REGISTROS NO IMPORTADOS (FALTANTES)',
+        missingRecords.length,
+      );
+      this.addRecordsToSheet(missingSheet, missingRecords);
+
+      this.logger.log('Análisis completado', {
+        totalRecords: data.length,
+        imported: importedRecords.length,
+        missing: missingRecords.length,
+        importedPercentage: (
+          (importedRecords.length / data.length) *
+          100
+        ).toFixed(1),
+      });
+
+      return resultWorkbook;
+    } catch (error) {
+      this.logger.error(
+        `Error analizando archivo Excel: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Error al analizar el archivo Excel: ${error.message}`,
+      );
+    }
+  }
+
+  private addHeadersToSheet(
+    worksheet: ExcelJS.Worksheet,
+    title: string,
+    recordCount: number,
+  ) {
+    // Configuración de página
+    worksheet.properties.defaultRowHeight = 22;
+    worksheet.pageSetup = {
+      paperSize: 9, // A4
+      orientation: 'landscape',
+      fitToPage: true,
+      margins: {
+        left: 0.7,
+        right: 0.7,
+        top: 0.75,
+        bottom: 0.75,
+        header: 0.3,
+        footer: 0.3,
+      },
+    };
+
+    // === ENCABEZADO CORPORATIVO ===
+
+    // Fila 1: Espacio superior
+    worksheet.addRow([]);
+    worksheet.getRow(1).height = 10;
+
+    // Fila 2: Título principal
+    const titleRow = worksheet.addRow(['HOTEL LA ALMOHADA DEL REY']);
+    worksheet.mergeCells('A2:AJ2');
+    const titleCell = worksheet.getCell('A2');
+    titleCell.font = {
+      bold: true,
+      size: 24,
+      color: { argb: 'FFFFFFFF' },
+      name: 'Calibri',
+    };
+    titleCell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF2E7D32' }, // Verde corporativo
+    };
+    titleCell.alignment = {
+      horizontal: 'center',
+      vertical: 'middle',
+    };
+    titleRow.height = 35;
+
+    // Fila 3: Subtítulo del análisis
+    const subtitleRow = worksheet.addRow([title]);
+    worksheet.mergeCells('A3:AJ3');
+    const subtitleCell = worksheet.getCell('A3');
+    subtitleCell.font = {
+      bold: true,
+      size: 14,
+      color: { argb: 'FF2E7D32' },
+      name: 'Calibri',
+    };
+    subtitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    subtitleRow.height = 25;
+
+    // Fila 4: Información del análisis
+    const fecha = new Date();
+    const currentDate = `${fecha.getDate().toString().padStart(2, '0')}/${(fecha.getMonth() + 1).toString().padStart(2, '0')}/${fecha.getFullYear()}`;
+    const infoRow = worksheet.addRow([
+      `Total de registros: ${recordCount} | Generado el: ${currentDate}`,
+    ]);
+    worksheet.mergeCells('A4:AJ4');
+    const infoCell = worksheet.getCell('A4');
+    infoCell.font = {
+      italic: true,
+      size: 11,
+      color: { argb: 'FF666666' },
+      name: 'Calibri',
+    };
+    infoCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    infoRow.height = 20;
+
+    // Fila 5: Espacio
+    worksheet.addRow([]);
+    worksheet.getRow(5).height = 15;
+
+    // === CABECERAS DE COLUMNAS ===
+    const headers = [
+      'ITEM',
+      'HABITACION',
+      'FECHA',
+      'HORA',
+      'APELLIDOS Y NOMBRES',
+      'TIPO DOCUMENTO',
+      'Nº DOCUMENTO',
+      'DOMICILIO',
+      'TELEFONO',
+      'OCUPACIÓN',
+      'EMAIL',
+      'ESTADO CIVIL',
+      'EMPRESA',
+      'RUC',
+      'DIRECCION',
+      'LISTA NEGRA',
+      'PERSONAS',
+      'PROCEDENCIA',
+      'ACOMPAÑANTE',
+      'DOCUMENTO ACOMPAÑANTE',
+      'MOTIVO DE VIAJE',
+      'COMPROBANTE',
+      'Nº',
+      'TIPO DE CLIENTE',
+      'TIPO HABITACION',
+      'DIAS DE ALOJAMIENTO',
+      'PRECIO',
+      'FORMA DE PAGO',
+      'PAGO',
+      '¿CÓMO LLEGO EL CLIENTE?',
+      'RECEPCIONISTA CHECK IN',
+      'FECHA DE SALIDA',
+      'HORA DE SALIDA',
+      'RECEPCIONISTA CHECK OUT',
+      'OBSERVACIONES',
+      'NACIONALIDAD',
+    ];
+
+    // Fila 6: Headers de columnas
+    const headerRow = worksheet.addRow(headers);
+    headerRow.height = 28;
+    headerRow.eachCell((cell) => {
+      cell.font = {
+        bold: true,
+        color: { argb: 'FFFFFFFF' },
+        size: 10,
+        name: 'Calibri',
+      };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF2E7D32' },
+      };
+      cell.border = {
+        top: { style: 'medium', color: { argb: 'FF2E7D32' } },
+        left: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+        bottom: { style: 'medium', color: { argb: 'FF2E7D32' } },
+        right: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+      };
+      cell.alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+        wrapText: true,
+      };
+    });
+
+    // Ajustar ancho de columnas
+    headers.forEach((_, index) => {
+      worksheet.getColumn(index + 1).width = 12;
+    });
+  }
+
+  private addRecordsToSheet(worksheet: ExcelJS.Worksheet, records: any[]) {
+    records.forEach((record, index) => {
+      const row = [
+        index + 1, // ITEM
+        record['HABITACION'] || '',
+        record['FECHA'] || '',
+        record['HORA'] || '',
+        record['APELLIDOS Y NOMBRES'] || '',
+        record['TIPO DOCUMENTO'] || '',
+        record['Nº DOCUMENTO'] || '',
+        record['DOMICILIO'] || '',
+        record['TELEFONO'] || '',
+        record['OCUPACIÓN'] || '',
+        record['EMAIL'] || '',
+        record['ESTADO CIVIL'] || '',
+        record['EMPRESA'] || '',
+        record['RUC'] || '',
+        record['DIRECCION'] || '',
+        record['LISTA NEGRA'] || '',
+        record['PERSONAS'] || '',
+        record['PROCEDENCIA'] || '',
+        record['ACOMPAÑANTE'] || '',
+        record['DOCUMENTO ACOMPAÑANTE'] || '',
+        record['MOTIVO DE VIAJE'] || '',
+        record['COMPROBANTE'] || '',
+        record['Nº'] || '',
+        record['TIPO DE CLIENTE'] || '',
+        record['TIPO HABITACION'] || '',
+        record['DIAS DE ALOJAMIENTO'] || '',
+        record['PRECIO'] || '',
+        record['FORMA DE PAGO'] || '',
+        record['PAGO'] || '',
+        record['¿CÓMO LLEGO EL CLIENTE?'] || '',
+        record['RECEPCIONISTA CHECK IN'] || '',
+        record['FECHA DE SALIDA'] || '',
+        record['HORA DE SALIDA'] || '',
+        record['RECEPCIONISTA CHECK OUT'] || '',
+        record['OBSERVACIONES'] || '',
+        record['NACIONALIDAD'] || '',
+      ];
+
+      const dataRow = worksheet.addRow(row);
+      dataRow.height = 24;
+
+      // Estilo alternado para filas
+      const isEven = index % 2 === 0;
+      const rowColor = isEven ? 'FFFFFFFF' : 'FFF5F5F5';
+
+      dataRow.eachCell((cell, colNumber) => {
+        // Configuración base para todas las celdas
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFE0E0E0' } },
+          left: { style: 'thin', color: { argb: 'FFE0E0E0' } },
+          bottom: { style: 'thin', color: { argb: 'FFE0E0E0' } },
+          right: { style: 'thin', color: { argb: 'FFE0E0E0' } },
+        };
+
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: rowColor },
+        };
+
+        cell.font = {
+          color: { argb: 'FF333333' },
+          name: 'Calibri',
+          size: 10,
+        };
+
+        // Configuración específica por columna
+        switch (colNumber) {
+          case 1: // ITEM
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.font = { ...cell.font, bold: true };
+            break;
+          case 5: // APELLIDOS Y NOMBRES
+            cell.alignment = { horizontal: 'left', vertical: 'middle' };
+            cell.font = { ...cell.font, bold: true };
+            break;
+          case 7: // Nº DOCUMENTO
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.font = { ...cell.font, bold: true };
+            break;
+          case 27: // PRECIO
+            cell.alignment = { horizontal: 'right', vertical: 'middle' };
+            cell.numFmt = '"S/ "#,##0.00';
+            break;
+          default:
+            cell.alignment = { horizontal: 'left', vertical: 'middle' };
+            break;
+        }
+      });
+    });
+  }
+
   async cleanupImportedData(user: UserData) {
     this.logger.log('Iniciando limpieza de datos importados...', {
       userId: user.id,
@@ -1471,22 +2306,19 @@ export class ImportService {
       };
 
       try {
-        // 1. Primero obtener las Reservations que vamos a eliminar
+        // 1. Primero obtener TODAS las Reservations importadas que vamos a eliminar
         const reservationsToDelete = await prisma.reservation.findMany({
           where: {
             createdByLandingPage: false, // Solo reservas creadas por importación
             status: 'CHECKED_OUT', // Solo las que están en estado importado
-            // Verificar que tengan fecha de creación reciente (últimos 7 días)
-            createdAt: {
-              gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Últimos 7 días
-            },
+            // ✅ ELIMINAR TODAS LAS RESERVAS IMPORTADAS (sin filtro de fecha)
           },
           select: { id: true },
         });
 
         const reservationIds = reservationsToDelete.map((r) => r.id);
         this.logger.log(
-          `Encontradas ${reservationIds.length} reservas para eliminar`,
+          `Encontradas ${reservationIds.length} reservas importadas para eliminar (TODAS)`,
         );
 
         // 2. Obtener los Payments que referencian estas Reservations
@@ -1595,5 +2427,192 @@ export class ImportService {
         );
       }
     });
+  }
+
+  /**
+   * Busca cliente para eliminación usando la misma lógica robusta del import
+   */
+  private async findCustomerForDeletion(
+    record: any,
+    documentNumber: string,
+    prisma: any,
+  ) {
+    // PRIORIDAD 1: Buscar por documento normalizado
+    let customer = await prisma.customer.findUnique({
+      where: { documentNumber },
+    });
+
+    if (customer) {
+      return customer;
+    }
+
+    // PRIORIDAD 2: Buscar por variaciones del documento
+    const documentVariations = this.generateDocumentVariations(
+      record['Nº DOCUMENTO'],
+      record['TIPO DOCUMENTO'],
+    );
+
+    for (const variation of documentVariations) {
+      customer = await prisma.customer.findUnique({
+        where: { documentNumber: variation },
+      });
+      if (customer) {
+        this.logger.log(
+          `Cliente encontrado por variación de documento: ${variation}`,
+        );
+        return customer;
+      }
+    }
+
+    // PRIORIDAD 3: Buscar por nombre y documento (fuzzy matching)
+    const normalizedName = this.normalizeName(record['APELLIDOS Y NOMBRES']);
+
+    const customers = await prisma.customer.findMany({
+      where: {
+        OR: [
+          { documentNumber: { contains: record['Nº DOCUMENTO'] } },
+          {
+            AND: [
+              { firstName: { contains: normalizedName.split(' ')[0] } },
+              {
+                lastName: {
+                  contains: normalizedName.split(' ').slice(1).join(' '),
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    // Encontrar el mejor match usando similitud
+    let bestMatch = null;
+    let bestScore = 0;
+
+    for (const candidate of customers) {
+      const score = this.calculateNameSimilarity(
+        normalizedName,
+        `${candidate.firstName} ${candidate.lastName}`,
+      );
+
+      if (score > bestScore && score > 0.7) {
+        // 70% de similitud mínima
+        bestMatch = candidate;
+        bestScore = score;
+      }
+    }
+
+    if (bestMatch) {
+      this.logger.log(
+        `Cliente encontrado por similitud de nombre: ${bestMatch.firstName} ${bestMatch.lastName} (score: ${bestScore})`,
+      );
+      return bestMatch;
+    }
+
+    return null;
+  }
+
+  /**
+   * Genera variaciones del documento para búsqueda más flexible
+   */
+  private generateDocumentVariations(
+    documentNumber: string,
+    documentType: string,
+  ): string[] {
+    const variations = [];
+
+    if (!documentNumber) return variations;
+
+    // Agregar ceros adelante si es DNI
+    if (documentType === 'DNI' || !documentType) {
+      const padded = documentNumber.padStart(8, '0');
+      if (padded !== documentNumber) {
+        variations.push(padded);
+      }
+    }
+
+    // Agregar versión sin ceros
+    const unpadded = documentNumber.replace(/^0+/, '');
+    if (unpadded !== documentNumber && unpadded.length > 0) {
+      variations.push(unpadded);
+    }
+
+    // Agregar versión con puntos y guiones
+    const withDots = documentNumber.replace(
+      /(\d{3})(\d{3})(\d{3})/,
+      '$1.$2.$3',
+    );
+    if (withDots !== documentNumber) {
+      variations.push(withDots);
+    }
+
+    return variations;
+  }
+
+  /**
+   * Normaliza nombres para búsqueda
+   */
+  private normalizeName(name: string): string {
+    if (!name) return '';
+
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/[áàäâ]/g, 'a')
+      .replace(/[éèëê]/g, 'e')
+      .replace(/[íìïî]/g, 'i')
+      .replace(/[óòöô]/g, 'o')
+      .replace(/[úùüû]/g, 'u')
+      .replace(/[ñ]/g, 'n')
+      .replace(/[ç]/g, 'c')
+      .replace(/[^a-z\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /**
+   * Calcula similitud entre dos nombres usando algoritmo de Levenshtein
+   */
+  private calculateNameSimilarity(name1: string, name2: string): number {
+    const normalized1 = this.normalizeName(name1);
+    const normalized2 = this.normalizeName(name2);
+
+    if (normalized1 === normalized2) return 1.0;
+
+    const distance = this.levenshteinDistance(normalized1, normalized2);
+    const maxLength = Math.max(normalized1.length, normalized2.length);
+
+    return maxLength === 0 ? 0 : (maxLength - distance) / maxLength;
+  }
+
+  /**
+   * Calcula distancia de Levenshtein entre dos strings
+   */
+  private levenshteinDistance(str1: string, str2: string): number {
+    const matrix = [];
+
+    for (let i = 0; i <= str2.length; i++) {
+      matrix[i] = [i];
+    }
+
+    for (let j = 0; j <= str1.length; j++) {
+      matrix[0][j] = j;
+    }
+
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1,
+          );
+        }
+      }
+    }
+
+    return matrix[str2.length][str1.length];
   }
 }
