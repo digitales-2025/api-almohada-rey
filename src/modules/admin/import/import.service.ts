@@ -197,55 +197,60 @@ export class ImportService {
       // No lanzar error, continuar con el procesamiento
     }
 
-    return await this.prisma.$transaction(async (prisma) => {
-      // 1. Calcular fechas primero (necesario para createdAt del cliente)
-      const { checkInDate, checkOutDate } =
-        await this.calculateDatesWithStrategy(record, prisma);
+    return await this.prisma.$transaction(
+      async (prisma) => {
+        // 1. Calcular fechas primero (necesario para createdAt del cliente)
+        const { checkInDate, checkOutDate } =
+          await this.calculateDatesWithStrategy(record, prisma);
 
-      // 2. Normalizar y crear/buscar cliente (con fecha de check-in como createdAt)
-      const customer = await this.findOrCreateCustomer(
-        record,
-        prisma,
-        results,
-        checkInDate,
-      );
+        // 2. Normalizar y crear/buscar cliente (con fecha de check-in como createdAt)
+        const customer = await this.findOrCreateCustomer(
+          record,
+          prisma,
+          results,
+          checkInDate,
+        );
 
-      // 3. Buscar habitación
-      const room = await this.findRoomByNumberOrPrice(record, prisma);
+        // 3. Buscar habitación
+        const room = await this.findRoomByNumberOrPrice(record, prisma);
 
-      // 4. Buscar usuario
-      const receptionist = await this.findUserByNameOrRandom(record, prisma);
+        // 4. Buscar usuario
+        const receptionist = await this.findUserByNameOrRandom(record, prisma);
 
-      // 5. Crear reserva
-      const reservation = await this.createReservation(
-        record,
-        customer,
-        room,
-        receptionist,
-        prisma,
-        checkInDate,
-        checkOutDate,
-      );
+        // 5. Crear reserva
+        const reservation = await this.createReservation(
+          record,
+          customer,
+          room,
+          receptionist,
+          prisma,
+          checkInDate,
+          checkOutDate,
+        );
 
-      // 5. Crear pago con detalles inteligentes
-      const { payment, paymentDetails } = await this.createPaymentWithDetails(
-        record,
-        reservation,
-        room,
-        prisma,
-      );
+        // 5. Crear pago con detalles inteligentes
+        const { payment, paymentDetails } = await this.createPaymentWithDetails(
+          record,
+          reservation,
+          room,
+          prisma,
+        );
 
-      // 6. Registrar auditoría
-      await this.audit.create({
-        entityId: reservation.id,
-        entityType: 'reservation',
-        action: 'CREATE',
-        performedById: user.id,
-        createdAt: new Date(),
-      });
+        // 6. Registrar auditoría
+        await this.audit.create({
+          entityId: reservation.id,
+          entityType: 'reservation',
+          action: 'CREATE',
+          performedById: user.id,
+          createdAt: new Date(),
+        });
 
-      return { customer, reservation, payment, paymentDetails };
-    });
+        return { customer, reservation, payment, paymentDetails };
+      },
+      {
+        timeout: 30000, // 30 segundos para operaciones complejas de importación
+      },
+    );
   }
 
   private async findOrCreateCustomer(
@@ -1540,31 +1545,73 @@ export class ImportService {
         totalRecords: data.length,
       });
 
-      return await this.prisma.$transaction(async (prisma) => {
-        const results = {
-          processed: 0,
+      // OPTIMIZACIÓN: Procesar en lotes internos de 50 registros para eliminación
+      const internalBatchSize = 50;
+      const internalBatches = this.chunkArray(data, internalBatchSize);
+
+      this.logger.log(
+        `Procesando en ${internalBatches.length} lotes internos de ${internalBatchSize} registros cada uno`,
+      );
+
+      const results = {
+        processed: 0,
+        deleted: 0,
+        notFound: 0,
+        errors: [],
+        deletedCounts: {
+          customers: 0,
+          reservations: 0,
+          payments: 0,
+          paymentDetails: 0,
+          auditLogs: 0,
+        },
+        internalBatches: [] as any[],
+      };
+
+      // Procesar cada lote interno
+      for (
+        let internalBatchIndex = 0;
+        internalBatchIndex < internalBatches.length;
+        internalBatchIndex++
+      ) {
+        const internalBatch = internalBatches[internalBatchIndex];
+        const batchStartTime = Date.now();
+
+        this.logger.log(
+          `🗑️ PROCESANDO LOTE DE ELIMINACIÓN ${internalBatchIndex + 1}/${internalBatches.length}`,
+          {
+            records: internalBatch.length,
+            startTime: new Date().toISOString(),
+            progress: `${((internalBatchIndex / internalBatches.length) * 100).toFixed(1)}%`,
+          },
+        );
+
+        const internalBatchResults = {
+          internalBatchNumber: internalBatchIndex + 1,
+          totalRecords: internalBatch.length,
           deleted: 0,
           notFound: 0,
-          errors: [],
-          deletedCounts: {
-            customers: 0,
-            reservations: 0,
-            payments: 0,
-            paymentDetails: 0,
-            auditLogs: 0,
-          },
+          errors: [] as any[],
+          processingTime: 0,
         };
 
-        // Procesar cada registro del Excel
-        for (const [index, record] of data.entries()) {
+        // Procesar cada registro del lote interno
+        for (const [recordIndex, record] of internalBatch.entries()) {
+          const globalRecordIndex =
+            internalBatchIndex * internalBatchSize + recordIndex;
+
           try {
-            const deleteResult = await this.deleteSingleRecord(
-              record,
-              prisma,
-              user,
+            const deleteResult = await this.prisma.$transaction(
+              async (prisma) => {
+                return await this.deleteSingleRecord(record, prisma, user);
+              },
+              {
+                timeout: 30000, // 30 segundos por registro individual
+              },
             );
 
             if (deleteResult.found) {
+              internalBatchResults.deleted++;
               results.deleted++;
               results.deletedCounts.customers +=
                 deleteResult.deletedCounts.customers || 0;
@@ -1577,40 +1624,61 @@ export class ImportService {
               results.deletedCounts.auditLogs +=
                 deleteResult.deletedCounts.auditLogs || 0;
             } else {
+              internalBatchResults.notFound++;
               results.notFound++;
             }
 
             results.processed++;
           } catch (error) {
-            results.errors.push({
-              recordIndex: index + 1,
+            const errorInfo = {
+              recordIndex: globalRecordIndex + 1,
+              internalBatchIndex: internalBatchIndex + 1,
               error: error.message,
               data: {
                 nombre: record['APELLIDOS Y NOMBRES'],
                 documento: record['Nº DOCUMENTO'],
                 fecha: record['FECHA'],
               },
-            });
+            };
+
+            internalBatchResults.errors.push(errorInfo);
+            results.errors.push(errorInfo);
+
             this.logger.error(
-              `Error eliminando registro ${index + 1}: ${error.message}`,
+              `Error eliminando registro ${globalRecordIndex + 1} (lote ${internalBatchIndex + 1}): ${error.message}`,
+              error.stack,
             );
           }
         }
 
-        this.logger.log('Eliminación completada', {
-          processed: results.processed,
-          deleted: results.deleted,
-          notFound: results.notFound,
-          errors: results.errors.length,
-          deletedCounts: results.deletedCounts,
-        });
+        internalBatchResults.processingTime = Date.now() - batchStartTime;
+        results.internalBatches.push(internalBatchResults);
 
-        return {
-          success: true,
-          message: `Eliminación completada: ${results.deleted} registros eliminados, ${results.notFound} no encontrados`,
-          ...results,
-        };
+        this.logger.log(
+          `✅ LOTE DE ELIMINACIÓN ${internalBatchIndex + 1} COMPLETADO`,
+          {
+            deleted: internalBatchResults.deleted,
+            notFound: internalBatchResults.notFound,
+            errors: internalBatchResults.errors.length,
+            processingTime: `${internalBatchResults.processingTime}ms`,
+          },
+        );
+      }
+
+      this.logger.log('🎉 ELIMINACIÓN MASIVA COMPLETADA', {
+        processed: results.processed,
+        deleted: results.deleted,
+        notFound: results.notFound,
+        errors: results.errors.length,
+        deletedCounts: results.deletedCounts,
+        totalBatches: internalBatches.length,
       });
+
+      return {
+        success: true,
+        message: `Eliminación completada: ${results.deleted} registros eliminados, ${results.notFound} no encontrados`,
+        ...results,
+      };
     } catch (error) {
       this.logger.error(
         `Error procesando archivo Excel para eliminación: ${error.message}`,

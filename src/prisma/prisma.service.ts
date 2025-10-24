@@ -114,16 +114,31 @@ export class PrismaService
   /**
    * Ejecuta operaciones dentro de una transacción.
    * @param operation - Función que contiene las operaciones a ejecutar
+   * @param options - Opciones de la transacción, incluyendo timeout
    * @returns Promise con el resultado de la operación
    */
   async withTransaction<T>(
     operation: (tx: PrismaTransaction) => Promise<T>,
+    options?: {
+      timeout?: number;
+      isolationLevel?:
+        | 'ReadUncommitted'
+        | 'ReadCommitted'
+        | 'RepeatableRead'
+        | 'Serializable';
+    },
   ): Promise<T> {
     const startTime = Date.now();
     try {
-      const result = await this.$transaction(async (tx) => {
-        return await operation(tx as PrismaTransaction);
-      });
+      const result = await this.$transaction(
+        async (tx) => {
+          return await operation(tx as PrismaTransaction);
+        },
+        {
+          timeout: options?.timeout || 5000, // Default 5 seconds, pero configurable
+          isolationLevel: options?.isolationLevel,
+        },
+      );
       return result;
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -143,6 +158,7 @@ export class PrismaService
       this.logger.error(`Unexpected transaction error after ${duration}ms`, {
         message: error.message,
         duration,
+        timeout: options?.timeout,
       });
       throw error;
     }
