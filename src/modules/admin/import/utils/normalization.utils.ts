@@ -251,7 +251,9 @@ export class NormalizationUtils {
    * @returns Nombre del departamento peruano o null si no es
    */
   static detectPeruvianDepartment(value?: string): string | null {
-    if (!value || value.trim() === '') return null;
+    if (!value || value.trim() === '') {
+      return null;
+    }
 
     const normalized = value.toLowerCase().trim();
 
@@ -263,6 +265,7 @@ export class NormalizationUtils {
       apurímac: 'Apurímac',
       apurimac: 'Apurímac',
       arequipa: 'Arequipa',
+      aequipa: 'Arequipa', // ✅ Agregar variante incorrecta "aequipa"
       ayacucho: 'Ayacucho',
       cajamarca: 'Cajamarca',
       callao: 'Callao',

@@ -4,6 +4,7 @@ import {
   UseInterceptors,
   UploadedFile,
   Res,
+  Delete,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -11,7 +12,13 @@ import { ImportService } from './import.service';
 import { Auth } from '../auth/decorators';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { UserData } from 'src/interfaces';
-import { ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiConsumes,
+  ApiBody,
+  ApiResponse,
+  ApiOperation,
+} from '@nestjs/swagger';
 
 @ApiTags('Import Excel')
 @Controller('import')
@@ -116,7 +123,6 @@ export class ImportController {
   }
 
   // Temporarily commented out due to safety concerns - this endpoint deletes reservations and is very dangerous
-  /*
   @Delete('cleanup')
   @ApiOperation({
     summary: 'Limpiar todos los datos importados',
@@ -147,5 +153,4 @@ export class ImportController {
   async cleanupImportedData(@GetUser() user: UserData) {
     return await this.importService.cleanupImportedData(user);
   }
-    */
 }

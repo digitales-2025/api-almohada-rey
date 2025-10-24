@@ -1646,10 +1646,12 @@ export class ImportService {
       throw new Error('Datos insuficientes para identificar el registro');
     }
 
-    // Buscar cliente por documento
-    const customer = await prisma.customer.findUnique({
-      where: { documentNumber },
-    });
+    // Buscar cliente usando estrategia robusta (como en el import)
+    const customer = await this.findCustomerForDeletion(
+      record,
+      documentNumber,
+      prisma,
+    );
 
     if (!customer) {
       return {
@@ -2304,22 +2306,19 @@ export class ImportService {
       };
 
       try {
-        // 1. Primero obtener las Reservations que vamos a eliminar
+        // 1. Primero obtener TODAS las Reservations importadas que vamos a eliminar
         const reservationsToDelete = await prisma.reservation.findMany({
           where: {
             createdByLandingPage: false, // Solo reservas creadas por importación
             status: 'CHECKED_OUT', // Solo las que están en estado importado
-            // Verificar que tengan fecha de creación reciente (últimos 7 días)
-            createdAt: {
-              gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Últimos 7 días
-            },
+            // ✅ ELIMINAR TODAS LAS RESERVAS IMPORTADAS (sin filtro de fecha)
           },
           select: { id: true },
         });
 
         const reservationIds = reservationsToDelete.map((r) => r.id);
         this.logger.log(
-          `Encontradas ${reservationIds.length} reservas para eliminar`,
+          `Encontradas ${reservationIds.length} reservas importadas para eliminar (TODAS)`,
         );
 
         // 2. Obtener los Payments que referencian estas Reservations
@@ -2428,5 +2427,192 @@ export class ImportService {
         );
       }
     });
+  }
+
+  /**
+   * Busca cliente para eliminación usando la misma lógica robusta del import
+   */
+  private async findCustomerForDeletion(
+    record: any,
+    documentNumber: string,
+    prisma: any,
+  ) {
+    // PRIORIDAD 1: Buscar por documento normalizado
+    let customer = await prisma.customer.findUnique({
+      where: { documentNumber },
+    });
+
+    if (customer) {
+      return customer;
+    }
+
+    // PRIORIDAD 2: Buscar por variaciones del documento
+    const documentVariations = this.generateDocumentVariations(
+      record['Nº DOCUMENTO'],
+      record['TIPO DOCUMENTO'],
+    );
+
+    for (const variation of documentVariations) {
+      customer = await prisma.customer.findUnique({
+        where: { documentNumber: variation },
+      });
+      if (customer) {
+        this.logger.log(
+          `Cliente encontrado por variación de documento: ${variation}`,
+        );
+        return customer;
+      }
+    }
+
+    // PRIORIDAD 3: Buscar por nombre y documento (fuzzy matching)
+    const normalizedName = this.normalizeName(record['APELLIDOS Y NOMBRES']);
+
+    const customers = await prisma.customer.findMany({
+      where: {
+        OR: [
+          { documentNumber: { contains: record['Nº DOCUMENTO'] } },
+          {
+            AND: [
+              { firstName: { contains: normalizedName.split(' ')[0] } },
+              {
+                lastName: {
+                  contains: normalizedName.split(' ').slice(1).join(' '),
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    // Encontrar el mejor match usando similitud
+    let bestMatch = null;
+    let bestScore = 0;
+
+    for (const candidate of customers) {
+      const score = this.calculateNameSimilarity(
+        normalizedName,
+        `${candidate.firstName} ${candidate.lastName}`,
+      );
+
+      if (score > bestScore && score > 0.7) {
+        // 70% de similitud mínima
+        bestMatch = candidate;
+        bestScore = score;
+      }
+    }
+
+    if (bestMatch) {
+      this.logger.log(
+        `Cliente encontrado por similitud de nombre: ${bestMatch.firstName} ${bestMatch.lastName} (score: ${bestScore})`,
+      );
+      return bestMatch;
+    }
+
+    return null;
+  }
+
+  /**
+   * Genera variaciones del documento para búsqueda más flexible
+   */
+  private generateDocumentVariations(
+    documentNumber: string,
+    documentType: string,
+  ): string[] {
+    const variations = [];
+
+    if (!documentNumber) return variations;
+
+    // Agregar ceros adelante si es DNI
+    if (documentType === 'DNI' || !documentType) {
+      const padded = documentNumber.padStart(8, '0');
+      if (padded !== documentNumber) {
+        variations.push(padded);
+      }
+    }
+
+    // Agregar versión sin ceros
+    const unpadded = documentNumber.replace(/^0+/, '');
+    if (unpadded !== documentNumber && unpadded.length > 0) {
+      variations.push(unpadded);
+    }
+
+    // Agregar versión con puntos y guiones
+    const withDots = documentNumber.replace(
+      /(\d{3})(\d{3})(\d{3})/,
+      '$1.$2.$3',
+    );
+    if (withDots !== documentNumber) {
+      variations.push(withDots);
+    }
+
+    return variations;
+  }
+
+  /**
+   * Normaliza nombres para búsqueda
+   */
+  private normalizeName(name: string): string {
+    if (!name) return '';
+
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/[áàäâ]/g, 'a')
+      .replace(/[éèëê]/g, 'e')
+      .replace(/[íìïî]/g, 'i')
+      .replace(/[óòöô]/g, 'o')
+      .replace(/[úùüû]/g, 'u')
+      .replace(/[ñ]/g, 'n')
+      .replace(/[ç]/g, 'c')
+      .replace(/[^a-z\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /**
+   * Calcula similitud entre dos nombres usando algoritmo de Levenshtein
+   */
+  private calculateNameSimilarity(name1: string, name2: string): number {
+    const normalized1 = this.normalizeName(name1);
+    const normalized2 = this.normalizeName(name2);
+
+    if (normalized1 === normalized2) return 1.0;
+
+    const distance = this.levenshteinDistance(normalized1, normalized2);
+    const maxLength = Math.max(normalized1.length, normalized2.length);
+
+    return maxLength === 0 ? 0 : (maxLength - distance) / maxLength;
+  }
+
+  /**
+   * Calcula distancia de Levenshtein entre dos strings
+   */
+  private levenshteinDistance(str1: string, str2: string): number {
+    const matrix = [];
+
+    for (let i = 0; i <= str2.length; i++) {
+      matrix[i] = [i];
+    }
+
+    for (let j = 0; j <= str1.length; j++) {
+      matrix[0][j] = j;
+    }
+
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1,
+          );
+        }
+      }
+    }
+
+    return matrix[str2.length][str1.length];
   }
 }
