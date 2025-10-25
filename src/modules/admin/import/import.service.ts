@@ -2463,14 +2463,10 @@ export class ImportService {
         OR: [
           { documentNumber: { contains: record['Nº DOCUMENTO'] } },
           {
-            AND: [
-              { firstName: { contains: normalizedName.split(' ')[0] } },
-              {
-                lastName: {
-                  contains: normalizedName.split(' ').slice(1).join(' '),
-                },
-              },
-            ],
+            name: {
+              contains: normalizedName,
+              mode: 'insensitive',
+            },
           },
         ],
       },
@@ -2483,7 +2479,7 @@ export class ImportService {
     for (const candidate of customers) {
       const score = this.calculateNameSimilarity(
         normalizedName,
-        `${candidate.firstName} ${candidate.lastName}`,
+        candidate.name,
       );
 
       if (score > bestScore && score > 0.7) {
@@ -2495,7 +2491,7 @@ export class ImportService {
 
     if (bestMatch) {
       this.logger.log(
-        `Cliente encontrado por similitud de nombre: ${bestMatch.firstName} ${bestMatch.lastName} (score: ${bestScore})`,
+        `Cliente encontrado por similitud de nombre: ${bestMatch.name} (score: ${bestScore})`,
       );
       return bestMatch;
     }
