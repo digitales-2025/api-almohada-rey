@@ -50,23 +50,12 @@ export class ImportService {
     };
 
     const startTime = Date.now();
-    const startTimeISO = new Date().toISOString();
 
     // OPTIMIZACIÓN: Procesar en lotes internos de 25 registros (más conservador para producción)
     const internalBatchSize = 25;
     const internalBatches = this.chunkArray(data, internalBatchSize);
 
-    this.logger.log(
-      `🚀 INICIANDO IMPORTACIÓN - Batch ${batchNumber}/${totalBatches}`,
-      {
-        totalRecords: data.length,
-        internalBatches: internalBatches.length,
-        batchSize: internalBatchSize,
-        startTime: startTimeISO,
-        batchNumber,
-        totalBatches,
-      },
-    );
+    // Sin logging detallado - no hay acceso a logs en producción
 
     // Procesar cada lote interno
     for (
@@ -77,15 +66,7 @@ export class ImportService {
       const internalBatch = internalBatches[internalBatchIndex];
       const batchStartTime = Date.now();
 
-      const batchStartTimeISO = new Date().toISOString();
-      this.logger.log(
-        `📦 PROCESANDO LOTE INTERNO ${internalBatchIndex + 1}/${internalBatches.length}`,
-        {
-          records: internalBatch.length,
-          startTime: batchStartTimeISO,
-          progress: `${((internalBatchIndex / internalBatches.length) * 100).toFixed(1)}%`,
-        },
-      );
+      // Sin logging detallado - no hay acceso a logs en producción
 
       const internalBatchResults = {
         internalBatchNumber: internalBatchIndex + 1,
@@ -102,12 +83,7 @@ export class ImportService {
           internalBatchIndex * internalBatchSize + recordIndex;
 
         try {
-          // Log de progreso cada 5 registros
-          if (globalRecordIndex % 5 === 0) {
-            this.logger.log(
-              `🔄 Procesando registro ${globalRecordIndex + 1}/${data.length} (${((globalRecordIndex / data.length) * 100).toFixed(1)}%)`,
-            );
-          }
+          // Sin logging de progreso - no hay acceso a logs en producción
 
           // MANTENER TODA LA LÓGICA COMPLEJA INTACTA
           await this.processSingleRecord(record, user, results);
@@ -138,39 +114,12 @@ export class ImportService {
       internalBatchResults.processingTime = Date.now() - batchStartTime;
       results.internalBatches.push(internalBatchResults);
 
-      const batchEndTimeISO = new Date().toISOString();
-      const avgTimePerRecord =
-        internalBatchResults.processingTime / internalBatch.length;
-
-      this.logger.log(`✅ LOTE INTERNO ${internalBatchIndex + 1} COMPLETADO`, {
-        successful: internalBatchResults.successful,
-        failed: internalBatchResults.failed,
-        totalRecords: internalBatch.length,
-        processingTime: `${internalBatchResults.processingTime}ms`,
-        avgTimePerRecord: `${avgTimePerRecord.toFixed(2)}ms`,
-        endTime: batchEndTimeISO,
-        successRate: `${((internalBatchResults.successful / internalBatch.length) * 100).toFixed(1)}%`,
-      });
+      // Sin logging detallado - no hay acceso a logs en producción
     }
 
     results.processingTime = Date.now() - startTime;
-    const endTimeISO = new Date().toISOString();
-    const avgTimePerRecord = results.processingTime / data.length;
-    const avgTimePerBatch = results.processingTime / internalBatches.length;
 
-    this.logger.log(`🎉 BATCH ${batchNumber}/${totalBatches} COMPLETADO`, {
-      totalRecords: data.length,
-      successful: results.successful,
-      failed: results.failed,
-      successRate: `${((results.successful / data.length) * 100).toFixed(1)}%`,
-      totalProcessingTime: `${results.processingTime}ms (${(results.processingTime / 1000).toFixed(2)}s)`,
-      avgTimePerRecord: `${avgTimePerRecord.toFixed(2)}ms`,
-      avgTimePerBatch: `${avgTimePerBatch.toFixed(2)}ms`,
-      internalBatches: internalBatches.length,
-      startTime: startTimeISO,
-      endTime: endTimeISO,
-      duration: `${(results.processingTime / 1000 / 60).toFixed(2)} minutos`,
-    });
+    // Sin logging detallado - no hay acceso a logs en producción
 
     // Crear reporte completo de nacionalidades
     const normalizationReport = {
@@ -1265,7 +1214,9 @@ export class ImportService {
   private isStandardizedCountry(country: string | null): boolean {
     if (!country) return true; // null está permitido
 
+    // Lista COMPLETA de todos los países que normalizeNationality() puede retornar
     const standardizedCountries = [
+      // América Latina
       'Perú',
       'Argentina',
       'Bolivia',
@@ -1276,6 +1227,7 @@ export class ImportService {
       'Paraguay',
       'Uruguay',
       'Venezuela',
+      // Centroamérica y Caribe
       'México',
       'Panamá',
       'Costa Rica',
@@ -1287,8 +1239,10 @@ export class ImportService {
       'Cuba',
       'República Dominicana',
       'Puerto Rico',
+      // Norteamérica
       'Estados Unidos',
       'Canadá',
+      // Europa
       'España',
       'Francia',
       'Italia',
@@ -1308,6 +1262,27 @@ export class ImportService {
       'República Checa',
       'Rusia',
       'Ucrania',
+      'Grecia',
+      'Hungría',
+      'Rumania',
+      'Bulgaria',
+      'Croacia',
+      'Serbia',
+      'Eslovaquia',
+      'Eslovenia',
+      'Estonia',
+      'Letonia',
+      'Lituania',
+      'Islandia',
+      'Malta',
+      'Chipre',
+      'Luxemburgo',
+      'Mónaco',
+      'Liechtenstein',
+      'Andorra',
+      'San Marino',
+      'Ciudad del Vaticano',
+      // Asia
       'China',
       'Japón',
       'Corea del Sur',
@@ -1317,13 +1292,114 @@ export class ImportService {
       'Filipinas',
       'Vietnam',
       'Indonesia',
+      'Myanmar',
+      'Malasia',
+      'Singapur',
+      'Brunéi',
+      'Camboya',
+      'Laos',
+      'Bangladesh',
+      'Pakistán',
+      'Afganistán',
+      'Nepal',
+      'Bután',
+      'Sri Lanka',
+      'Maldivas',
+      'Mongolia',
+      'Kazajistán',
+      'Uzbekistán',
+      'Turkmenistán',
+      'Kirguistán',
+      'Tayikistán',
+      'Armenia',
+      'Azerbaiyán',
+      'Georgia',
+      'Turquía',
+      // Oceanía
       'Australia',
       'Nueva Zelanda',
+      'Fiyi',
+      'Papúa Nueva Guinea',
+      'Samoa',
+      'Tonga',
+      'Vanuatu',
+      'Islas Salomón',
+      'Micronesia',
+      'Palaos',
+      'Kiribati',
+      'Tuvalu',
+      'Nauru',
+      'Islas Marshall',
+      // Medio Oriente
       'Líbano',
       'Siria',
       'Irak',
       'Irán',
       'Israel',
+      'Jordania',
+      'Arabia Saudita',
+      'Kuwait',
+      'Baréin',
+      'Catar',
+      'Emiratos Árabes Unidos',
+      'Omán',
+      'Yemen',
+      // África
+      'Egipto',
+      'Sudáfrica',
+      'Nigeria',
+      'Kenia',
+      'Etiopía',
+      'Ghana',
+      'Tanzania',
+      'Uganda',
+      'Argelia',
+      'Marruecos',
+      'Túnez',
+      'Libia',
+      'Sudán',
+      'Sudán del Sur',
+      'Somalia',
+      'Eritrea',
+      'Yibuti',
+      'Senegal',
+      'Mali',
+      'Níger',
+      'Chad',
+      'Mauritania',
+      'Gambia',
+      'Guinea',
+      'Guinea-Bisáu',
+      'Sierra Leona',
+      'Liberia',
+      'Costa de Marfil',
+      'Burkina Faso',
+      'Togo',
+      'Benín',
+      'Camerún',
+      'República Centroafricana',
+      'Guinea Ecuatorial',
+      'Gabón',
+      'Congo',
+      'República Democrática del Congo',
+      'Angola',
+      'Zambia',
+      'Zimbabue',
+      'Malaui',
+      'Mozambique',
+      'Botsuana',
+      'Namibia',
+      'Lesoto',
+      'Suazilandia',
+      'Madagascar',
+      'Mauricio',
+      'Seychelles',
+      'Comoras',
+      'Cabo Verde',
+      'Santo Tomé y Príncipe',
+      'Ruanda',
+      'Burundi',
+      // Otros
       'Otro',
     ];
 
@@ -1556,9 +1632,7 @@ export class ImportService {
       const internalBatchSize = 10;
       const internalBatches = this.chunkArray(data, internalBatchSize);
 
-      this.logger.log(
-        `Procesando en ${internalBatches.length} lotes internos de ${internalBatchSize} registros cada uno`,
-      );
+      // Sin logging detallado - no hay acceso a logs en producción
 
       const results = {
         processed: 0,
@@ -1584,14 +1658,7 @@ export class ImportService {
         const internalBatch = internalBatches[internalBatchIndex];
         const batchStartTime = Date.now();
 
-        this.logger.log(
-          `🗑️ PROCESANDO LOTE DE ELIMINACIÓN ${internalBatchIndex + 1}/${internalBatches.length}`,
-          {
-            records: internalBatch.length,
-            startTime: new Date().toISOString(),
-            progress: `${((internalBatchIndex / internalBatches.length) * 100).toFixed(1)}%`,
-          },
-        );
+        // Sin logging detallado - no hay acceso a logs en producción
 
         const internalBatchResults = {
           internalBatchNumber: internalBatchIndex + 1,
@@ -1661,25 +1728,10 @@ export class ImportService {
         internalBatchResults.processingTime = Date.now() - batchStartTime;
         results.internalBatches.push(internalBatchResults);
 
-        this.logger.log(
-          `✅ LOTE DE ELIMINACIÓN ${internalBatchIndex + 1} COMPLETADO`,
-          {
-            deleted: internalBatchResults.deleted,
-            notFound: internalBatchResults.notFound,
-            errors: internalBatchResults.errors.length,
-            processingTime: `${internalBatchResults.processingTime}ms`,
-          },
-        );
+        // Sin logging detallado - no hay acceso a logs en producción
       }
 
-      this.logger.log('🎉 ELIMINACIÓN MASIVA COMPLETADA', {
-        processed: results.processed,
-        deleted: results.deleted,
-        notFound: results.notFound,
-        errors: results.errors.length,
-        deletedCounts: results.deletedCounts,
-        totalBatches: internalBatches.length,
-      });
+      // Sin logging detallado - no hay acceso a logs en producción
 
       return {
         success: true,
@@ -2538,14 +2590,10 @@ export class ImportService {
         OR: [
           { documentNumber: { contains: record['Nº DOCUMENTO'] } },
           {
-            AND: [
-              { firstName: { contains: normalizedName.split(' ')[0] } },
-              {
-                lastName: {
-                  contains: normalizedName.split(' ').slice(1).join(' '),
-                },
-              },
-            ],
+            name: {
+              contains: normalizedName,
+              mode: 'insensitive',
+            },
           },
         ],
       },
@@ -2558,7 +2606,7 @@ export class ImportService {
     for (const candidate of customers) {
       const score = this.calculateNameSimilarity(
         normalizedName,
-        `${candidate.firstName} ${candidate.lastName}`,
+        candidate.name,
       );
 
       if (score > bestScore && score > 0.7) {
@@ -2570,7 +2618,7 @@ export class ImportService {
 
     if (bestMatch) {
       this.logger.log(
-        `Cliente encontrado por similitud de nombre: ${bestMatch.firstName} ${bestMatch.lastName} (score: ${bestScore})`,
+        `Cliente encontrado por similitud de nombre: ${bestMatch.name} (score: ${bestScore})`,
       );
       return bestMatch;
     }
