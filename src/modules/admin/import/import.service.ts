@@ -52,8 +52,8 @@ export class ImportService {
     const startTime = Date.now();
     const startTimeISO = new Date().toISOString();
 
-    // OPTIMIZACIÓN: Procesar en lotes internos de 100 registros
-    const internalBatchSize = 100;
+    // OPTIMIZACIÓN: Procesar en lotes internos de 25 registros (más conservador para producción)
+    const internalBatchSize = 25;
     const internalBatches = this.chunkArray(data, internalBatchSize);
 
     this.logger.log(
@@ -102,6 +102,13 @@ export class ImportService {
           internalBatchIndex * internalBatchSize + recordIndex;
 
         try {
+          // Log de progreso cada 5 registros
+          if (globalRecordIndex % 5 === 0) {
+            this.logger.log(
+              `🔄 Procesando registro ${globalRecordIndex + 1}/${data.length} (${((globalRecordIndex / data.length) * 100).toFixed(1)}%)`,
+            );
+          }
+
           // MANTENER TODA LA LÓGICA COMPLEJA INTACTA
           await this.processSingleRecord(record, user, results);
           internalBatchResults.successful++;
@@ -197,7 +204,7 @@ export class ImportService {
       // No lanzar error, continuar con el procesamiento
     }
 
-    return await this.prisma.$transaction(
+    return await this.prisma.withTransaction(
       async (prisma) => {
         // 1. Calcular fechas primero (necesario para createdAt del cliente)
         const { checkInDate, checkOutDate } =
@@ -248,7 +255,7 @@ export class ImportService {
         return { customer, reservation, payment, paymentDetails };
       },
       {
-        timeout: 30000, // 30 segundos para operaciones complejas de importación
+        timeout: 300000, // 5 minutos por registro para importaciones largas en producción
       },
     );
   }
@@ -1545,8 +1552,8 @@ export class ImportService {
         totalRecords: data.length,
       });
 
-      // OPTIMIZACIÓN: Procesar en lotes internos de 50 registros para eliminación
-      const internalBatchSize = 50;
+      // OPTIMIZACIÓN: Procesar en lotes internos de 10 registros para eliminación (ultra conservador para producción)
+      const internalBatchSize = 10;
       const internalBatches = this.chunkArray(data, internalBatchSize);
 
       this.logger.log(
@@ -1601,12 +1608,12 @@ export class ImportService {
             internalBatchIndex * internalBatchSize + recordIndex;
 
           try {
-            const deleteResult = await this.prisma.$transaction(
+            const deleteResult = await this.prisma.withTransaction(
               async (prisma) => {
                 return await this.deleteSingleRecord(record, prisma, user);
               },
               {
-                timeout: 30000, // 30 segundos por registro individual
+                timeout: 180000, // 3 minutos por registro individual para producción
               },
             );
 
@@ -1779,55 +1786,46 @@ export class ImportService {
       };
     }
 
-    // Eliminar en orden: PaymentDetails -> Payments -> Reservations
-    // ✅ NO eliminar Customer
-    for (const reservation of reservations) {
-      // 1. Buscar y eliminar PaymentDetails primero
-      if (reservation.payment && reservation.payment.id) {
-        const deletedPaymentDetails = await prisma.paymentDetail.deleteMany({
-          where: {
-            paymentId: reservation.payment.id,
-          },
-        });
-        deletedCounts.paymentDetails += deletedPaymentDetails.count;
+    // OPTIMIZACIÓN: Eliminar en lotes para ser más eficiente
+    const reservationIds = reservations.map((r) => r.id);
 
-        // 2. Eliminar Payment
-        await prisma.payment.delete({
-          where: { id: reservation.payment.id },
-        });
-        deletedCounts.payments++;
-      } else {
-        // Si no hay payment relacionado, buscar payments por reservationId
-        const payments = await prisma.payment.findMany({
-          where: { reservationId: reservation.id },
-          include: { paymentDetail: true },
-        });
+    // 1. Obtener todos los payments relacionados de una vez
+    const allPayments = await prisma.payment.findMany({
+      where: {
+        reservationId: { in: reservationIds },
+      },
+      select: { id: true },
+    });
 
-        for (const payment of payments) {
-          // Eliminar PaymentDetails
-          if (payment.paymentDetail) {
-            const deletedPaymentDetails = await prisma.paymentDetail.deleteMany(
-              {
-                where: { paymentId: payment.id },
-              },
-            );
-            deletedCounts.paymentDetails += deletedPaymentDetails.count;
-          }
+    const paymentIds = allPayments.map((p) => p.id);
 
-          // Eliminar Payment
-          await prisma.payment.delete({
-            where: { id: payment.id },
-          });
-          deletedCounts.payments++;
-        }
-      }
-
-      // 3. Eliminar Reservation
-      await prisma.reservation.delete({
-        where: { id: reservation.id },
+    // 2. Eliminar PaymentDetails en lote
+    if (paymentIds.length > 0) {
+      const deletedPaymentDetails = await prisma.paymentDetail.deleteMany({
+        where: {
+          paymentId: { in: paymentIds },
+        },
       });
-      deletedCounts.reservations++;
+      deletedCounts.paymentDetails = deletedPaymentDetails.count;
     }
+
+    // 3. Eliminar Payments en lote
+    if (paymentIds.length > 0) {
+      const deletedPayments = await prisma.payment.deleteMany({
+        where: {
+          id: { in: paymentIds },
+        },
+      });
+      deletedCounts.payments = deletedPayments.count;
+    }
+
+    // 4. Eliminar Reservations en lote
+    const deletedReservations = await prisma.reservation.deleteMany({
+      where: {
+        id: { in: reservationIds },
+      },
+    });
+    deletedCounts.reservations = deletedReservations.count;
 
     // Eliminar AuditLogs relacionados solo con las reservas eliminadas
     const deletedAuditLogs = await prisma.audit.deleteMany({
