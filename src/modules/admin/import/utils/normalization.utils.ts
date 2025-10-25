@@ -937,6 +937,9 @@ export class NormalizationUtils {
       'nueva zelanda': 'Nueva Zelanda',
       auckland: 'Nueva Zelanda',
       wellington: 'Nueva Zelanda',
+      tahiti: 'Francia', // Polinesia Francesa
+      tahití: 'Francia',
+      thihtih: 'Francia', // Typo de Tahití
 
       // Medio Oriente
       árabe: 'Otro',
