@@ -271,6 +271,7 @@ export class NormalizationUtils {
       '0',
       '00',
       '000',
+      'a',
     ];
     if (invalidValues.includes(value.toLowerCase().trim())) {
       return null;
@@ -375,6 +376,7 @@ export class NormalizationUtils {
 
       abancay: 'Apurímac',
       andahuaylas: 'Apurímac',
+      andahuyas: 'Apurímac', // Typo de Andahuaylas
       antabamba: 'Apurímac',
       aymaraes: 'Apurímac',
       cotabambas: 'Apurímac',
@@ -481,6 +483,8 @@ export class NormalizationUtils {
       yunguyo: 'Puno',
 
       moyobamba: 'San Martín',
+      moyobmaba: 'San Martín', // Typo de Moyobamba
+      moyobamaba: 'San Martín', // Otro typo de Moyobamba
       bellavista: 'San Martín',
       'el dorado': 'San Martín',
       huallaga: 'San Martín',
@@ -488,6 +492,7 @@ export class NormalizationUtils {
       'mariscal caceres': 'San Martín',
       picota: 'San Martín',
       tocache: 'San Martín',
+      coñumbuque: 'San Martín',
 
       candarave: 'Tacna',
       'jorge basadre': 'Tacna',
@@ -521,6 +526,14 @@ export class NormalizationUtils {
       cotahuasi: 'Arequipa',
       'la joya': 'Arequipa',
       chuquibamba: 'Arequipa',
+      chala: 'Arequipa',
+      chivay: 'Arequipa',
+      apla: 'Arequipa',
+      caravely: 'Arequipa',
+      arerquipa: 'Arequipa', // Typo de Arequipa
+      arequipà: 'Arequipa', // Con tilde
+      cháparra: 'Arequipa',
+      majes: 'Arequipa',
 
       // ========================================
       // CIUDADES Y DISTRITOS ADICIONALES DE PUNO
@@ -535,6 +548,8 @@ export class NormalizationUtils {
       juli: 'Puno',
       macusani: 'Puno',
       putina: 'Puno',
+      jukliaca: 'Puno', // Typo de Juliaca
+      ollachea: 'Puno',
 
       // ========================================
       // CIUDADES Y DISTRITOS ADICIONALES DE LIMA
@@ -565,6 +580,9 @@ export class NormalizationUtils {
       magdalena: 'Lima',
       rimac: 'Lima',
       'cercado de lima': 'Lima',
+      surquillo: 'Lima',
+      'lim a': 'Lima', // Typo de Lima
+      limatambo: 'Lima',
       ventanilla: 'Callao',
       'la perla': 'Callao',
       'carmen de la legua': 'Callao',
@@ -581,6 +599,8 @@ export class NormalizationUtils {
       calca: 'Cusco',
       sicuani: 'Cusco',
       espinar: 'Cusco',
+      quillabamba: 'Cusco',
+      quillabanba: 'Cusco', // Typo de Quillabamba
 
       // ========================================
       // OTRAS CIUDADES IMPORTANTES
@@ -596,11 +616,13 @@ export class NormalizationUtils {
 
       // Junín
       huancayo: 'Junín',
+      huancyo: 'Junín', // Typo de Huancayo
       'la oroya': 'Junín',
       chanchamayo: 'Junín',
 
       // Ancash
       'nuevo chimbote': 'Ancash',
+      chinbote: 'Ancash', // Typo de Chimbote
     };
 
     return peruvianLocations[normalized] || null;
@@ -640,6 +662,7 @@ export class NormalizationUtils {
       '0',
       '00',
       '000',
+      'a',
     ];
     if (invalidValues.includes(nationality.toLowerCase().trim())) {
       return null;
@@ -721,6 +744,8 @@ export class NormalizationUtils {
       quito: 'Ecuador', // Capital
       guayaquil: 'Ecuador',
       cuenca: 'Ecuador',
+      loja: 'Ecuador',
+      azogues: 'Ecuador',
       paraguaya: 'Paraguay',
       paraguayo: 'Paraguay',
       paraguay: 'Paraguay',
@@ -745,6 +770,8 @@ export class NormalizationUtils {
       'ciudad de méxico': 'México',
       guadalajara: 'México',
       monterrey: 'México',
+      durango: 'México',
+      queretaro: 'México',
       panameña: 'Panamá',
       panameño: 'Panamá',
       panama: 'Panamá',
@@ -847,6 +874,7 @@ export class NormalizationUtils {
       holandés: 'Países Bajos',
       holanda: 'Países Bajos',
       'paises bajos': 'Países Bajos',
+      'países bajos': 'Países Bajos',
       belga: 'Bélgica',
       belgica: 'Bélgica',
       bélgica: 'Bélgica',
