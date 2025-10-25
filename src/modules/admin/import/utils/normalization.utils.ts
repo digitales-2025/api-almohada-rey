@@ -255,21 +255,73 @@ export class NormalizationUtils {
       return null;
     }
 
+    // Filtrar valores inválidos comunes
+    const invalidValues = [
+      '-',
+      '--',
+      'n/a',
+      'na',
+      'x',
+      'xx',
+      'xxx',
+      'p',
+      's/n',
+      'sin dato',
+      'sin datos',
+      '0',
+      '00',
+      '000',
+    ];
+    if (invalidValues.includes(value.toLowerCase().trim())) {
+      return null;
+    }
+
+    // Limpiar y normalizar el valor
     const normalized = value.toLowerCase().trim();
+
+    // Manejar formatos compuestos (PUNO-AYAVIRI, JULIACA-PUNO, NAZCA - ICA, etc.)
+    // Extraer la parte más relevante (generalmente la primera o la que sea departamento)
+    if (normalized.includes('-') || normalized.includes('–')) {
+      const parts = normalized.split(/[-–]/).map((p) => p.trim());
+      // Intentar con cada parte
+      for (const part of parts) {
+        const result = this.detectPeruvianDepartment(part);
+        if (result) return result;
+      }
+    }
+
+    // Manejar espacios múltiples (CALLAO LIMA, SAN MARTIN PORRES, etc.)
+    if (normalized.includes(' ')) {
+      const parts = normalized.split(/\s+/);
+      // Primero intentar con el string completo
+      // Luego intentar con cada parte individual
+      for (const part of parts) {
+        if (part.length > 2) {
+          // Ignorar preposiciones cortas
+          const result = this.detectPeruvianDepartment(part);
+          if (result) return result;
+        }
+      }
+    }
 
     // Mapa de departamentos, provincias y ciudades del Perú a sus departamentos correspondientes
     const peruvianLocations: { [key: string]: string } = {
-      // Departamentos
+      // Departamentos (con variantes y typos comunes)
       amazonas: 'Amazonas',
       ancash: 'Ancash',
+      anchash: 'Ancash', // Typo común
       apurímac: 'Apurímac',
       apurimac: 'Apurímac',
       arequipa: 'Arequipa',
-      aequipa: 'Arequipa', // ✅ Agregar variante incorrecta "aequipa"
+      aequipa: 'Arequipa', // Typo común
+      arequia: 'Arequipa', // Typo común
+      arequip: 'Arequipa', // Typo común
       ayacucho: 'Ayacucho',
       cajamarca: 'Cajamarca',
       callao: 'Callao',
       cusco: 'Cusco',
+      cuzco: 'Cusco', // Variante ortográfica
+      qosqo: 'Cusco', // Quechua
       huancavelica: 'Huancavelica',
       huánuco: 'Huánuco',
       huanuco: 'Huánuco',
@@ -289,6 +341,7 @@ export class NormalizationUtils {
       'san martin': 'San Martín',
       tacna: 'Tacna',
       tumbes: 'Tumbes',
+      ucayali: 'Ucayali',
 
       // Ciudades principales y sus departamentos
       chachapoyas: 'Amazonas',
@@ -391,7 +444,6 @@ export class NormalizationUtils {
       'alto amazonas': 'Loreto',
       'mariscal ramon castilla': 'Loreto',
       requena: 'Loreto',
-      ucayali: 'Loreto',
       'datem del marañon': 'Loreto',
       putumayo: 'Loreto',
       iquitos: 'Loreto',
@@ -451,6 +503,101 @@ export class NormalizationUtils {
       nasca: 'Ica',
       palpa: 'Ica',
       pisco: 'Ica',
+
+      // ========================================
+      // CIUDADES Y DISTRITOS ADICIONALES DE AREQUIPA
+      // ========================================
+      mollendo: 'Arequipa',
+      camama: 'Arequipa',
+      pedregal: 'Arequipa',
+      atico: 'Arequipa',
+      camaná: 'Arequipa',
+      matarani: 'Arequipa',
+      mejia: 'Arequipa',
+      cocachacra: 'Arequipa',
+      'dean valdivia': 'Arequipa',
+      'punta de bombón': 'Arequipa',
+      'punta de bombon': 'Arequipa',
+
+      // ========================================
+      // CIUDADES Y DISTRITOS ADICIONALES DE PUNO
+      // ========================================
+      juliaca: 'Puno',
+      ayaviri: 'Puno',
+      ananea: 'Puno',
+      cabana: 'Puno',
+      'cabana san roman': 'Puno',
+      desaguadero: 'Puno',
+      ilave: 'Puno',
+      juli: 'Puno',
+      macusani: 'Puno',
+      putina: 'Puno',
+
+      // ========================================
+      // CIUDADES Y DISTRITOS ADICIONALES DE LIMA
+      // ========================================
+      'san martin de porres': 'Lima',
+      'san martin porres': 'Lima',
+      comas: 'Lima',
+      'los olivos': 'Lima',
+      'san juan de lurigancho': 'Lima',
+      'villa el salvador': 'Lima',
+      'villa maria del triunfo': 'Lima',
+      'san juan de miraflores': 'Lima',
+      surco: 'Lima',
+      'santiago de surco': 'Lima',
+      miraflores: 'Lima',
+      'san isidro': 'Lima',
+      'la molina': 'Lima',
+      ate: 'Lima',
+      'santa anita': 'Lima',
+      'el agustino': 'Lima',
+      'san luis': 'Lima',
+      breña: 'Lima',
+      'la victoria': 'Lima',
+      lince: 'Lima',
+      'jesus maria': 'Lima',
+      'jesús maria': 'Lima',
+      'pueblo libre': 'Lima',
+      magdalena: 'Lima',
+      rimac: 'Lima',
+      'cercado de lima': 'Lima',
+      ventanilla: 'Callao',
+      'la perla': 'Callao',
+      'carmen de la legua': 'Callao',
+
+      // ========================================
+      // CIUDADES Y DISTRITOS ADICIONALES DE CUSCO
+      // ========================================
+      'machu picchu': 'Cusco',
+      'aguas calientes': 'Cusco',
+      ollantaytambo: 'Cusco',
+      urubamba: 'Cusco',
+      'valle sagrado': 'Cusco',
+      pisac: 'Cusco',
+      calca: 'Cusco',
+      sicuani: 'Cusco',
+      espinar: 'Cusco',
+
+      // ========================================
+      // OTRAS CIUDADES IMPORTANTES
+      // ========================================
+      // Loreto
+      yurimaguas: 'Loreto',
+
+      // Ucayali
+      pucallpa: 'Ucayali',
+
+      // Pasco
+      'cerro de pasco': 'Pasco',
+
+      // Junín
+      huancayo: 'Junín',
+      'la oroya': 'Junín',
+      chanchamayo: 'Junín',
+
+      // Ancash
+      'nuevo chimbote': 'Ancash',
     };
 
     return peruvianLocations[normalized] || null;
@@ -474,7 +621,50 @@ export class NormalizationUtils {
       return null;
     }
 
+    // Filtrar valores inválidos comunes
+    const invalidValues = [
+      '-',
+      '--',
+      'n/a',
+      'na',
+      'x',
+      'xx',
+      'xxx',
+      'p',
+      's/n',
+      'sin dato',
+      'sin datos',
+      '0',
+      '00',
+      '000',
+    ];
+    if (invalidValues.includes(nationality.toLowerCase().trim())) {
+      return null;
+    }
+
     const normalized = nationality.toLowerCase().trim();
+
+    // Manejar formatos compuestos (BRASILIA-BRASIL, POTOSI BOLIVIA, etc.)
+    if (normalized.includes('-') || normalized.includes('–')) {
+      const parts = normalized.split(/[-–]/).map((p) => p.trim());
+      // Intentar con cada parte
+      for (const part of parts) {
+        const result = this.normalizeNationality(part, documentType);
+        if (result && result !== 'Otro') return result;
+      }
+    }
+
+    // Extraer país de formatos como "CIUDAD PAIS" (ej: BARQUISIMETO VENEZUELA)
+    if (normalized.includes(' ')) {
+      const parts = normalized.split(/\s+/);
+      // Intentar con cada parte (la última suele ser el país)
+      for (let i = parts.length - 1; i >= 0; i--) {
+        if (parts[i].length > 2) {
+          const result = this.normalizeNationality(parts[i], documentType);
+          if (result && result !== 'Otro') return result;
+        }
+      }
+    }
 
     // Mapeos directos de nacionalidades comunes (femenino/masculino)
     const nationalityMappings: { [key: string]: string } = {
@@ -487,32 +677,77 @@ export class NormalizationUtils {
       // América Latina
       argentina: 'Argentina',
       argentino: 'Argentina',
+      'buenos aires': 'Argentina', // Capital
+      cordoba: 'Argentina',
+      córdoba: 'Argentina',
+      rosario: 'Argentina',
+      mendoza: 'Argentina',
       boliviana: 'Bolivia',
       boliviano: 'Bolivia',
+      bolivia: 'Bolivia',
+      bilivia: 'Bolivia', // Typo común
+      'la paz': 'Bolivia', // Capital
+      'santa cruz': 'Bolivia',
+      cochabamba: 'Bolivia',
       brasileña: 'Brasil',
       brasileño: 'Brasil',
+      brasil: 'Brasil',
+      brasilia: 'Brasil', // Capital
+      'sao paulo': 'Brasil',
+      'são paulo': 'Brasil',
+      'rio de janeiro': 'Brasil',
       chilena: 'Chile',
       chileno: 'Chile',
+      chile: 'Chile',
+      santiago: 'Chile', // Capital
+      valparaiso: 'Chile',
+      valparaíso: 'Chile',
       colombiana: 'Colombia',
       colombiano: 'Colombia',
+      colombia: 'Colombia', // ✅ FALTABA ESTO
+      bogota: 'Colombia', // Capital
+      bogotá: 'Colombia',
+      medellin: 'Colombia',
+      medellín: 'Colombia',
+      cali: 'Colombia',
+      barranquilla: 'Colombia',
+      cartagena: 'Colombia',
       ecuatoriana: 'Ecuador',
       ecuatoriano: 'Ecuador',
+      ecuador: 'Ecuador',
+      quito: 'Ecuador', // Capital
+      guayaquil: 'Ecuador',
+      cuenca: 'Ecuador',
       paraguaya: 'Paraguay',
       paraguayo: 'Paraguay',
+      paraguay: 'Paraguay',
       uruguaya: 'Uruguay',
       uruguayo: 'Uruguay',
+      uruguay: 'Uruguay',
+      montevideo: 'Uruguay', // Capital
       venezolana: 'Venezuela',
       venezolano: 'Venezuela',
+      venezuela: 'Venezuela',
+      caracas: 'Venezuela', // Capital
+      maracaibo: 'Venezuela',
+      barquisimeto: 'Venezuela',
+      maracay: 'Venezuela',
 
       // Centroamérica y Caribe
       mexicana: 'México',
       mexicano: 'México',
       mexico: 'México',
       méxico: 'México',
+      'ciudad de mexico': 'México',
+      'ciudad de méxico': 'México',
+      guadalajara: 'México',
+      monterrey: 'México',
       panameña: 'Panamá',
       panameño: 'Panamá',
       panama: 'Panamá',
       panamá: 'Panamá',
+      'ciudad de panama': 'Panamá',
+      'ciudad de panamá': 'Panamá',
       costarricense: 'Costa Rica',
       'costa rica': 'Costa Rica',
       nicaragüense: 'Nicaragua',
@@ -545,24 +780,52 @@ export class NormalizationUtils {
       americana: 'Estados Unidos',
       norteamericano: 'Estados Unidos',
       norteamericana: 'Estados Unidos',
+      'estados unidos': 'Estados Unidos',
+      'new york': 'Estados Unidos',
+      'nueva york': 'Estados Unidos',
+      'los angeles': 'Estados Unidos',
+      'los ángeles': 'Estados Unidos',
+      miami: 'Estados Unidos',
+      chicago: 'Estados Unidos',
+      washington: 'Estados Unidos',
       canadiense: 'Canadá',
       canada: 'Canadá',
       canadá: 'Canadá',
+      toronto: 'Canadá',
+      montreal: 'Canadá',
+      vancouver: 'Canadá',
 
       // Europa
       española: 'España',
       español: 'España',
       espana: 'España',
       españa: 'España',
+      madrid: 'España',
+      barcelona: 'España',
+      valencia: 'España',
+      sevilla: 'España',
       francesa: 'Francia',
       francés: 'Francia',
       francia: 'Francia',
+      paris: 'Francia',
+      parís: 'Francia',
+      marsella: 'Francia',
+      lyon: 'Francia',
       italiana: 'Italia',
       italiano: 'Italia',
       italia: 'Italia',
+      roma: 'Italia',
+      milan: 'Italia',
+      milán: 'Italia',
+      venecia: 'Italia',
+      florencia: 'Italia',
       alemana: 'Alemania',
       alemán: 'Alemania',
       alemania: 'Alemania',
+      berlin: 'Alemania',
+      berlín: 'Alemania',
+      munich: 'Alemania',
+      hamburgo: 'Alemania',
       inglesa: 'Reino Unido',
       inglés: 'Reino Unido',
       ingles: 'Reino Unido',
@@ -570,6 +833,10 @@ export class NormalizationUtils {
       británico: 'Reino Unido',
       british: 'Reino Unido',
       'reino unido': 'Reino Unido',
+      londres: 'Reino Unido',
+      manchester: 'Reino Unido',
+      liverpool: 'Reino Unido',
+      inglaterra: 'Reino Unido',
       portuguesa: 'Portugal',
       portugués: 'Portugal',
       portugal: 'Portugal',
@@ -610,40 +877,66 @@ export class NormalizationUtils {
       ucraniana: 'Ucrania',
       ucraniano: 'Ucrania',
       ucrania: 'Ucrania',
+      ukrania: 'Ucrania', // Typo común
 
       // Asia
       china: 'China',
       chino: 'China',
+      beijing: 'China',
+      pekin: 'China',
+      pekín: 'China',
+      shanghai: 'China',
+      hongkong: 'China',
+      'hong kong': 'China',
       japonesa: 'Japón',
       japonés: 'Japón',
       japon: 'Japón',
       japón: 'Japón',
+      tokio: 'Japón',
+      tokyo: 'Japón',
+      osaka: 'Japón',
       coreana: 'Corea del Sur',
       coreano: 'Corea del Sur',
       corea: 'Corea del Sur',
       'corea del sur': 'Corea del Sur',
+      seul: 'Corea del Sur',
+      seoul: 'Corea del Sur',
       india: 'India',
       indio: 'India',
       hindú: 'India',
       hindu: 'India',
+      'nueva delhi': 'India',
+      mumbai: 'India',
+      bombay: 'India',
       tailandesa: 'Tailandia',
       tailandés: 'Tailandia',
       tailandia: 'Tailandia',
+      bangkok: 'Tailandia',
       filipina: 'Filipinas',
       filipino: 'Filipinas',
       filipinas: 'Filipinas',
+      manila: 'Filipinas',
       vietnamita: 'Vietnam',
       vietnam: 'Vietnam',
       indonesia: 'Indonesia',
       indonesio: 'Indonesia',
+      birmana: 'Myanmar',
+      birmano: 'Myanmar',
+      myanmar: 'Myanmar',
+      birmania: 'Myanmar',
+      yangon: 'Myanmar', // Ciudad capital
 
       // Oceanía
       australiana: 'Australia',
       australiano: 'Australia',
       australia: 'Australia',
+      sydney: 'Australia',
+      melbourne: 'Australia',
       neozelandesa: 'Nueva Zelanda',
       neozelandés: 'Nueva Zelanda',
       'nueva zelanda': 'Nueva Zelanda',
+      auckland: 'Nueva Zelanda',
+      wellington: 'Nueva Zelanda',
 
       // Medio Oriente
       árabe: 'Otro',
@@ -661,6 +954,14 @@ export class NormalizationUtils {
       israelí: 'Israel',
       israeli: 'Israel',
       israel: 'Israel',
+
+      // Argentina - Casos especiales
+      caba: 'Argentina', // Ciudad Autónoma de Buenos Aires
+      'ciudad autonoma de buenos aires': 'Argentina',
+
+      // Bolivia - Ciudades
+      potosi: 'Bolivia',
+      potosí: 'Bolivia',
     };
 
     // Si es un mapeo directo, retornarlo
