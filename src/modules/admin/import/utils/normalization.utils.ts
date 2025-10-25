@@ -518,6 +518,9 @@ export class NormalizationUtils {
       'dean valdivia': 'Arequipa',
       'punta de bombón': 'Arequipa',
       'punta de bombon': 'Arequipa',
+      cotahuasi: 'Arequipa',
+      'la joya': 'Arequipa',
+      chuquibamba: 'Arequipa',
 
       // ========================================
       // CIUDADES Y DISTRITOS ADICIONALES DE PUNO
