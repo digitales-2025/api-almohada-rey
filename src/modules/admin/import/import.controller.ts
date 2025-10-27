@@ -1,3 +1,14 @@
+/*
+ * CONTROLADOR DE IMPORTACIÓN COMENTADO
+ * ===================================
+ * Este controlador ha sido comentado porque ya se realizó la migración del sistema
+ * y ya no es necesario. Se mantiene comentado para referencia histórica.
+ *
+ * Fecha de comentado: ${new Date().toISOString().split('T')[0]}
+ * Razón: Migración del sistema completada
+ */
+
+/*
 import {
   Controller,
   Post,
@@ -154,3 +165,4 @@ export class ImportController {
     return await this.importService.cleanupImportedData(user);
   }
 }
+*/
