@@ -317,12 +317,17 @@ export class NormalizationUtils {
       aequipa: 'Arequipa', // Typo común
       arequia: 'Arequipa', // Typo común
       arequip: 'Arequipa', // Typo común
+      àrequipa: 'Arequipa', // Con tilde
+      arqeuipa: 'Arequipa', // Typo de Arequipa
+      arrequipa: 'Arequipa', // Otro typo de Arequipa
+      aqp: 'Arequipa', // Abreviación de Arequipa
       ayacucho: 'Ayacucho',
       cajamarca: 'Cajamarca',
       callao: 'Callao',
       cusco: 'Cusco',
       cuzco: 'Cusco', // Variante ortográfica
       qosqo: 'Cusco', // Quechua
+      chumbivilcas: 'Cusco', // Provincia de Cusco
       huancavelica: 'Huancavelica',
       huánuco: 'Huánuco',
       huanuco: 'Huánuco',
@@ -332,6 +337,7 @@ export class NormalizationUtils {
       'la libertad': 'La Libertad',
       lambayeque: 'Lambayeque',
       lima: 'Lima',
+      llima: 'Lima', // Typo de Lima
       loreto: 'Loreto',
       'madre de dios': 'Madre de Dios',
       moquegua: 'Moquegua',
@@ -341,6 +347,7 @@ export class NormalizationUtils {
       'san martín': 'San Martín',
       'san martin': 'San Martín',
       tacna: 'Tacna',
+      tacxna: 'Tacna', // Typo común de Tacna
       tumbes: 'Tumbes',
       ucayali: 'Ucayali',
 
@@ -377,6 +384,7 @@ export class NormalizationUtils {
       abancay: 'Apurímac',
       andahuaylas: 'Apurímac',
       andahuyas: 'Apurímac', // Typo de Andahuaylas
+      andahylas: 'Apurímac', // Otro typo de Andahuaylas
       antabamba: 'Apurímac',
       aymaraes: 'Apurímac',
       cotabambas: 'Apurímac',
@@ -390,6 +398,7 @@ export class NormalizationUtils {
       condesuyos: 'Arequipa',
       islay: 'Arequipa',
       'la unión': 'Arequipa',
+      'la union': 'Arequipa', // Sin tilde
 
       huamanga: 'Ayacucho',
       cangallo: 'Ayacucho',
@@ -458,6 +467,7 @@ export class NormalizationUtils {
       'mariscal nieto': 'Moquegua',
       'general sanchez cerro': 'Moquegua',
       ilo: 'Moquegua',
+      omate: 'Moquegua',
 
       'daniel alcides carrión': 'Pasco',
       oxapampa: 'Pasco',
@@ -529,7 +539,9 @@ export class NormalizationUtils {
       chala: 'Arequipa',
       chivay: 'Arequipa',
       apla: 'Arequipa',
+      aplao: 'Arequipa', // Agregado para manejar "APLAO"
       caravely: 'Arequipa',
+      carabeli: 'Arequipa', // Typo de Caravelí
       arerquipa: 'Arequipa', // Typo de Arequipa
       arequipà: 'Arequipa', // Con tilde
       cháparra: 'Arequipa',
@@ -539,6 +551,8 @@ export class NormalizationUtils {
       // CIUDADES Y DISTRITOS ADICIONALES DE PUNO
       // ========================================
       juliaca: 'Puno',
+      julkiaca: 'Puno', // Typo de Juliaca
+      jukliaca: 'Puno', // Otro typo de Juliaca
       ayaviri: 'Puno',
       ananea: 'Puno',
       cabana: 'Puno',
@@ -548,7 +562,6 @@ export class NormalizationUtils {
       juli: 'Puno',
       macusani: 'Puno',
       putina: 'Puno',
-      jukliaca: 'Puno', // Typo de Juliaca
       ollachea: 'Puno',
 
       // ========================================
@@ -610,6 +623,7 @@ export class NormalizationUtils {
 
       // Ucayali
       pucallpa: 'Ucayali',
+      pucalpa: 'Ucayali', // Typo de Pucallpa
 
       // Pasco
       'cerro de pasco': 'Pasco',
@@ -669,6 +683,27 @@ export class NormalizationUtils {
     }
 
     const normalized = nationality.toLowerCase().trim();
+
+    // CASOS ESPECIALES ANTES DE LA NORMALIZACIÓN GENERAL
+    // Manejar formatos PERU/DEPARTAMENTO
+    if (normalized.startsWith('peru/')) {
+      return 'Perú';
+    }
+
+    // Manejar variantes de Perú
+    if (normalized === 'pèru' || normalized === 'peru') {
+      return 'Perú';
+    }
+
+    // Manejar variantes de Reino Unido con espacios
+    if (normalized === 'rein o unido' || normalized === 'reino unido') {
+      return 'Reino Unido';
+    }
+
+    // Manejar abreviaciones de una sola letra (probablemente errores de tipeo)
+    if (normalized === 'j' || normalized === 'l') {
+      return null; // No se puede determinar, devolver null
+    }
 
     // Manejar formatos compuestos (BRASILIA-BRASIL, POTOSI BOLIVIA, etc.)
     if (normalized.includes('-') || normalized.includes('–')) {
@@ -863,6 +898,7 @@ export class NormalizationUtils {
       británico: 'Reino Unido',
       british: 'Reino Unido',
       'reino unido': 'Reino Unido',
+      'REINO UNIDO': 'Reino Unido', // Agregado para manejar "REINO UNIDO" en mayúsculas
       londres: 'Reino Unido',
       manchester: 'Reino Unido',
       liverpool: 'Reino Unido',
@@ -901,7 +937,12 @@ export class NormalizationUtils {
       polonia: 'Polonia',
       checa: 'República Checa',
       checo: 'República Checa',
+      czech: 'República Checa', // Agregado para manejar "CZECH"
       'republica checa': 'República Checa',
+      eslovaca: 'Eslovaquia',
+      eslovaco: 'Eslovaquia',
+      eslovaquia: 'Eslovaquia',
+      eslovakia: 'Eslovaquia', // Agregado para manejar "ESLOVAKIA"
       rusa: 'Rusia',
       ruso: 'Rusia',
       rusia: 'Rusia',
@@ -923,6 +964,7 @@ export class NormalizationUtils {
       japonés: 'Japón',
       japon: 'Japón',
       japón: 'Japón',
+      japan: 'Japón', // Agregado para manejar "JAPAN"
       tokio: 'Japón',
       tokyo: 'Japón',
       osaka: 'Japón',
@@ -946,6 +988,7 @@ export class NormalizationUtils {
       filipina: 'Filipinas',
       filipino: 'Filipinas',
       filipinas: 'Filipinas',
+      pilipinas: 'Filipinas', // Agregado para manejar "PILIPINAS"
       manila: 'Filipinas',
       vietnamita: 'Vietnam',
       vietnam: 'Vietnam',
@@ -1393,8 +1436,6 @@ export class NormalizationUtils {
       'corea del norte': 'Corea del Norte',
       'corea del sur': 'Corea del Sur',
       'estados unidos': 'Estados Unidos',
-      'reino unido': 'Reino Unido',
-      'paises bajos': 'Países Bajos',
       'el salvador': 'El Salvador',
       'costa rica': 'Costa Rica',
       'puerto rico': 'Puerto Rico',
