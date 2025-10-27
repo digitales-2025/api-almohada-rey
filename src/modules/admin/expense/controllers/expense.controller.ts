@@ -270,9 +270,18 @@ export class ExpenseController {
     return this.expenseService.deleteMany(deleteHotelExpenseDto, user);
   }
 
+  /*
+   * ENDPOINT COMENTADO - GENERACIÓN DE GASTOS AUTOMÁTICOS
+   * ====================================================
+   * Este endpoint ha sido comentado temporalmente.
+   * Fecha de comentado: ${new Date().toISOString().split('T')[0]}
+   */
+
+  /*
   /**
    * Genera gastos automáticos para un año específico
    */
+  /*
   @Post('generate/:year')
   @ApiOperation({
     summary: 'Generar gastos automáticos para un año',
@@ -313,4 +322,5 @@ export class ExpenseController {
     const yearNumber = parseInt(year, 10);
     return this.expenseService.generateExpensesForYear(yearNumber, user);
   }
+  */
 }
