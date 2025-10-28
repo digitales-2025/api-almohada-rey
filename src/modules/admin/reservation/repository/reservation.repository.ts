@@ -169,7 +169,8 @@ export class ReservationRepository extends BaseRepository<Reservation> {
 
   /**
    * Obtiene todas las razones únicas de las reservas activas
-   * @returns Lista de razones únicas ordenadas alfabéticamente
+   * Normaliza las razones mapeando valores inválidos a categorías válidas
+   * @returns Lista de razones únicas normalizadas ordenadas alfabéticamente
    */
   async getAllReasons(): Promise<{ reason: string }[]> {
     const reasons = await this.prisma.reservation.findMany({
@@ -181,14 +182,122 @@ export class ReservationRepository extends BaseRepository<Reservation> {
       select: {
         reason: true,
       },
-      distinct: ['reason'],
-      orderBy: {
-        reason: 'asc',
-      },
     });
 
-    return reasons
-      .map((item) => ({ reason: item.reason }))
-      .filter((item) => item.reason);
+    // Mapeo de normalización para valores inválidos o variaciones
+    const reasonMapping: Record<string, string> = {
+      // Números y valores inválidos -> "otros"
+      '0': 'otros',
+      p: 'otros',
+      '30402326': 'otros',
+      '77325245': 'otros',
+
+      // Variaciones de trabajo
+      trabajo: 'trabajo',
+      'negocios y motivos profesionales': 'trabajo',
+      competencia: 'trabajo',
+      compras: 'trabajo',
+
+      // Variaciones de vacaciones
+      vacaciones: 'vacaciones',
+      'vacaciones/eventos': 'vacaciones',
+      'vienen por vacaciones': 'vacaciones',
+
+      // Variaciones de visitas familiares
+      'visita familiares': 'visitas familiares',
+      'visitas a familiares/amigos': 'visitas familiares',
+
+      // Variaciones de educación
+      educacion: 'educación',
+      'educacion  y formacion': 'educación',
+
+      // Variaciones de salud
+      'salud y atencion medica': 'salud',
+      calcina: 'salud', // Posible error de tipeo de "calcinación" o similar
+
+      // Variaciones de religión
+      'religion/peregrinaciones': 'religión',
+
+      // Nombres propios -> "otros"
+      ojeda: 'otros',
+    };
+
+    // Normalizar las razones
+    const normalizedReasons = reasons
+      .map((item) => {
+        const reason = item.reason?.toLowerCase().trim();
+        if (!reason || reason.length === 0) return null;
+
+        // Si existe mapeo directo, usarlo
+        if (reasonMapping[reason]) {
+          return reasonMapping[reason];
+        }
+
+        // Si es un número, mapear a "otros"
+        if (/^\d+$/.test(reason)) {
+          return 'otros';
+        }
+
+        // Si contiene solo caracteres especiales o es muy corto, mapear a "otros"
+        if (reason.length <= 2 || /^[^a-záéíóúñ\s]+$/i.test(reason)) {
+          return 'otros';
+        }
+
+        // Si contiene palabras clave, mapear apropiadamente
+        if (
+          reason.includes('trabajo') ||
+          reason.includes('negocio') ||
+          reason.includes('profesional')
+        ) {
+          return 'trabajo';
+        }
+        if (
+          reason.includes('vacacion') ||
+          reason.includes('turismo') ||
+          reason.includes('descanso')
+        ) {
+          return 'vacaciones';
+        }
+        if (
+          reason.includes('familia') ||
+          reason.includes('amigo') ||
+          reason.includes('visita')
+        ) {
+          return 'visitas familiares';
+        }
+        if (
+          reason.includes('educacion') ||
+          reason.includes('formacion') ||
+          reason.includes('estudio')
+        ) {
+          return 'educación';
+        }
+        if (
+          reason.includes('salud') ||
+          reason.includes('medic') ||
+          reason.includes('hospital')
+        ) {
+          return 'salud';
+        }
+        if (
+          reason.includes('religion') ||
+          reason.includes('peregrinacion') ||
+          reason.includes('iglesia')
+        ) {
+          return 'religión';
+        }
+
+        // Si no coincide con nada, mantener el valor original normalizado
+        return reason;
+      })
+      .filter((reason) => reason && reason.length > 0);
+
+    // Eliminar duplicados usando Set y convertir de vuelta a array
+    const uniqueReasons = [...new Set(normalizedReasons)];
+
+    // Ordenar alfabéticamente
+    uniqueReasons.sort();
+
+    return uniqueReasons.map((reason) => ({ reason }));
   }
 }
