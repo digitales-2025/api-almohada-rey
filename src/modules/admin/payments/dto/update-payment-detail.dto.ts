@@ -144,4 +144,14 @@ export class UpdatePaymentDetailDto extends PartialType(
   @IsNotEmpty()
   @IsOptional()
   subtotal: number;
+
+  @ApiProperty({
+    name: 'discount',
+    description: 'Descuento aplicado (opcional, solo para habitaciones)',
+    example: '5.00',
+    required: false,
+  })
+  @IsNumber()
+  @IsOptional()
+  discount?: number;
 }

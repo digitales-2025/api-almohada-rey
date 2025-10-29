@@ -287,6 +287,7 @@ export class PaymentsService {
             ...(detail.serviceId && {
               service: { connect: { id: detail.serviceId } },
             }),
+            ...(detail.discount && { discount: detail.discount }),
           };
 
           const createdDetail = await prisma.paymentDetail.create({
@@ -383,6 +384,7 @@ export class PaymentsService {
             ...(detail.days && { days: detail.days }),
             ...(detail.room && { room: detail.room }),
             ...(detail.service && { service: detail.service }),
+            ...(detail.discount && { discount: detail.discount }),
           })),
         },
       };
@@ -550,6 +552,7 @@ export class PaymentsService {
               ...(detail.days && { days: detail.days }),
               ...(detail.serviceId && { serviceId: detail.serviceId }),
               ...(movementsDetailId && { movementsDetailId }),
+              ...(detail.discount && { discount: detail.discount }),
             },
             include: {
               product: { select: { id: true, name: true } },
@@ -728,6 +731,9 @@ export class PaymentsService {
             roomId: reservation.roomId,
             unitPrice: lateCheckoutPrice,
             subtotal: subtotal, // 0 si es PENDING_PAYMENT, lateCheckoutPrice de lo contrario
+            ...(lateCheckoutDto.discount && {
+              discount: lateCheckoutDto.discount,
+            }),
           },
           include: {
             room: {
@@ -915,6 +921,9 @@ export class PaymentsService {
               unitPrice: roomPrice,
               subtotal: extendStayAmount,
               days: additionalNights,
+              ...(extendStayDto.discount && {
+                discount: extendStayDto.discount,
+              }),
             },
             include: {
               room: {
@@ -1014,12 +1023,25 @@ export class PaymentsService {
           amountPaid: true,
           date: true,
           status: true,
+          observations: true,
           reservation: {
             select: {
               customer: {
                 select: {
                   id: true,
                   name: true,
+                },
+              },
+              room: {
+                select: {
+                  id: true,
+                  number: true,
+                  RoomTypes: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
                 },
               },
             },
@@ -1038,11 +1060,22 @@ export class PaymentsService {
         amountPaid: payment.amountPaid,
         date: payment.date,
         status: payment.status,
+        observations: payment.observations,
         reservation: {
           customer: {
             id: payment.reservation.customer.id,
             name: payment.reservation.customer.name,
           },
+          room: payment.reservation.room
+            ? {
+                id: payment.reservation.room.id,
+                number: payment.reservation.room.number,
+                RoomTypes: {
+                  id: payment.reservation.room.RoomTypes.id,
+                  name: payment.reservation.room.RoomTypes.name,
+                },
+              }
+            : undefined,
         },
       })) as SummaryPaymentData[];
     } catch (error) {
@@ -1107,6 +1140,18 @@ export class PaymentsService {
                   country: true,
                 },
               },
+              room: {
+                select: {
+                  id: true,
+                  number: true,
+                  RoomTypes: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -1137,6 +1182,16 @@ export class PaymentsService {
                     province: payment.reservation.customer.province,
                     country: payment.reservation.customer.country,
                   },
+                  room: payment.reservation.room
+                    ? {
+                        id: payment.reservation.room.id,
+                        number: payment.reservation.room.number,
+                        RoomTypes: {
+                          id: payment.reservation.room.RoomTypes.id,
+                          name: payment.reservation.room.RoomTypes.name,
+                        },
+                      }
+                    : undefined,
                 }
               : null,
         }),
@@ -1213,6 +1268,7 @@ export class PaymentsService {
             subtotal: true,
             quantity: true,
             days: true,
+            discount: true,
             product: {
               select: {
                 id: true,
@@ -1332,6 +1388,7 @@ export class PaymentsService {
               subtotal: true,
               quantity: true,
               days: true,
+              discount: true,
               product: {
                 select: {
                   id: true,
@@ -1453,6 +1510,18 @@ export class PaymentsService {
                   name: true,
                 },
               },
+              room: {
+                select: {
+                  id: true,
+                  number: true,
+                  RoomTypes: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -1476,6 +1545,16 @@ export class PaymentsService {
             id: payment.reservation.customer.id,
             name: payment.reservation.customer.name,
           },
+          room: payment.reservation.room
+            ? {
+                id: payment.reservation.room.id,
+                number: payment.reservation.room.number,
+                RoomTypes: {
+                  id: payment.reservation.room.RoomTypes.id,
+                  name: payment.reservation.room.RoomTypes.name,
+                },
+              }
+            : undefined,
         },
       } as SummaryPaymentData;
     } catch (error) {
@@ -1514,15 +1593,7 @@ export class PaymentsService {
         return {
           statusCode: HttpStatus.OK,
           message: 'Payment updated successfully',
-          data: {
-            id: paymentDB.id,
-            code: paymentDB.code,
-            date: paymentDB.date,
-            amount: paymentDB.amount,
-            amountPaid: paymentDB.amountPaid,
-            status: paymentDB.status,
-            reservation: paymentDB.reservation,
-          },
+          data: paymentDB,
         };
       }
 
@@ -1547,6 +1618,18 @@ export class PaymentsService {
                     name: true,
                   },
                 },
+                room: {
+                  select: {
+                    id: true,
+                    number: true,
+                    RoomTypes: {
+                      select: {
+                        id: true,
+                        name: true,
+                      },
+                    },
+                  },
+                },
               },
             },
           },
@@ -1567,7 +1650,30 @@ export class PaymentsService {
       return {
         statusCode: HttpStatus.OK,
         message: 'Payment updated successfully',
-        data: updatedPayment,
+        data: {
+          id: updatedPayment.id,
+          code: updatedPayment.code,
+          date: updatedPayment.date,
+          amount: updatedPayment.amount,
+          amountPaid: updatedPayment.amountPaid,
+          status: updatedPayment.status,
+          reservation: {
+            customer: {
+              id: updatedPayment.reservation.customer.id,
+              name: updatedPayment.reservation.customer.name,
+            },
+            room: updatedPayment.reservation.room
+              ? {
+                  id: updatedPayment.reservation.room.id,
+                  number: updatedPayment.reservation.room.number,
+                  RoomTypes: {
+                    id: updatedPayment.reservation.room.RoomTypes.id,
+                    name: updatedPayment.reservation.room.RoomTypes.name,
+                  },
+                }
+              : undefined,
+          },
+        },
       };
     } catch (error) {
       this.logger.error(
@@ -2744,12 +2850,26 @@ export class PaymentsService {
     user: UserData,
   ): Promise<HttpResponse<any>> {
     try {
+      console.log('🔄 INICIANDO RECÁLCULO DE PAGOS POR CAMBIO DE FECHAS');
+      console.log('📅 Fechas anteriores:', {
+        checkIn: oldCheckInDate,
+        checkOut: oldCheckOutDate,
+      });
+      console.log('📅 Fechas nuevas:', {
+        checkIn: newCheckInDate,
+        checkOut: newCheckOutDate,
+      });
+      console.log('🆔 Reservation ID:', reservationId);
+
       // 1. Calcular las noches de estancia anterior y nueva
       const oldNights = calculateStayNights(oldCheckInDate, oldCheckOutDate);
       const newNights = calculateStayNights(newCheckInDate, newCheckOutDate);
 
+      console.log('🌙 Cálculo de noches:', { oldNights, newNights });
+
       // 2. Si no hay cambios en la cantidad de días, no es necesario hacer nada
       if (oldNights === newNights) {
+        console.log('✅ No hay cambios en noches, terminando proceso');
         return {
           statusCode: HttpStatus.OK,
           message:
@@ -2757,6 +2877,16 @@ export class PaymentsService {
           data: { reservationId, oldNights, newNights },
         };
       }
+
+      console.log(
+        '⚠️ Se detectaron cambios en noches, procediendo con recálculo...',
+      );
+      console.log('📖 REGLAS DE NEGOCIO:');
+      console.log('  • Si reduces días: Se recalcula el monto hacia abajo');
+      console.log(
+        '  • Si aumentas días: Se mantiene el monto pagado original (no se cobra más automáticamente)',
+      );
+      console.log('  • Para extensiones: Crear pago adicional separado');
 
       // 3. Obtener el pago relacionado con la reserva y todos sus detalles
       const payment = await this.prisma.payment.findFirst({
@@ -2790,6 +2920,7 @@ export class PaymentsService {
       });
 
       if (!payment) {
+        console.log('❌ No se encontró pago para la reserva:', reservationId);
         return {
           statusCode: HttpStatus.OK,
           message:
@@ -2797,6 +2928,15 @@ export class PaymentsService {
           data: { reservationId },
         };
       }
+
+      console.log('💰 Pago encontrado:', {
+        paymentId: payment.id,
+        code: payment.code,
+        amount: payment.amount,
+        amountPaid: payment.amountPaid,
+        status: payment.status,
+        totalDetails: payment.paymentDetail.length,
+      });
 
       // 4. Iniciar transacción para actualizar todos los detalles y el pago principal
       const result = await this.prisma.$transaction(async (prisma) => {
@@ -2809,6 +2949,22 @@ export class PaymentsService {
         const extraServiceDetails = payment.paymentDetail.filter(
           (detail) => detail.type === 'EXTRA_SERVICE',
         );
+
+        console.log('📊 Detalles de pago separados:');
+        console.log('🏨 Detalles de habitación pagados:', roomDetails.length);
+        console.log(
+          '🛎️ Detalles de servicios extra:',
+          extraServiceDetails.length,
+        );
+
+        roomDetails.forEach((detail, index) => {
+          console.log(`  🏨 Habitación ${index + 1}:`, {
+            id: detail.id,
+            days: detail.days,
+            unitPrice: detail.unitPrice,
+            subtotal: detail.subtotal,
+          });
+        });
 
         const updatedDetails = [];
 
@@ -2830,11 +2986,25 @@ export class PaymentsService {
           0,
         );
 
+        console.log('💵 Cálculos iniciales:');
+        console.log('  💰 Monto actual habitaciones:', currentRoomAmountPaid);
+        console.log('  💵 Precio por noche:', roomPrice);
+        console.log('  🛎️ Monto servicios extra:', extraServicesAmount);
+
         // 7. Calcular el NUEVO monto total de la habitación
         const newRoomAmount = roomPrice * newNights;
 
+        console.log('🔢 Nuevo cálculo:');
+        console.log('  📅 Nuevas noches:', newNights);
+        console.log('  💰 Nuevo monto habitaciones:', newRoomAmount);
+        console.log(
+          '  📈 Cambio de monto:',
+          newRoomAmount - currentRoomAmountPaid,
+        );
+
         // 8. Si hay detalles de habitación pagados, actualizarlos
         if (roomDetails.length > 0) {
+          console.log('🔄 Procesando detalles de habitación pagados...');
           // Si tenemos más de un detalle de pago para la misma habitación
           if (roomDetails.length > 1) {
             // Ordenar los detalles por días para procesarlos primero los más grandes
@@ -2909,10 +3079,28 @@ export class PaymentsService {
             const detail = roomDetails[0];
             const currentDays = detail.days || 1;
 
+            console.log(`🔍 Detalle único de habitación:`);
+            console.log(`  📅 Días actuales en BD: ${currentDays}`);
+            console.log(`  🌙 Nuevas noches calculadas: ${newNights}`);
+            console.log(
+              `  📊 Lógica: Math.min(${currentDays}, ${newNights}) = ${Math.min(currentDays, newNights)}`,
+            );
+
             // IMPORTANTE: Si los nuevos días son menos que los actuales, reducimos
             // Si son más, mantenemos los actuales (no podemos aumentar días pagados sin un nuevo pago)
             const newDays = Math.min(currentDays, newNights);
             const newSubtotal = roomPrice * newDays;
+
+            console.log(`  ✅ Días finales: ${newDays}`);
+            console.log(
+              `  💰 Subtotal: ${roomPrice} × ${newDays} = ${newSubtotal}`,
+            );
+            console.log(
+              `  📋 Lógica de negocio: Solo se pagan los días que ya estaban pagados (${currentDays}), no se aumenta automáticamente el pago`,
+            );
+            console.log(
+              `  ⚠️ Si se necesitan más días, crear un pago adicional separado`,
+            );
 
             const updatedDetail = await prisma.paymentDetail.update({
               where: { id: detail.id },
@@ -2969,6 +3157,11 @@ export class PaymentsService {
           newAmountPaid = Math.min(payment.amountPaid, newTotalAmount);
         }
 
+        console.log('🎯 Cálculos finales:');
+        console.log('  💰 Nuevo monto total:', newTotalAmount);
+        console.log('  💸 Nuevo monto pagado:', newAmountPaid);
+        console.log('  📊 Detalles actualizados:', updatedDetails.length);
+
         // 11. Determinar el estado del pago
         const paymentStatus =
           newAmountPaid >= newTotalAmount
@@ -3007,12 +3200,26 @@ export class PaymentsService {
         };
       });
 
+      console.log('✅ RECÁLCULO COMPLETADO EXITOSAMENTE');
+      console.log('📈 Resumen final:', {
+        reservationId,
+        oldNights,
+        newNights,
+        paymentId: result.paymentId,
+        detallesActualizados: result.updatedDetails?.length || 0,
+        montoTotalAnterior: result.currentRoomAmountPaid,
+        nuevoMontoTotal: result.newTotalAmount,
+        nuevoMontoPagado: result.newAmountPaid,
+      });
+
       return {
         statusCode: HttpStatus.OK,
         message: `Detalles de pago actualizados correctamente para la nueva duración de ${newNights} noche(s)`,
         data: result,
       };
     } catch (error) {
+      console.error('❌ ERROR en recálculo de pagos:', error.message);
+      console.error('Stack trace:', error.stack);
       this.logger.error(
         `Error actualizando detalles de pago por cambio de fechas: ${error.message}`,
         error.stack,
