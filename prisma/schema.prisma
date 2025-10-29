@@ -298,12 +298,13 @@ model PaymentDetail {
 
   unitPrice Float
   subtotal  Float
+  discount  Float? // Descuento aplicado (opcional)
 
   payment   Payment @relation("PaymentDetailPayment", fields: [paymentId], references: [id])
   paymentId String
 
-  typePaymentDetail ExpenseDocumentType?
-  documentNumberPaymentDetail    String?
+  typePaymentDetail           ExpenseDocumentType?
+  documentNumberPaymentDetail String?
 
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt

@@ -60,6 +60,14 @@ export type SummaryPaymentData = Pick<
       id: string;
       name: string;
     };
+    room?: {
+      id: string;
+      number: number;
+      RoomTypes: {
+        id: string;
+        name: string;
+      };
+    };
   };
 };
 

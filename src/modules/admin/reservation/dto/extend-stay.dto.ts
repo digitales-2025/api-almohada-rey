@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsNumber,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
@@ -71,4 +72,14 @@ export class ExtendStayDto {
   )
   @Transform(({ value }) => value.toUpperCase())
   paymentMethod: PaymentDetailMethod;
+
+  @ApiProperty({
+    name: 'discount',
+    description: 'Descuento aplicado (opcional, solo para habitaciones)',
+    example: '5.00',
+    required: false,
+  })
+  @IsNumber()
+  @IsOptional()
+  discount?: number;
 }
