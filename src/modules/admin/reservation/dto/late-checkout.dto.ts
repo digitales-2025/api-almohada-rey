@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsNumber,
   Matches,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
@@ -70,4 +71,14 @@ export class LateCheckoutDto {
   )
   @Transform(({ value }) => value.toUpperCase())
   paymentMethod: PaymentDetailMethod;
+
+  @ApiProperty({
+    name: 'discount',
+    description: 'Descuento aplicado (opcional, solo para habitaciones)',
+    example: '5.00',
+    required: false,
+  })
+  @IsNumber()
+  @IsOptional()
+  discount?: number;
 }

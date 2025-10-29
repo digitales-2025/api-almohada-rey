@@ -304,13 +304,6 @@ export class ReservationService {
     userData: UserData,
   ) {
     try {
-      Logger.log(
-        'Request received to change reservation status' +
-          ' ' +
-          id +
-          ' ' +
-          newStatus,
-      );
       const reservation = await this.changeReservationStatusUseCase.execute(
         id,
         newStatus,
@@ -319,9 +312,18 @@ export class ReservationService {
 
       // Emitir evento de actualización por WebSocket
       if (reservation.success && reservation.data) {
+        // Obtener la reservación detallada para emitir el evento
         const detailedReservation = await this.findOneDetailed(id);
         if (detailedReservation) {
           this.reservationGateway.emitReservationUpdate(detailedReservation);
+        }
+
+        // Si la reservación fue cancelada, emitir cambio de disponibilidad
+        if (newStatus === ReservationStatus.CANCELED) {
+          this.reservationGateway.emitAvailabilityChange(
+            reservation.data.checkInDate,
+            reservation.data.checkOutDate,
+          );
         }
       }
 
@@ -539,22 +541,44 @@ export class ReservationService {
       // Validar que no estamos en el pasado
       const now = new Date();
 
-      // For updates, validate only new check-in dates to allow historical data updates
+      // For updates, validate only when actually changing dates to the past
       if (parsedCheckInDate < now) {
-        // If it's an update, only validate if the date is being changed
         if (forUpdate && reservationId) {
+          // For updates, only validate if we're actually changing the check-in date to the past
           const originalReservation = await this.reservationRepository.findOne({
             where: { id: reservationId, isActive: true },
           });
 
-          // Only validate if check-in date is being changed to a new date
-          if (
-            originalReservation &&
-            originalReservation.checkInDate !== checkInDate
-          ) {
-            throw new BadRequestException(
-              'La fecha de check-in nueva no puede estar en el pasado',
+          if (originalReservation) {
+            // Convert both dates to ISO strings for proper comparison
+            const originalCheckInISO = new Date(
+              originalReservation.checkInDate,
+            ).toISOString();
+            const newCheckInISO = new Date(checkInDate).toISOString();
+
+            // Debug logs
+            console.log('🔍 DEBUG - Date Comparison:');
+            console.log(
+              'Original checkInDate:',
+              originalReservation.checkInDate,
             );
+            console.log('Original ISO:', originalCheckInISO);
+            console.log('New checkInDate:', checkInDate);
+            console.log('New ISO:', newCheckInISO);
+            console.log(
+              'Are they equal?',
+              originalCheckInISO === newCheckInISO,
+            );
+
+            // Only throw error if we're actually changing the date AND the new date is in the past
+            if (originalCheckInISO !== newCheckInISO) {
+              console.log('❌ Dates are different, throwing error');
+              throw new BadRequestException(
+                'La fecha de check-in nueva no puede estar en el pasado',
+              );
+            }
+            console.log('✅ Dates are the same, allowing verification');
+            // If dates are the same, allow it (even if it's in the past) - it's just verification
           }
         } else {
           // For new reservations, always validate
