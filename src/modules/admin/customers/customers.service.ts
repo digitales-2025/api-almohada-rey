@@ -40,6 +40,7 @@ import { PaginationService } from 'src/pagination/pagination.service';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
 import { lastValueFrom } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
+import * as cheerio from 'cheerio';
 
 @Injectable()
 export class CustomersService {
@@ -268,17 +269,32 @@ export class CustomersService {
    * @returns Datos del cliente obtenidos desde la API de Perú
    */
   async getDataByDni(dni: string): Promise<ResponseApiCustomer> {
-    // Primero consultar en la base de datos local
+    // 1) Consultar en caché primero
     const cachedData = await this.prisma.apiPeruCache.findUnique({
       where: { dni },
     });
-
     if (cachedData) {
       this.logger.log(`DNI ${dni} encontrado en caché local`);
-      return {
-        name: cachedData.name,
-        dni: cachedData.dni,
-      };
+      return { name: cachedData.name, dni: cachedData.dni };
+    }
+
+    // 2) Intentar scraping (eldni.com) si no hay caché
+    try {
+      const scraped = await this.scrapDniFromEldni(dni);
+      if (scraped?.name) {
+        const capitalizedName = this.capitalizeWithAccents(scraped.name);
+        await this.prisma.apiPeruCache.upsert({
+          where: { dni: scraped.dni },
+          create: { dni: scraped.dni, name: capitalizedName },
+          update: { name: capitalizedName },
+        });
+        this.logger.log(`DNI ${dni} obtenido por scraping y cacheado`);
+        return { name: capitalizedName, dni: scraped.dni };
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Scraping DNI falló, se usará API Peru: ${error.message}`,
+      );
     }
 
     // Si no está en caché, consultar la API de Perú
@@ -345,6 +361,91 @@ export class CustomersService {
       }
 
       throw new Error('No se pudo obtener los datos del DNI desde API Peru');
+    }
+  }
+
+  /**
+   * Scraping de https://eldni.com/pe/buscar-datos-por-dni para obtener nombre por DNI
+   */
+  private async scrapDniFromEldni(dni: string): Promise<ResponseApiCustomer> {
+    try {
+      // 1) GET inicial para obtener cookies y token CSRF
+      const url = 'https://eldni.com/pe/buscar-datos-por-dni';
+      const getResponse = await lastValueFrom(
+        this.httpService.get(url, {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+            Accept:
+              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+          },
+          // Important: allow redirects to complete and keep headers
+          maxRedirects: 3,
+        }),
+      );
+
+      const $get = cheerio.load(getResponse.data);
+      const csrfToken = $get('input[name="_token"]').attr('value') || '';
+
+      // Preparar cookies de sesión devueltas por el servidor
+      const setCookieHeader = getResponse.headers?.['set-cookie'] as
+        | string[]
+        | undefined;
+      const cookieJar = setCookieHeader
+        ? setCookieHeader.map((c) => c.split(';')[0]).join('; ')
+        : '';
+
+      // 2) POST del formulario con el DNI
+      const formData = new URLSearchParams({
+        _token: csrfToken,
+        dni,
+      });
+
+      const postResponse = await lastValueFrom(
+        this.httpService.post(url, formData.toString(), {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+            Accept:
+              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            Origin: 'https://eldni.com',
+            Referer: url,
+            ...(cookieJar ? { Cookie: cookieJar } : {}),
+          },
+          maxRedirects: 3,
+        }),
+      );
+
+      const $ = cheerio.load(postResponse.data);
+
+      // Preferimos el nombre completo que aparece en el <samp> grande si existe
+      let fullName = $('samp.inline-block').first().text().trim();
+
+      // Si no hay <samp>, intentamos desde la tabla de resultados
+      if (!fullName) {
+        const table = $('table.table.table-striped.table-scroll').first();
+        const row = table.find('tbody tr').first();
+        const tds = row.find('td');
+        const nombres = tds.eq(1).text().trim();
+        const apellidoP = tds.eq(2).text().trim();
+        const apellidoM = tds.eq(3).text().trim();
+        if (nombres || apellidoP || apellidoM) {
+          fullName = [nombres, apellidoP, apellidoM].filter(Boolean).join(' ');
+        }
+      }
+
+      const dniOut = dni;
+
+      if (!fullName) {
+        throw new Error('No se pudo extraer el nombre del HTML');
+      }
+
+      return { name: fullName, dni: dniOut };
+    } catch (error) {
+      this.logger.error('Error en scraping de DNI (eldni):', error);
+      throw new Error('Scraping DNI falló');
     }
   }
 
