@@ -3250,8 +3250,24 @@ export class PaymentsService {
   ): Promise<HttpResponse<any>> {
     try {
       // 1. Calcular las noches de estancia anterior y nueva
-      const oldNights = calculateStayNights(oldCheckInDate, oldCheckOutDate);
-      const newNights = calculateStayNights(newCheckInDate, newCheckOutDate);
+      // Primero obtener la reservación para verificar si hay late checkout aplicado
+      const reservation = await this.prisma.reservation.findUnique({
+        where: { id: reservationId },
+        select: { appliedLateCheckOut: true },
+      });
+
+      const appliedLateCheckOut = reservation?.appliedLateCheckOut || false;
+
+      const oldNights = calculateStayNights(
+        oldCheckInDate,
+        oldCheckOutDate,
+        appliedLateCheckOut,
+      );
+      const newNights = calculateStayNights(
+        newCheckInDate,
+        newCheckOutDate,
+        appliedLateCheckOut,
+      );
 
       // 2. Si no hay cambios en la cantidad de días, no es necesario hacer nada
       if (oldNights === newNights) {
@@ -3306,9 +3322,15 @@ export class PaymentsService {
       // 4. Iniciar transacción para actualizar todos los detalles y el pago principal
       const result = await this.prisma.$transaction(async (prisma) => {
         // Separamos los detalles por tipo
+        // Solo filtramos los detalles PAID para actualizar sus días y subtotales
         const roomDetails = payment.paymentDetail.filter(
           (detail) =>
             detail.type === 'ROOM_RESERVATION' && detail.status === 'PAID',
+        );
+
+        // Obtenemos TODOS los detalles de habitación (PAID y PENDING_PAYMENT) para calcular descuentos
+        const allRoomDetails = payment.paymentDetail.filter(
+          (detail) => detail.type === 'ROOM_RESERVATION',
         );
 
         const extraServiceDetails = payment.paymentDetail.filter(
@@ -3329,14 +3351,24 @@ export class PaymentsService {
             ? roomDetails[0].unitPrice
             : payment.reservation.room?.RoomTypes?.price || 0;
 
-        // 6. Calcular el monto total de servicios extra (no cambiará)
-        const extraServicesAmount = extraServiceDetails.reduce(
-          (sum, detail) => sum + detail.subtotal,
+        // 6. Calcular el descuento total aplicado a habitaciones (suma de discounts de todos los detalles de habitación)
+        const totalRoomDiscount = allRoomDetails.reduce(
+          (sum, detail) => sum + ((detail as any).discount || 0),
           0,
         );
 
-        // 7. Calcular el NUEVO monto total de la habitación
-        const newRoomAmount = roomPrice * newNights;
+        // 7. Calcular el monto total de servicios extra
+        // Para servicios con PENDING_PAYMENT, estimar por unitPrice * quantity
+        const extraServicesAmount = extraServiceDetails.reduce(
+          (sum, detail) => {
+            if (detail.method === 'PENDING_PAYMENT') {
+              const quantity = detail.quantity || 1;
+              return sum + detail.unitPrice * quantity;
+            }
+            return sum + detail.subtotal;
+          },
+          0,
+        );
 
         // 8. Si hay detalles de habitación pagados, actualizarlos
         if (roomDetails.length > 0) {
@@ -3376,14 +3408,29 @@ export class PaymentsService {
                 continue;
               }
 
-              // Actualizar el detalle con los nuevos días
-              const newSubtotal = roomPrice * newDays;
+              // Actualizar el detalle con los nuevos días, considerando el descuento
+              const detailDiscount = (detail as any).discount || 0;
+              const currentDaysForDetail = detail.days || 1;
+              // Calcular el subtotal proporcional al número de días, aplicando el descuento proporcional
+              // Si el detalle tenía un descuento, lo distribuimos proporcionalmente según los días del detalle
+              const proportionalDiscount =
+                currentDaysForDetail > 0
+                  ? (detailDiscount * newDays) / currentDaysForDetail
+                  : detailDiscount;
+              const newSubtotal = Math.max(
+                0,
+                roomPrice * newDays - proportionalDiscount,
+              );
 
               const updatedDetail = await prisma.paymentDetail.update({
                 where: { id: detail.id },
                 data: {
                   days: newDays,
                   subtotal: newSubtotal,
+                  // Preservar el descuento (ajustado proporcionalmente)
+                  ...(detailDiscount > 0 && {
+                    discount: proportionalDiscount,
+                  }),
                 },
                 include: {
                   room: {
@@ -3417,12 +3464,26 @@ export class PaymentsService {
             // IMPORTANTE: Si los nuevos días son menos que los actuales, reducimos
             // Si son más, mantenemos los actuales (no podemos aumentar días pagados sin un nuevo pago)
             const newDays = Math.min(currentDays, newNights);
-            const newSubtotal = roomPrice * newDays;
+            // Calcular el subtotal considerando el descuento
+            const detailDiscount = (detail as any).discount || 0;
+            // Ajustar el descuento proporcionalmente según los días
+            const proportionalDiscount =
+              currentDays > 0
+                ? (detailDiscount * newDays) / currentDays
+                : detailDiscount;
+            const newSubtotal = Math.max(
+              0,
+              roomPrice * newDays - proportionalDiscount,
+            );
             const updatedDetail = await prisma.paymentDetail.update({
               where: { id: detail.id },
               data: {
                 days: newDays,
                 subtotal: newSubtotal,
+                // Preservar el descuento (ajustado proporcionalmente)
+                ...(detailDiscount > 0 && {
+                  discount: proportionalDiscount,
+                }),
               },
               include: {
                 room: {
@@ -3448,8 +3509,49 @@ export class PaymentsService {
           }
         }
 
-        // 9. Calcular el nuevo monto total incluyendo servicios extra
-        const newTotalAmount = newRoomAmount + extraServicesAmount;
+        // 9. Calcular el nuevo monto total usando la lógica global:
+        // amount = (precio noche * noches totales) - descuentos totales + extras
+        // Obtener todos los detalles actualizados para recalcular el descuento total
+        const allUpdatedRoomDetails = await prisma.paymentDetail.findMany({
+          where: {
+            paymentId: payment.id,
+            type: 'ROOM_RESERVATION',
+          },
+        });
+
+        // Recalcular el descuento total con los detalles actualizados
+        const updatedTotalRoomDiscount = allUpdatedRoomDetails.reduce(
+          (sum, detail) => sum + ((detail as any).discount || 0),
+          0,
+        );
+
+        // Calcular el amount final usando la lógica global
+        const newTotalAmount =
+          Math.max(0, roomPrice * newNights - updatedTotalRoomDiscount) +
+          extraServicesAmount;
+
+        console.log('UPDATE_PAYMENT_DETAILS_FOR_DATE_CHANGE:', {
+          paymentId: payment.id,
+          oldNights,
+          newNights,
+          roomPrice,
+          totalRoomDiscount,
+          updatedTotalRoomDiscount,
+          extraServicesAmount,
+          newTotalAmount,
+          calculation: {
+            formula:
+              '(precio noche × noches totales) - descuentos totales + extras',
+            breakdown: {
+              'precio noche × noches totales': `${roomPrice} × ${newNights} = ${roomPrice * newNights}`,
+              'descuentos totales': updatedTotalRoomDiscount,
+              'base habitación':
+                roomPrice * newNights - updatedTotalRoomDiscount,
+              extras: extraServicesAmount,
+              total: newTotalAmount,
+            },
+          },
+        });
 
         // 10. Calcular el nuevo monto pagado
         let newAmountPaid = 0;

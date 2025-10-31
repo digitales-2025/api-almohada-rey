@@ -100,6 +100,11 @@ export function calculateStayNights(
   const checkIn = new Date(checkInDate);
   const checkOut = new Date(checkOutDate);
 
+  // Validar que las fechas sean válidas
+  if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
+    return 0;
+  }
+
   // Convertir a zona horaria de Perú para obtener las fechas reales en Perú
   const checkInLima = toZonedTime(checkIn, LIMA_TIMEZONE_NAME);
   const checkOutLima = toZonedTime(checkOut, LIMA_TIMEZONE_NAME);
@@ -134,8 +139,11 @@ export function calculateStayNights(
     }
   }
 
-  // Si no hay late checkout o el checkout es antes del mediodía, usamos el cálculo normal
-  // Calcular diferencia usando las fechas en Perú (solo día, mes, año)
+  // IMPORTANTE: Para el cálculo de noches en hoteles, solo consideramos las FECHAS (día, mes, año)
+  // No importa la hora del check-in o check-out, solo cuenta la diferencia de días calendario
+  // Ejemplo: check-in dom 12/10 21:00 → check-out lun 13/10 12:00 = 1 noche (1 día)
+
+  // Extraer solo la fecha (sin horas) en zona horaria de Perú
   const checkInDateOnly = new Date(
     checkInLima.getFullYear(),
     checkInLima.getMonth(),
@@ -147,11 +155,12 @@ export function calculateStayNights(
     checkOutLima.getDate(),
   );
 
+  // Calcular diferencia en milisegundos
   const millisecondsPerDay = 1000 * 60 * 60 * 24;
-  const diffDays = Math.floor(
-    (checkOutDateOnly.getTime() - checkInDateOnly.getTime()) /
-      millisecondsPerDay,
-  );
+  const diffTime = checkOutDateOnly.getTime() - checkInDateOnly.getTime();
+  const diffDays = Math.floor(diffTime / millisecondsPerDay);
 
+  // Asegurar que siempre devolvamos un número válido (>= 0)
+  // Si las fechas son iguales o el checkout es antes del check-in, retornar 0
   return diffDays > 0 ? diffDays : 0;
 }
