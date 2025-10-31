@@ -3250,8 +3250,24 @@ export class PaymentsService {
   ): Promise<HttpResponse<any>> {
     try {
       // 1. Calcular las noches de estancia anterior y nueva
-      const oldNights = calculateStayNights(oldCheckInDate, oldCheckOutDate);
-      const newNights = calculateStayNights(newCheckInDate, newCheckOutDate);
+      // Primero obtener la reservación para verificar si hay late checkout aplicado
+      const reservation = await this.prisma.reservation.findUnique({
+        where: { id: reservationId },
+        select: { appliedLateCheckOut: true },
+      });
+
+      const appliedLateCheckOut = reservation?.appliedLateCheckOut || false;
+
+      const oldNights = calculateStayNights(
+        oldCheckInDate,
+        oldCheckOutDate,
+        appliedLateCheckOut,
+      );
+      const newNights = calculateStayNights(
+        newCheckInDate,
+        newCheckOutDate,
+        appliedLateCheckOut,
+      );
 
       // 2. Si no hay cambios en la cantidad de días, no es necesario hacer nada
       if (oldNights === newNights) {

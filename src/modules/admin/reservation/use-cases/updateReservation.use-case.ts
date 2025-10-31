@@ -232,27 +232,31 @@ export class UpdateReservationUseCase {
         { isolationLevel: 'Serializable' },
       );
 
-      // 4. NUEVO: Actualizar pagos SOLO si la reserva tiene estado CONFIRMED y cambiaron las fechas
+      // 4. NUEVO: Actualizar pagos si la reserva tiene estado CONFIRMED o CHECKED_IN y cambiaron las fechas
       const hasChangedDates =
         (possibleUpdatedReservation.checkInDate &&
           possibleUpdatedReservation.checkInDate !== originalCheckInDate) ||
         (possibleUpdatedReservation.checkOutDate &&
           possibleUpdatedReservation.checkOutDate !== originalCheckOutDate);
 
+      // Permitir actualización de pagos para reservas CONFIRMED y CHECKED_IN
+      const canUpdatePayments =
+        reservationStatus === 'CONFIRMED' || reservationStatus === 'CHECKED_IN';
+
       if (
         hasChangedDates &&
         originalCheckInDate &&
         originalCheckOutDate &&
-        reservationStatus === 'CONFIRMED'
+        canUpdatePayments
       ) {
-        // Solo para reservas CONFIRMED
-
+        // Para reservas CONFIRMED y CHECKED_IN
         try {
           // Obtener las nuevas fechas de la reserva actualizada
           const newCheckInDate =
             possibleUpdatedReservation.checkInDate || originalCheckInDate;
           const newCheckOutDate =
             possibleUpdatedReservation.checkOutDate || originalCheckOutDate;
+
           await this.paymentsService.updatePaymentDetailsForDateChange(
             id,
             originalCheckInDate,
@@ -268,7 +272,6 @@ export class UpdateReservationUseCase {
             paymentUpdateError.stack,
           );
         }
-      } else if (hasChangedDates && reservationStatus !== 'CONFIRMED') {
       }
 
       return {
