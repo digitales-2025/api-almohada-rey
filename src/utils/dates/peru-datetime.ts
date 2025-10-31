@@ -96,49 +96,62 @@ export function calculateStayNights(
   checkOutDate: string,
   appliedLateCheckOut?: boolean,
 ): number {
+  // Convertir las fechas UTC a la zona horaria de Perú primero
   const checkIn = new Date(checkInDate);
   const checkOut = new Date(checkOutDate);
 
+  // Convertir a zona horaria de Perú para obtener las fechas reales en Perú
+  const checkInLima = toZonedTime(checkIn, LIMA_TIMEZONE_NAME);
+  const checkOutLima = toZonedTime(checkOut, LIMA_TIMEZONE_NAME);
+
   // Si hay late checkout aplicado, ajustamos el cálculo para no contar las horas extras como un día adicional
   if (appliedLateCheckOut) {
-    // Creamos una fecha de checkout ajustada a las 12:00 PM de ese día
-    const adjustedCheckOut = new Date(checkOut);
-    adjustedCheckOut.setHours(12, 0, 0, 0);
+    // Creamos una fecha de checkout ajustada a las 12:00 PM de ese día en Perú
+    const adjustedCheckOutLima = new Date(checkOutLima);
+    adjustedCheckOutLima.setHours(12, 0, 0, 0);
 
-    // Si el checkout original es después del mediodía, usamos el checkout ajustado
-    if (checkOut.getHours() > 12) {
-      const utcCheckIn = Date.UTC(
-        checkIn.getUTCFullYear(),
-        checkIn.getUTCMonth(),
-        checkIn.getUTCDate(),
+    // Si el checkout original es después del mediodía en Perú, usamos el checkout ajustado
+    if (checkOutLima.getHours() > 12) {
+      // Calcular diferencia usando las fechas en Perú (solo día, mes, año)
+      const checkInDateOnly = new Date(
+        checkInLima.getFullYear(),
+        checkInLima.getMonth(),
+        checkInLima.getDate(),
       );
-      const utcAdjustedCheckOut = Date.UTC(
-        adjustedCheckOut.getUTCFullYear(),
-        adjustedCheckOut.getUTCMonth(),
-        adjustedCheckOut.getUTCDate(),
+      const checkOutDateOnly = new Date(
+        adjustedCheckOutLima.getFullYear(),
+        adjustedCheckOutLima.getMonth(),
+        adjustedCheckOutLima.getDate(),
       );
 
       const millisecondsPerDay = 1000 * 60 * 60 * 24;
-      const diffDays = (utcAdjustedCheckOut - utcCheckIn) / millisecondsPerDay;
+      const diffDays = Math.floor(
+        (checkOutDateOnly.getTime() - checkInDateOnly.getTime()) /
+          millisecondsPerDay,
+      );
 
       return diffDays > 0 ? diffDays : 0;
     }
   }
 
   // Si no hay late checkout o el checkout es antes del mediodía, usamos el cálculo normal
-  const utcCheckIn = Date.UTC(
-    checkIn.getUTCFullYear(),
-    checkIn.getUTCMonth(),
-    checkIn.getUTCDate(),
+  // Calcular diferencia usando las fechas en Perú (solo día, mes, año)
+  const checkInDateOnly = new Date(
+    checkInLima.getFullYear(),
+    checkInLima.getMonth(),
+    checkInLima.getDate(),
   );
-  const utcCheckOut = Date.UTC(
-    checkOut.getUTCFullYear(),
-    checkOut.getUTCMonth(),
-    checkOut.getUTCDate(),
+  const checkOutDateOnly = new Date(
+    checkOutLima.getFullYear(),
+    checkOutLima.getMonth(),
+    checkOutLima.getDate(),
   );
 
   const millisecondsPerDay = 1000 * 60 * 60 * 24;
-  const diffDays = (utcCheckOut - utcCheckIn) / millisecondsPerDay;
+  const diffDays = Math.floor(
+    (checkOutDateOnly.getTime() - checkInDateOnly.getTime()) /
+      millisecondsPerDay,
+  );
 
   return diffDays > 0 ? diffDays : 0;
 }
