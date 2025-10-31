@@ -556,28 +556,12 @@ export class ReservationService {
             ).toISOString();
             const newCheckInISO = new Date(checkInDate).toISOString();
 
-            // Debug logs
-            console.log('🔍 DEBUG - Date Comparison:');
-            console.log(
-              'Original checkInDate:',
-              originalReservation.checkInDate,
-            );
-            console.log('Original ISO:', originalCheckInISO);
-            console.log('New checkInDate:', checkInDate);
-            console.log('New ISO:', newCheckInISO);
-            console.log(
-              'Are they equal?',
-              originalCheckInISO === newCheckInISO,
-            );
-
             // Only throw error if we're actually changing the date AND the new date is in the past
             if (originalCheckInISO !== newCheckInISO) {
-              console.log('❌ Dates are different, throwing error');
               throw new BadRequestException(
                 'La fecha de check-in nueva no puede estar en el pasado',
               );
             }
-            console.log('✅ Dates are the same, allowing verification');
             // If dates are the same, allow it (even if it's in the past) - it's just verification
           }
         } else {
