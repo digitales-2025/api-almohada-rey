@@ -1043,7 +1043,14 @@ export abstract class BaseRepository<T extends BaseEntity> {
         }
       }
 
-      if (orConditions.length > 0) whereClause['OR'] = orConditions;
+      if (orConditions.length > 0) {
+        // Combinar con OR existente si ya existe (creado por searchByFieldsRelational)
+        if (whereClause['OR'] && Array.isArray(whereClause['OR'])) {
+          whereClause['OR'] = [...whereClause['OR'], ...orConditions];
+        } else {
+          whereClause['OR'] = orConditions;
+        }
+      }
     }
 
     // Arrays y resto
