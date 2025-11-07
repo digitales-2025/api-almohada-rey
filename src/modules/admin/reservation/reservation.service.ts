@@ -412,10 +412,6 @@ export class ReservationService {
 
       // Agregar filtros de fecha legacy al filterOptions si no están ya definidos
       if (checkInDate || checkOutDate) {
-        if (!combinedFilterOptions.searchByField) {
-          combinedFilterOptions.searchByField = {};
-        }
-
         if (checkInDate && !checkOutDate) {
           combinedFilterOptions.fieldDate = {
             field: 'checkInDate',
@@ -429,10 +425,9 @@ export class ReservationService {
             operator: 'lte',
           };
         } else if (checkInDate && checkOutDate) {
-          // Para rangos de fecha, usar el campo searchByField con un valor especial
-          // que será manejado por lógica adicional en el repository
-          combinedFilterOptions.searchByField!['dateRange'] =
-            `${checkInDate.toISOString()} - ${checkOutDate.toISOString()}`;
+          // Para rangos de fecha, usar el campo dateRange directamente en filterOptions
+          // que será manejado por lógica especial en el BaseRepository
+          combinedFilterOptions.dateRange = `${checkInDate.toISOString()} - ${checkOutDate.toISOString()}`;
         }
       }
 
@@ -466,7 +461,6 @@ export class ReservationService {
           pagination,
           repositoryParams,
         );
-
       return result;
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');

@@ -1005,25 +1005,107 @@ export class PaymentsService {
 
       // 4. Calcular el costo de las noches adicionales
       const roomPrice = reservation.room.RoomTypes.price;
-      const extendStayAmount = roomPrice * additionalNights;
+      const discount = extendStayDto.discount || 0;
+      // Calcular el subtotal considerando el descuento
+      const extendStayAmount = Math.max(
+        0,
+        roomPrice * additionalNights - discount,
+      );
 
       const formattedDescription = `Extensión de estadía`;
 
-      // 6. Determinar si es un pago pendiente
+      // 5. Determinar si es un pago pendiente
       const isPendingPayment =
         extendStayDto.paymentMethod === 'PENDING_PAYMENT';
 
-      // 7. Crear el detalle de pago o solo actualizar el amount según el método de pago
+      // 6. Crear el detalle de pago o solo actualizar el amount según el método de pago
       const result = await this.prisma.$transaction(async (prisma) => {
-        // Siempre actualizamos el amount total del pago (sin importar el método)
-        const newAmount = payment.amount + extendStayAmount;
+        // Obtener todos los detalles de habitación para calcular descuentos totales
+        const allRoomDetails = await prisma.paymentDetail.findMany({
+          where: {
+            paymentId: payment.id,
+            type: 'ROOM_RESERVATION',
+          },
+        });
 
-        // Solo si NO es PENDING_PAYMENT, creamos el detalle de pago y aumentamos amountPaid
+        const extraServiceDetails = await prisma.paymentDetail.findMany({
+          where: {
+            paymentId: payment.id,
+            type: 'EXTRA_SERVICE',
+          },
+        });
+
+        // Calcular el descuento total de todos los detalles de habitación (existentes + nuevo)
+        const existingRoomDiscount = allRoomDetails.reduce(
+          (sum, detail) => sum + ((detail as any).discount || 0),
+          0,
+        );
+        const totalRoomDiscount = existingRoomDiscount + discount;
+
+        // Calcular el monto total de servicios extra
+        // Para servicios con PENDING_PAYMENT, estimar por unitPrice * quantity
+        const extraServicesAmount = extraServiceDetails.reduce(
+          (sum, detail) => {
+            if (detail.method === 'PENDING_PAYMENT') {
+              const quantity = detail.quantity || 1;
+              return sum + detail.unitPrice * quantity;
+            }
+            return sum + detail.subtotal;
+          },
+          0,
+        );
+
+        // Calcular el nuevo amount usando la lógica global:
+        // amount = (precio noche * noches totales) - descuentos totales + extras
+        const newAmount =
+          Math.max(0, roomPrice * newNights - totalRoomDiscount) +
+          extraServicesAmount;
+
+        // Manejar la creación del detalle de pago según el método
         let detailCreated = null;
         let newAmountPaid = payment.amountPaid;
 
-        if (!isPendingPayment) {
-          // Crear el detalle de pago
+        if (isPendingPayment) {
+          // Si es PENDING_PAYMENT y tiene descuento, crear el detalle con subtotal 0 pero preservando el descuento
+          // Si NO tiene descuento, no crear el detalle (comportamiento original)
+          if (discount > 0) {
+            detailCreated = await prisma.paymentDetail.create({
+              data: {
+                paymentId: payment.id,
+                paymentDate: extendStayDto.paymentDate,
+                description: formattedDescription,
+                type: PaymentDetailType.ROOM_RESERVATION,
+                method: extendStayDto.paymentMethod,
+                status: PaymentDetailStatus.PENDING,
+                roomId: reservation.roomId,
+                unitPrice: roomPrice,
+                subtotal: 0, // PENDING_PAYMENT siempre tiene subtotal 0
+                days: additionalNights,
+                discount: discount, // Preservar el descuento
+              },
+              include: {
+                room: {
+                  select: {
+                    id: true,
+                    number: true,
+                    RoomTypes: { select: { id: true, name: true } },
+                  },
+                },
+              },
+            });
+
+            // Registrar auditoría para el detalle
+            await this.audit.create({
+              entityId: detailCreated.id,
+              entityType: 'paymentDetail',
+              action: AuditActionType.CREATE,
+              performedById: user.id,
+              createdAt: new Date(),
+            });
+          }
+          // Si es PENDING_PAYMENT sin descuento, no crear detalle (no incrementar amountPaid)
+        } else {
+          // Si NO es PENDING_PAYMENT, crear el detalle de pago con el subtotal que ya considera el descuento
           detailCreated = await prisma.paymentDetail.create({
             data: {
               paymentId: payment.id,
@@ -1034,10 +1116,10 @@ export class PaymentsService {
               status: PaymentDetailStatus.PAID,
               roomId: reservation.roomId,
               unitPrice: roomPrice,
-              subtotal: extendStayAmount,
+              subtotal: extendStayAmount, // Ya incluye el descuento aplicado
               days: additionalNights,
-              ...(extendStayDto.discount && {
-                discount: extendStayDto.discount,
+              ...(discount > 0 && {
+                discount: discount,
               }),
             },
             include: {
@@ -1061,6 +1143,7 @@ export class PaymentsService {
           });
 
           // Incrementar el amountPaid solo si NO es PENDING_PAYMENT
+          // Usamos extendStayAmount que ya tiene el descuento aplicado
           newAmountPaid = payment.amountPaid + extendStayAmount;
         }
 
@@ -3328,11 +3411,6 @@ export class PaymentsService {
             detail.type === 'ROOM_RESERVATION' && detail.status === 'PAID',
         );
 
-        // Obtenemos TODOS los detalles de habitación (PAID y PENDING_PAYMENT) para calcular descuentos
-        const allRoomDetails = payment.paymentDetail.filter(
-          (detail) => detail.type === 'ROOM_RESERVATION',
-        );
-
         const extraServiceDetails = payment.paymentDetail.filter(
           (detail) => detail.type === 'EXTRA_SERVICE',
         );
@@ -3350,12 +3428,6 @@ export class PaymentsService {
           roomDetails.length > 0
             ? roomDetails[0].unitPrice
             : payment.reservation.room?.RoomTypes?.price || 0;
-
-        // 6. Calcular el descuento total aplicado a habitaciones (suma de discounts de todos los detalles de habitación)
-        const totalRoomDiscount = allRoomDetails.reduce(
-          (sum, detail) => sum + ((detail as any).discount || 0),
-          0,
-        );
 
         // 7. Calcular el monto total de servicios extra
         // Para servicios con PENDING_PAYMENT, estimar por unitPrice * quantity
@@ -3529,29 +3601,6 @@ export class PaymentsService {
         const newTotalAmount =
           Math.max(0, roomPrice * newNights - updatedTotalRoomDiscount) +
           extraServicesAmount;
-
-        console.log('UPDATE_PAYMENT_DETAILS_FOR_DATE_CHANGE:', {
-          paymentId: payment.id,
-          oldNights,
-          newNights,
-          roomPrice,
-          totalRoomDiscount,
-          updatedTotalRoomDiscount,
-          extraServicesAmount,
-          newTotalAmount,
-          calculation: {
-            formula:
-              '(precio noche × noches totales) - descuentos totales + extras',
-            breakdown: {
-              'precio noche × noches totales': `${roomPrice} × ${newNights} = ${roomPrice * newNights}`,
-              'descuentos totales': updatedTotalRoomDiscount,
-              'base habitación':
-                roomPrice * newNights - updatedTotalRoomDiscount,
-              extras: extraServicesAmount,
-              total: newTotalAmount,
-            },
-          },
-        });
 
         // 10. Calcular el nuevo monto pagado
         let newAmountPaid = 0;

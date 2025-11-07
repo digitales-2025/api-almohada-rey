@@ -392,6 +392,16 @@ export class ReservationController {
           },
         },
       ];
+
+      // 5. Búsqueda en campo JSON guests (combinar con OR existente)
+      // Para campos JSONB en PostgreSQL, usar string_contains para buscar en todo el JSON
+      filterOptions.OR = [
+        {
+          guests: {
+            string_contains: search,
+          },
+        },
+      ];
     }
 
     // Boolean array filters
