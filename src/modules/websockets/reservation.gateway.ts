@@ -63,7 +63,7 @@ export class ReservationGateway
 
   // Método para emitir actualizaciones de reservaciones
   emitReservationUpdate(reservation: DetailedReservation) {
-    const clientCount = this.server.sockets.sockets.size;
+    const clientCount = this.server.sockets.sockets?.size || 0;
     this.logger.log(
       `📤 [GATEWAY] Emitiendo actualización de reservación: ${reservation.id}`,
       {
@@ -78,7 +78,7 @@ export class ReservationGateway
 
   // Método para emitir nuevas reservaciones
   emitNewReservation(reservation: DetailedReservation) {
-    const clientCount = this.server.sockets.sockets.size;
+    const clientCount = this.server.sockets.sockets?.size || 0;
     this.logger.log(
       `📤 [GATEWAY] Emitiendo nueva reservación: ${reservation.id}`,
       {
@@ -93,7 +93,7 @@ export class ReservationGateway
 
   // Método para emitir cuando una reservación es eliminada
   emitReservationDeleted(reservationId: string) {
-    const clientCount = this.server.sockets.sockets.size;
+    const clientCount = this.server.sockets.sockets?.size || 0;
     this.logger.log(
       `📤 [GATEWAY] Emitiendo eliminación de reservación: ${reservationId}`,
       {
@@ -108,7 +108,7 @@ export class ReservationGateway
 
   // Método para emitir cuando cambia la disponibilidad de habitaciones
   emitAvailabilityChange(checkInDate: string, checkOutDate: string) {
-    const clientCount = this.server.sockets.sockets.size;
+    const clientCount = this.server.sockets.sockets?.size || 0;
     this.logger.log(
       `📤 [GATEWAY] Emitiendo cambio de disponibilidad para el período: ${checkInDate} - ${checkOutDate}`,
       {
