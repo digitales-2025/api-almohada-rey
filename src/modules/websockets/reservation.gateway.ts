@@ -25,7 +25,7 @@ import { ReservationService } from '../admin/reservation/reservation.service';
       'Authorization',
     ],
   },
-  namespace: '/api/websocket/reservations',
+  namespace: '/reservations',
   path: '/socket.io',
 })
 export class ReservationGateway
@@ -42,37 +42,82 @@ export class ReservationGateway
   ) {}
 
   handleConnection(client: Socket) {
-    this.logger.log(`Cliente conectado: ${client.id}`);
+    this.logger.log(`✅ [GATEWAY] Cliente conectado: ${client.id}`, {
+      socketId: client.id,
+      namespace: client.nsp.name,
+      transport: client.conn.transport.name,
+      remoteAddress: client.handshake.address,
+      userAgent: client.handshake.headers['user-agent'],
+      origin: client.handshake.headers.origin,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   handleDisconnect(client: Socket) {
-    this.logger.log(`Cliente desconectado: ${client.id}`);
+    this.logger.log(`❌ [GATEWAY] Cliente desconectado: ${client.id}`, {
+      socketId: client.id,
+      namespace: client.nsp.name,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   // Método para emitir actualizaciones de reservaciones
   emitReservationUpdate(reservation: DetailedReservation) {
+    const clientCount = this.server.sockets.sockets.size;
     this.logger.log(
-      `Emitiendo actualización de reservación: ${reservation.id}`,
+      `📤 [GATEWAY] Emitiendo actualización de reservación: ${reservation.id}`,
+      {
+        reservationId: reservation.id,
+        event: 'reservationUpdated',
+        connectedClients: clientCount,
+        timestamp: new Date().toISOString(),
+      },
     );
     this.server.emit('reservationUpdated', reservation);
   }
 
   // Método para emitir nuevas reservaciones
   emitNewReservation(reservation: DetailedReservation) {
-    this.logger.log(`Emitiendo nueva reservación: ${reservation.id}`);
+    const clientCount = this.server.sockets.sockets.size;
+    this.logger.log(
+      `📤 [GATEWAY] Emitiendo nueva reservación: ${reservation.id}`,
+      {
+        reservationId: reservation.id,
+        event: 'newReservation',
+        connectedClients: clientCount,
+        timestamp: new Date().toISOString(),
+      },
+    );
     this.server.emit('newReservation', reservation);
   }
 
   // Método para emitir cuando una reservación es eliminada
   emitReservationDeleted(reservationId: string) {
-    this.logger.log(`Emitiendo eliminación de reservación: ${reservationId}`);
+    const clientCount = this.server.sockets.sockets.size;
+    this.logger.log(
+      `📤 [GATEWAY] Emitiendo eliminación de reservación: ${reservationId}`,
+      {
+        reservationId,
+        event: 'reservationDeleted',
+        connectedClients: clientCount,
+        timestamp: new Date().toISOString(),
+      },
+    );
     this.server.emit('reservationDeleted', { id: reservationId });
   }
 
   // Método para emitir cuando cambia la disponibilidad de habitaciones
   emitAvailabilityChange(checkInDate: string, checkOutDate: string) {
+    const clientCount = this.server.sockets.sockets.size;
     this.logger.log(
-      `Emitiendo cambio de disponibilidad para el período: ${checkInDate} - ${checkOutDate}`,
+      `📤 [GATEWAY] Emitiendo cambio de disponibilidad para el período: ${checkInDate} - ${checkOutDate}`,
+      {
+        checkInDate,
+        checkOutDate,
+        event: 'availabilityChanged',
+        connectedClients: clientCount,
+        timestamp: new Date().toISOString(),
+      },
     );
     this.server.emit('availabilityChanged', { checkInDate, checkOutDate });
   }
@@ -146,7 +191,13 @@ export class ReservationGateway
     payload: { checkInDate: string; checkOutDate: string },
   ) {
     this.logger.log(
-      `Cliente ${client.id} solicitó reservaciones en intervalo: ${payload.checkInDate} - ${payload.checkOutDate}`,
+      `📥 [GATEWAY] Cliente ${client.id} solicitó reservaciones en intervalo: ${payload.checkInDate} - ${payload.checkOutDate}`,
+      {
+        clientId: client.id,
+        checkInDate: payload.checkInDate,
+        checkOutDate: payload.checkOutDate,
+        timestamp: new Date().toISOString(),
+      },
     );
 
     try {
