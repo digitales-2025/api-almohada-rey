@@ -25,7 +25,8 @@ import { ReservationService } from '../admin/reservation/reservation.service';
       'Authorization',
     ],
   },
-  namespace: 'reservations',
+  namespace: '/api/websocket/reservations',
+  path: '/socket.io',
 })
 export class ReservationGateway
   implements OnGatewayConnection, OnGatewayDisconnect
