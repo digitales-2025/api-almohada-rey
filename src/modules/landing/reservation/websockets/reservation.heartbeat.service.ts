@@ -132,6 +132,11 @@ export class HeartbeatService {
     reservationId: string | undefined,
     locale: SupportedLocales | undefined,
   ): void {
+    Logger.log(
+      `Registrando cliente ${socket.id} en heartbeat service${reservationId ? ` para reserva ${reservationId}` : ' (sin reserva)'}`,
+      'HeartbeatService',
+    );
+
     // Guardar el cliente
     this.clients.set(socket.id, {
       socket,
@@ -146,12 +151,25 @@ export class HeartbeatService {
 
     // Enviar primer ping inmediatamente
     socket.emit(sendingEvents.ping);
+    Logger.log(
+      `Ping inicial enviado a cliente ${socket.id}`,
+      'HeartbeatService',
+    );
   }
 
   updateClientPing(clientId: string): void {
     const client = this.clients.get(clientId);
     if (client) {
       client.lastPing = Date.now();
+      Logger.log(
+        `Pong recibido de cliente ${clientId}${client.reservationId ? ` (reserva: ${client.reservationId})` : ''}`,
+        'HeartbeatService',
+      );
+    } else {
+      Logger.warn(
+        `Intento de actualizar ping para cliente desconocido: ${clientId}`,
+        'HeartbeatService',
+      );
     }
   }
 
