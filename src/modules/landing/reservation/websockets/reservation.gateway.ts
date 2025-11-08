@@ -62,9 +62,21 @@ export class ReservationGateway
       const reservationId = client.handshake.query.reservationId as string;
       const locale = client.handshake.query.locale as SupportedLocales;
 
+      Logger.log(`Cliente ${client.id} - Query params:`, {
+        query: client.handshake.query,
+        reservationId: reservationId || 'UNDEFINED/EMPTY',
+        locale: locale || 'UNDEFINED',
+        namespace: client.nsp.name,
+        origin: client.handshake.headers.origin,
+      });
+
       if (!reservationId) {
-        // Añadir cliente sin reservationId
-        this.heartbeatService.addClient(client, undefined, undefined);
+        // Los clientes sin reservationId (como admin) no necesitan heartbeat
+        // Solo los registramos para que puedan recibir broadcasts
+        Logger.log(
+          `Cliente ${client.id} conectado sin reserva - NO se registra en heartbeat`,
+          'ReservationGateway',
+        );
         return;
       }
 
@@ -105,9 +117,17 @@ export class ReservationGateway
 
       // Configurar evento para manejar pongs
       const pongListener = () => {
+        Logger.log(
+          `Pong recibido de cliente ${client.id} (reserva: ${reservationId})`,
+          'ReservationGateway',
+        );
         this.heartbeatService.updateClientPing(client.id);
       };
       client.on(listeningEvents.pong, pongListener);
+      Logger.log(
+        `Listener de pong registrado para cliente ${client.id}`,
+        'ReservationGateway',
+      );
 
       // Limpiar el listener al desconectar
       client.once('disconnect', () => {
