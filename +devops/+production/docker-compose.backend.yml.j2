@@ -16,7 +16,20 @@ services:
       - {{ project_name }}-network-{{ project_stage}}
     labels:
       - "traefik.enable=true"
+
+      - "traefik.http.routers.{{ project_name }}-backend-ws.rule=Host(`api.hotellaalmohadadelrey.com`) && PathPrefix(`/socket.io`)"
+      - "traefik.http.routers.{{ project_name }}-backend-ws.priority=45"
+      - "traefik.http.routers.{{ project_name }}-backend-ws.service={{ project_name }}-backend-{{ project_stage }}"
+      - "traefik.http.routers.{{ project_name }}-backend-ws.entrypoints=websecure"
+      - "traefik.http.routers.{{ project_name }}-backend-ws.tls=true"
+      - "traefik.http.routers.{{ project_name }}-backend-ws.tls.certresolver=dns-cloudflare"
+      - "traefik.http.routers.{{ project_name }}-backend-ws.tls.domains[0].main=hotellaalmohadadelrey.com"
+      - "traefik.http.routers.{{ project_name }}-backend-ws.tls.domains[0].sans=*.hotellaalmohadadelrey.com"
+      - "traefik.http.services.{{ project_name }}-backend-ws.loadbalancer.server.port=5000"
+
       - "traefik.http.routers.{{ project_name }}-backend-{{ project_stage}}.rule=Host(`api.hotellaalmohadadelrey.com`)"
+      - "traefik.http.routers.{{ project_name }}-backend-{{ project_stage}}.priority=44"
+      - "traefik.http.routers.{{ project_name }}-backend-{{ project_stage}}.service={{ project_name }}-backend-{{ project_stage }}"
       - "traefik.http.routers.{{ project_name }}-backend-{{ project_stage}}.entrypoints=websecure"
       - "traefik.http.routers.{{ project_name }}-backend-{{ project_stage}}.tls=true"
       - "traefik.http.routers.{{ project_name }}-backend-{{ project_stage}}.tls.certresolver=dns-cloudflare"
