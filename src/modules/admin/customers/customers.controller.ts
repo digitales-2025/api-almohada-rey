@@ -45,6 +45,7 @@ import { ReservationStatus } from '@prisma/client';
 import { ImportCustomersDto } from './dto/import-customers.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedResponse.dto';
+import { ToggleBlacklistDto } from './dto/toggle-blacklist.dto';
 
 @ApiTags('Admin Customers')
 @ApiUnauthorizedResponse({ description: 'Unauthorized' })
@@ -409,6 +410,19 @@ export class CustomersController {
     @GetUser() user: UserData,
   ): Promise<HttpResponse<CustomerData>> {
     return this.customersService.update(id, updateCustomerDto, user);
+  }
+
+  @ApiOkResponse({
+    description: 'Customer blacklist status updated successfully',
+  })
+  @ApiOperation({ summary: 'Toggle blacklist status of a customer by id' })
+  @Patch(':id/blacklist')
+  toggleBlacklist(
+    @Param('id') id: string,
+    @Body() toggleBlacklistDto: ToggleBlacklistDto,
+    @GetUser() user: UserData,
+  ): Promise<HttpResponse<CustomerData>> {
+    return this.customersService.toggleBlacklist(id, toggleBlacklistDto, user);
   }
 
   @ApiOkResponse({ description: 'Customers deactivated successfully' })
