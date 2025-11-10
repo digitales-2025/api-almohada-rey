@@ -41,6 +41,7 @@ import { PaginatedResponse } from 'src/utils/paginated-response/PaginatedRespons
 import { lastValueFrom } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
 import * as cheerio from 'cheerio';
+import { ToggleBlacklistDto } from './dto/toggle-blacklist.dto';
 
 @Injectable()
 export class CustomersService {
@@ -571,7 +572,10 @@ export class CustomersService {
         ...filterOptions,
       };
 
-      return await this.paginationService.paginateAdvanced<any, CustomerData>({
+      const paginatedResult = await this.paginationService.paginateAdvanced<
+        any,
+        any
+      >({
         model: 'customer',
         page,
         pageSize,
@@ -605,10 +609,62 @@ export class CustomersService {
           blacklistReason: true,
           blacklistDate: true,
           blacklistedById: true,
+          blacklistedBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
           createdByLandingPage: true,
           mustCompleteData: true,
-        },
-        transformer: (customer) => ({
+        } as any,
+        transformer: (customer: any) => customer,
+        filterOptions: combinedFilterOptions,
+        sortOptions,
+        enumFields,
+        dateFields,
+      });
+
+      // Cargar blacklistedBy manualmente para los clientes que lo necesiten
+      const customerIdsWithBlacklist = paginatedResult.data
+        .filter((c: any) => c.blacklistedById && !c.blacklistedBy)
+        .map((c: any) => ({ id: c.id, blacklistedById: c.blacklistedById }));
+
+      if (customerIdsWithBlacklist.length > 0) {
+        const userIds = [
+          ...new Set(
+            customerIdsWithBlacklist.map((c: any) => c.blacklistedById),
+          ),
+        ];
+
+        const users = await this.prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, name: true, email: true },
+        });
+
+        const usersMap = new Map(users.map((u) => [u.id, u]));
+
+        // Agregar blacklistedBy a los clientes que lo necesiten
+        paginatedResult.data = paginatedResult.data.map((customer: any) => {
+          if (customer.blacklistedById && !customer.blacklistedBy) {
+            const user = usersMap.get(customer.blacklistedById);
+            if (user) {
+              customer.blacklistedBy = {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+              };
+            }
+          }
+          return customer;
+        });
+      }
+
+      // Transformar los resultados al formato final
+      return {
+        ...paginatedResult,
+        data: paginatedResult.data.map((customer: any) => ({
           id: customer.id,
           name: customer.name,
           address: customer.address,
@@ -639,14 +695,17 @@ export class CustomersService {
           ...(customer.blacklistedById && {
             blacklistedById: customer.blacklistedById,
           }),
+          ...(customer.blacklistedBy && {
+            blacklistedBy: {
+              id: customer.blacklistedBy.id,
+              name: customer.blacklistedBy.name,
+              email: customer.blacklistedBy.email,
+            },
+          }),
           createdByLandingPage: customer.createdByLandingPage,
           mustCompleteData: customer.mustCompleteData,
-        }),
-        filterOptions: combinedFilterOptions,
-        sortOptions,
-        enumFields,
-        dateFields,
-      });
+        })),
+      };
     } catch (error) {
       this.logger.error('Error getting paginated customers', error.stack);
       handleException(error, 'Error getting paginated customers');
@@ -968,6 +1027,150 @@ export class CustomersService {
       this.errorHandler.handleError(error, 'getting');
     }
   }
+  /**
+   * Cambiar el estado de blacklist de un cliente
+   * @param id Id del cliente
+   * @param toggleBlacklistDto Datos del blacklist
+   * @param user Usuario que realiza la acción
+   * @returns Cliente actualizado
+   */
+  async toggleBlacklist(
+    id: string,
+    toggleBlacklistDto: ToggleBlacklistDto,
+    user: UserData,
+  ): Promise<HttpResponse<CustomerData>> {
+    try {
+      // Validar que el cliente existe y está activo
+      await this.findById(id);
+
+      // Preparar los datos de actualización según el estado del blacklist
+      const updateData: any = {};
+
+      if (toggleBlacklistDto.isBlacklist === true) {
+        // Agregar a blacklist: requiere fecha y razón
+        if (
+          !toggleBlacklistDto.blacklistReason ||
+          !toggleBlacklistDto.blacklistDate
+        ) {
+          throw new BadRequestException(
+            'Para agregar un cliente a la lista negra, es necesario proporcionar la razón y la fecha del blacklist',
+          );
+        }
+
+        updateData.isBlacklist = true;
+        updateData.blacklistReason = toggleBlacklistDto.blacklistReason.trim();
+        updateData.blacklistDate = new Date(toggleBlacklistDto.blacklistDate);
+        updateData.blacklistedById = user.id;
+      } else {
+        // Quitar de blacklist: solo poner false y limpiar los campos relacionados
+        updateData.isBlacklist = false;
+        updateData.blacklistReason = null;
+        updateData.blacklistDate = null;
+        updateData.blacklistedById = null;
+      }
+
+      // Transacción para realizar la actualización
+      const updatedCustomer = await this.prisma.$transaction(async (prisma) => {
+        const customer = await prisma.customer.update({
+          where: { id },
+          data: updateData,
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            birthPlace: true,
+            birthDate: true,
+            country: true,
+            documentNumber: true,
+            documentType: true,
+            email: true,
+            maritalStatus: true,
+            occupation: true,
+            phone: true,
+            ruc: true,
+            companyAddress: true,
+            companyName: true,
+            department: true,
+            province: true,
+            isActive: true,
+            isBlacklist: true,
+            blacklistReason: true,
+            blacklistDate: true,
+            blacklistedById: true,
+            createdByLandingPage: true,
+            mustCompleteData: true,
+          },
+        });
+
+        // Crear un registro de auditoría
+        await this.audit.create({
+          entityId: customer.id,
+          entityType: 'customer',
+          action: AuditActionType.UPDATE_STATUS,
+          performedById: user.id,
+          createdAt: new Date(),
+        });
+
+        return customer;
+      });
+
+      return {
+        statusCode: HttpStatus.OK,
+        message: toggleBlacklistDto.isBlacklist
+          ? 'Cliente agregado a la lista negra correctamente'
+          : 'Cliente removido de la lista negra correctamente',
+        data: {
+          ...updatedCustomer,
+          ...(updatedCustomer.ruc && {
+            ruc: updatedCustomer.ruc,
+            companyAddress: updatedCustomer.companyAddress,
+            companyName: updatedCustomer.companyName,
+          }),
+          ...(updatedCustomer.email && { email: updatedCustomer.email }),
+          ...(updatedCustomer.birthDate && {
+            birthDate: updatedCustomer.birthDate,
+          }),
+          ...(updatedCustomer.department && {
+            department: updatedCustomer.department,
+          }),
+          ...(updatedCustomer.province && {
+            province: updatedCustomer.province,
+          }),
+          isActive: updatedCustomer.isActive,
+          isBlacklist: updatedCustomer.isBlacklist,
+          ...(updatedCustomer.blacklistReason && {
+            blacklistReason: updatedCustomer.blacklistReason,
+          }),
+          ...(updatedCustomer.blacklistDate && {
+            blacklistDate: updatedCustomer.blacklistDate,
+          }),
+          ...(updatedCustomer.blacklistedById && {
+            blacklistedById: updatedCustomer.blacklistedById,
+          }),
+          createdByLandingPage: updatedCustomer.createdByLandingPage,
+          mustCompleteData: updatedCustomer.mustCompleteData,
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error al cambiar el estado de blacklist del cliente: ${error.message}`,
+        error.stack,
+      );
+
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+
+      handleException(
+        error,
+        'Error al cambiar el estado de blacklist del cliente',
+      );
+    }
+  }
+
   /**
    * Actualizar un cliente
    * @param id Id del cliente

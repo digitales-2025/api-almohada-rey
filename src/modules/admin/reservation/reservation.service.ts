@@ -451,16 +451,28 @@ export class ReservationService {
             },
           },
           user: true,
-          customer: true,
+          customer: {
+            include: {
+              blacklistedBy: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                },
+              },
+            },
+          },
         },
       };
 
       // Usar el método avanzado del repository
+      // Prisma cargará automáticamente blacklistedBy con el include configurado
       const result =
         await this.reservationRepository.findManyPaginated<DetailedReservation>(
           pagination,
           repositoryParams,
         );
+
       return result;
     } catch (error) {
       this.errorHandler.handleError(error, 'getting');
