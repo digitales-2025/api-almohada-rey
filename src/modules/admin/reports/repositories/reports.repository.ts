@@ -540,8 +540,8 @@ export class ReportsRepository {
       const roomTypeName = reservation.room.RoomTypes.name;
       const roomNumber = reservation.room.number;
       const capacity = reservation.room.RoomTypes.guests;
-      const country = reservation.customer.country || 'No especificado';
-      const department = reservation.customer.department;
+      const country = reservation.customer?.country || 'No especificado';
+      const department = reservation.customer?.department || null;
 
       // Inicializar entrada si no existe para el tipo de habitación
       if (!statsByRoomType[roomTypeId]) {
