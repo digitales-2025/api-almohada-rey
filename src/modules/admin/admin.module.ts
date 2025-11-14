@@ -14,6 +14,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { CustomersModule } from './customers/customers.module';
 import { RucModule } from './ruc/ruc.module';
 import { CustomerReservationHistoryModule } from './customer-reservation-history/customer-reservation-history.module';
+import { AdicionalesModule } from './adicionales/adicionales.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { CustomerReservationHistoryModule } from './customer-reservation-history
     CustomersModule,
     RucModule,
     CustomerReservationHistoryModule,
+    AdicionalesModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],
